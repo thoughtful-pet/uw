@@ -1,0 +1,455 @@
+#include <string.h>
+
+#include "uw_value.h"
+
+// capacity must be power of two, it doubles when map needs to grow
+#define UWMAP_INITIAL_CAPACITY  8  // must be power of two
+
+/*
+ * optimized methods for acessing hash table
+ */
+#define HT_ITEM_METHODS(typename) \
+    static size_t get_ht_item_##typename(struct __UwHashTable* ht, size_t index) \
+    { \
+        return ((typename*) (ht->items))[index]; \
+    } \
+    static void set_ht_item_##typename(struct __UwHashTable* ht, size_t index, size_t value) \
+    { \
+        ((typename*) (ht->items))[index] = (typename) value; \
+    }
+
+HT_ITEM_METHODS(uint8_t)
+HT_ITEM_METHODS(uint16_t)
+HT_ITEM_METHODS(uint32_t)
+HT_ITEM_METHODS(uint64_t)
+
+/*
+ * methods for acessing hash table with any item size
+ */
+static size_t get_ht_item(struct __UwHashTable* ht, size_t index)
+{
+    uint8_t *item_ptr = &ht->items[index * ht->item_size];
+    size_t result = 0;
+    for (uint8_t i = ht->item_size; i > 0; i--) {
+        result <<= 8;
+        result += *item_ptr++;
+    }
+    return result;
+}
+
+static void set_ht_item(struct __UwHashTable* ht, size_t index, size_t value)
+{
+    uint8_t *item_ptr = &ht->items[(index + 1) * ht->item_size];
+    for (uint8_t i = ht->item_size; i > 0; i--) {
+        *(--item_ptr) = (uint8_t) value;
+        value >>= 8;
+    }
+}
+
+static uint8_t get_item_size(size_t capacity)
+/*
+ * Return hash table item size for desired capacity.
+ *
+ * Index 0 in hash table means no item, so one byte is capable
+ * to index 255 items, not 256.
+ */
+{
+    uint8_t item_size = 1;
+
+    for (size_t n = capacity; n > 255; n >>= 8) {
+        item_size++;
+    }
+    return item_size;
+}
+
+/*
+ * Notes on indexes and naming conventions.
+ *
+ * In hash map we store indexes of key-value pair (named `kv_index`),
+ * not the index in kv_pairs list.
+ *
+ * key_index is the index of key in kv_pais list, suitable for passing to uw_list_get.
+ *
+ * So,
+ *
+ * value_index = key_index + 1
+ * kv_index = key_index / 2
+ */
+
+static _UwMap* allocate_map(size_t capacity)
+/*
+ * Create internal map structure for UwValue.map_value
+ *
+ * This function does not allocate kv_pairs because when
+ * hash table is resized, which means allocating new map,
+ * an existing kv_pairs will be used.
+ */
+{
+    size_t item_size = get_item_size(capacity);
+    _UwMap* map = malloc(sizeof(_UwMap) + item_size * capacity);
+    if (!map) {
+        perror(__func__);
+        exit(1);
+    }
+
+    _UwHashTable* ht = &map->hash_table;
+
+    ht->item_size = item_size;
+    ht->hash_bitmask = capacity - 1;
+    ht->items_used = 0;
+    ht->capacity = capacity;
+
+    memset(ht->items, 0,  item_size * capacity);
+
+    switch (item_size) {
+        case 1:
+            ht->get_item = get_ht_item_uint8_t;
+            ht->set_item = set_ht_item_uint8_t;
+            break;
+        case 2:
+            ht->get_item = get_ht_item_uint16_t;
+            ht->set_item = set_ht_item_uint16_t;
+            break;
+        case 4:
+            ht->get_item = get_ht_item_uint32_t;
+            ht->set_item = set_ht_item_uint32_t;
+            break;
+        case 8:
+            ht->get_item = get_ht_item_uint64_t;
+            ht->set_item = set_ht_item_uint64_t;
+            break;
+        default:
+            ht->get_item = get_ht_item;
+            ht->set_item = set_ht_item;
+            break;
+    }
+    return map;
+}
+
+UwValuePtr uw_create_map()
+{
+    UwValuePtr value = _uw_alloc_value();
+    value->type_id = UwTypeId_Map;
+    value->map_value = allocate_map(UWMAP_INITIAL_CAPACITY);
+    value->map_value->kv_pairs = _uw_alloc_list(UWMAP_INITIAL_CAPACITY * 2);
+    return value;
+}
+
+void _uw_delete_map(_UwMap* map)
+{
+    _uw_delete_list(map->kv_pairs);
+    free(map);
+}
+
+int _uw_map_cmp(_UwMap* a, _UwMap* b)
+{
+    if (a == b) {
+        // compare with self
+        return UW_EQ;
+    }
+    return _uw_list_cmp(a->kv_pairs, b->kv_pairs);
+}
+
+bool _uw_map_eq(_UwMap* a, _UwMap* b)
+{
+    if (a == b) {
+        // compare with self
+        return true;
+    }
+    return _uw_list_eq(a->kv_pairs, b->kv_pairs);
+}
+
+static UwType_Hash lookup(_UwMap* map, UwType_Hash ht_index, UwValuePtr key,
+                           size_t* key_index, size_t* ht_offset)
+/*
+ * Lookup key starting from `ht_index`.
+ *
+ * Return index of hash table item where lookup has stopped.
+ *
+ * Write index of key in kv_pairs to `key_index` or SIZE_MAX if hash table has no item matching `key`.
+ * Write the difference from final `ht_index` and initial `ht_index` to `ht_offset`;
+ */
+{
+    _UwHashTable* hash_table = &map->hash_table;
+    UwType_Hash key_hash = key->hash;
+    size_t offset = 0;
+
+    do {
+        size_t kv_index = hash_table->get_item(hash_table, ht_index);
+
+        if (kv_index == 0) {
+            // no entry matching key
+            *key_index = SIZE_MAX;
+            *ht_offset = offset;
+            return ht_index;
+        }
+
+        // make index 0-based
+        kv_index--;
+
+        UwValuePtr k = *_uw_list_item_ref(map->kv_pairs, kv_index * 2);
+
+        // compare keys
+        if (k->hash == key_hash) {
+            if (uw_equal(k, key)) {
+                // found key
+                *key_index = kv_index * 2;
+                *ht_offset = offset;
+                return ht_index;
+            }
+        }
+
+        // probe next item
+        ht_index = (ht_index + 1) & hash_table->hash_bitmask;
+        offset++;
+
+    } while (true);
+}
+
+static void set_hash_table_item(_UwHashTable* hash_table, UwType_Hash ht_index, size_t kv_index)
+/*
+ * Assign `kv_index` to `hash_table` at position `ht_index` & hash_bitmask.
+ * If the position is already occupied, try next one.
+ */
+{
+    do {
+        ht_index &= hash_table->hash_bitmask;
+        if (hash_table->get_item(hash_table, ht_index)) {
+            ht_index++;
+        } else {
+            hash_table->set_item(hash_table, ht_index, kv_index);
+            return;
+        }
+    } while (true);
+}
+
+static inline _UwMap* double_hash_table(_UwMap* map)
+/*
+ * Helper functtion for uw_map_update.
+ *
+ * Double the capacity of map's hash table and rebuild it.
+ * The hash table is embedded into map structure, so re-allocate entire map.
+ */
+{
+    _UwMap* new_map = allocate_map(map->hash_table.capacity * 2);
+    new_map->kv_pairs = map->kv_pairs;
+    new_map->hash_table.items_used = map->hash_table.items_used;
+
+    _UwHashTable* hash_table = &new_map->hash_table;
+
+    // rebuild hash table
+    UwValueRef key = _uw_list_item_ref(new_map->kv_pairs, 0);
+    size_t kv_index = 0;
+    size_t n = _uw_list_length(new_map->kv_pairs);
+    uw_assert((n & 1) == 0);
+    while (n) {
+        set_hash_table_item(hash_table, (*key)->hash, kv_index);
+        key += 2;
+        n -= 2;
+        kv_index++;
+    }
+
+    // dispose old map
+    free(map);
+
+    return new_map;
+}
+
+static void update_map(UwValuePtr map, UwValueRef key, UwValueRef value)
+{
+    _UwMap* m = map->map_value;
+
+    // calculate key hash and store it in `key`
+    UwType_Hash key_hash = uw_hash(*key);
+    (*key)->hash = key_hash;
+
+    _UwHashTable* hash_table = &m->hash_table;
+
+    // lookup key in the map
+
+    UwType_Hash ht_index = key_hash & hash_table->hash_bitmask;
+    size_t ht_offset;
+    size_t key_index;
+    ht_index = lookup(m, ht_index, *key, &key_index, &ht_offset);
+
+    if (key_index != SIZE_MAX) {
+        // found key, update value
+
+        size_t value_index = key_index + 1;
+        UwValueRef v = _uw_list_item_ref(m->kv_pairs, value_index);
+
+        // update only if value is different
+        if (*v != *value) {
+            uw_move(v, value);
+        }
+        return;
+    }
+
+    // key not found, insert
+
+    UwValuePtr key_copy;
+
+    if (*key == *value) {
+        // make copy of key, although in some cases it can take more memory than value
+        key_copy = uw_copy(*key);
+        key_copy->hash = key_hash;
+        key = &key_copy;
+    }
+
+    size_t quarter_cap = hash_table->capacity / 4;
+    if (ht_offset > quarter_cap || (hash_table->capacity - hash_table->items_used) < quarter_cap) {
+
+        // too long lookup and too few space left --> resize!
+
+        m = double_hash_table(m);
+
+        // update changed stuff
+        map->map_value = m;
+        hash_table = &m->hash_table;
+        ht_index = key_hash & hash_table->hash_bitmask;
+    }
+
+    size_t kv_index = _uw_list_length(m->kv_pairs) / 2;
+
+    _uw_list_append(&m->kv_pairs, key);
+    _uw_list_append(&m->kv_pairs, value);
+
+    set_hash_table_item(hash_table, key_hash, kv_index + 1);
+
+    hash_table->items_used++;
+}
+
+void uw_map_update(UwValuePtr map, UwValueRef key, UwValueRef value)
+{
+    uw_assert_map(map);
+    uw_assert(*key != map);
+    uw_assert(*value != map);
+
+    update_map(map, key, value);
+}
+
+bool uw_map_has_key(UwValuePtr map, UwValuePtr key)
+{
+    uw_assert_map(map);
+
+    // calculate key hash and store it in `key` for lookup
+    UwType_Hash key_hash = uw_hash(key);
+    key->hash = key_hash;
+
+    _UwMap* m = map->map_value;
+    _UwHashTable* hash_table = &m->hash_table;
+
+    // lookup key in the map
+
+    UwType_Hash ht_index = key_hash & hash_table->hash_bitmask;
+    size_t ht_offset;
+    size_t key_index;
+    ht_index = lookup(m, ht_index, key, &key_index, &ht_offset);
+
+    return key_index != SIZE_MAX;
+}
+
+UwValuePtr uw_map_get(UwValuePtr map, UwValuePtr key)
+{
+    uw_assert_map(map);
+
+    // calculate key hash and store it in `key` for lookup
+    UwType_Hash key_hash = uw_hash(key);
+    key->hash = key_hash;
+
+    _UwMap* m = map->map_value;
+    _UwHashTable* hash_table = &m->hash_table;
+
+    // lookup key in the map
+
+    UwType_Hash ht_index = key_hash & hash_table->hash_bitmask;
+    size_t ht_offset;
+    size_t key_index;
+    ht_index = lookup(m, ht_index, key, &key_index, &ht_offset);
+
+    if (key_index == SIZE_MAX) {
+        // key not found
+        return nullptr;
+    }
+
+    // return value
+    size_t value_index = key_index + 1;
+    return *_uw_list_item_ref(m->kv_pairs, value_index);
+}
+
+bool uw_map_item(UwValuePtr map, size_t index, UwValuePtr* key, UwValuePtr* value)
+{
+    uw_assert_map(map);
+
+    _UwMap* m = map->map_value;
+
+    index <<= 1;
+
+    if (index < _uw_list_length(m->kv_pairs)) {
+        *key = *_uw_list_item_ref(m->kv_pairs, index);
+        *value = *_uw_list_item_ref(m->kv_pairs, index + 1);
+        return true;
+    } else {
+        *key = nullptr;
+        *value = nullptr;
+        return false;
+    }
+}
+
+UwValuePtr _uw_copy_map(_UwMap* map)
+{
+    size_t length = _uw_list_length(map->kv_pairs) / 2;
+
+    // find nearest power of two for hash table capacity
+    size_t ht_capacity = UWMAP_INITIAL_CAPACITY;
+    while (ht_capacity < length) {
+        ht_capacity <<= 1;
+    }
+
+    length *= 2;
+
+    UwValuePtr new_map = _uw_alloc_value();
+    new_map->type_id = UwTypeId_Map;
+    new_map->map_value = allocate_map(ht_capacity);
+    new_map->map_value->kv_pairs = _uw_alloc_list(length);
+
+    // deep copy
+    for (size_t i = 0; i < length;) {
+        UwValuePtr key = uw_copy(map->kv_pairs->items[i++]);
+        UwValuePtr value = uw_copy(map->kv_pairs->items[i++]);
+        update_map(new_map, &key, &value);
+    }
+    return new_map;
+}
+
+#ifdef DEBUG
+
+void _uw_dump_map(_UwMap* map, int indent)
+{
+    // continue current line
+    printf("%zu key+values, capacity=%zu\n", map->kv_pairs->length, map->kv_pairs->capacity);
+
+    indent += 4;
+    for (size_t i = 0; i < map->kv_pairs->length; i++) {
+        char label[64];
+        sprintf(label, "Key (hash: %llx): ", (unsigned long long) map->kv_pairs->items[i]->hash);
+        _uw_dump_value(map->kv_pairs->items[i], indent, label);
+        i++;
+        sprintf(label, "Value: ");
+        _uw_dump_value(map->kv_pairs->items[i], indent, label);
+    }
+
+    _uw_print_indent(indent);
+
+    _UwHashTable* ht = &map->hash_table;
+    printf("hash table item size %u, items_used=%zu, capacity=%zu (bitmask %llx)\n",
+           ht->item_size, ht->items_used, ht->capacity, (unsigned long long) ht->hash_bitmask);
+
+    for (size_t i = 0; i < ht->capacity; i++ ) {
+        size_t kv_index = ht->get_item(ht, i);
+        _uw_print_indent(indent);
+        printf("%zx: %zu\n", i, kv_index);
+    }
+}
+
+#endif
