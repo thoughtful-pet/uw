@@ -50,11 +50,21 @@ extern "C" {
  */
 
 #define uw_ptr(var) \
-    ({ typeof(var) tmp = (var); (var) = nullptr; tmp; })
+    ({  \
+        typeof(var) tmp = (var);  \
+        (var) = nullptr;  \
+        tmp;  \
+    })
 
 // move one value to another, src and dest must be UwValueRef
 #define uw_move(dest, src) \
-    do { if (*dest) { uw_delete_value(dest); } *(dest) = *(src); *(src) = nullptr; } while (false)
+    ({  \
+        if (*dest) {  \
+            uw_delete_value(dest);  \
+        }  \
+        *(dest) = *(src);  \
+        *(src) = nullptr;  \
+    })
 
 /****************************************************************
  * Low level hash functions
@@ -195,12 +205,12 @@ typedef CStringPtr* CStringRef;
  */
 
 #define uw_assert(condition) \
-    do {  \
+    ({  \
         if (!(condition)) {  \
             fprintf(stderr, "UW assertion failed at %s:%s:%d: " #condition "\n", __FILE__, __func__, __LINE__);  \
             exit(1);  \
         }  \
-    } while (false)
+    })
 
 #define uw_assert_null(value)    uw_assert(uw_is_null  (value))
 #define uw_assert_bool(value)    uw_assert(uw_is_bool  (value))
@@ -273,7 +283,7 @@ UwValuePtr uw_create_empty_string(size_t capacity, uint8_t char_size);
 #endif
 
 #define uw_create_string(initializer) _Generic((initializer), \
-             char*: _uw_create_string_c,    \
+             char*: _uw_create_string_c,   \
         UwValuePtr: _uw_create_string_uw   \
     )(initializer)
 
@@ -339,25 +349,25 @@ void _uw_list_hash(_UwList* list, UwHashContext* ctx);
  * Full comparison functions.
  * Return one of four constants.
  */
-#define uw_compare(a, b) _Generic((b),      \
-             nullptr_t: _uw_compare_null,      \
-                  bool: _uw_compare_bool,      \
-                  char: _uw_compare_char,      \
-         unsigned char: _uw_compare_uchar,     \
-                 short: _uw_compare_short,     \
-        unsigned short: _uw_compare_ushort,    \
-                   int: _uw_compare_int,       \
-          unsigned int: _uw_compare_uint,      \
-                  long: _uw_compare_long,      \
-         unsigned long: _uw_compare_ulong,     \
-             long long: _uw_compare_longlong,  \
-    unsigned long long: _uw_compare_ulonglong, \
-                 float: _uw_compare_float,     \
-                double: _uw_compare_double,    \
-                 char*: _uw_compare_u8_wrapper,  \
-              char8_t*: _uw_compare_u8,        \
-             char32_t*: _uw_compare_u32,       \
-            UwValuePtr: _uw_compare_uw        \
+#define uw_compare(a, b) _Generic((b),          \
+             nullptr_t: _uw_compare_null,       \
+                  bool: _uw_compare_bool,       \
+                  char: _uw_compare_char,       \
+         unsigned char: _uw_compare_uchar,      \
+                 short: _uw_compare_short,      \
+        unsigned short: _uw_compare_ushort,     \
+                   int: _uw_compare_int,        \
+          unsigned int: _uw_compare_uint,       \
+                  long: _uw_compare_long,       \
+         unsigned long: _uw_compare_ulong,      \
+             long long: _uw_compare_longlong,   \
+    unsigned long long: _uw_compare_ulonglong,  \
+                 float: _uw_compare_float,      \
+                double: _uw_compare_double,     \
+                 char*: _uw_compare_u8_wrapper, \
+              char8_t*: _uw_compare_u8,         \
+             char32_t*: _uw_compare_u32,        \
+            UwValuePtr: _uw_compare_uw          \
     )((a), (b))
 
 int _uw_compare_null     (UwValuePtr a, nullptr_t          b);
@@ -378,7 +388,7 @@ int  uw_compare_cstr     (UwValuePtr a, char*              b);
 int _uw_compare_u8_wrapper(UwValuePtr a, char*             b);
 int _uw_compare_u8       (UwValuePtr a, char8_t*           b);
 int _uw_compare_u32      (UwValuePtr a, char32_t*          b);
-int _uw_compare_uw       (UwValuePtr a, UwValuePtr        b);
+int _uw_compare_uw       (UwValuePtr a, UwValuePtr         b);
 
 int _uw_string_cmp(_UwString* a, _UwString* b);
 int _uw_list_cmp(_UwList* a, _UwList* b);
@@ -405,7 +415,7 @@ int _uw_map_cmp(_UwMap* a, _UwMap* b);
                  char*: _uw_equal_u8_wrapper, \
               char8_t*: _uw_equal_u8,         \
              char32_t*: _uw_equal_u32,        \
-            UwValuePtr: _uw_equal_uw         \
+            UwValuePtr: _uw_equal_uw          \
     )((a), (b))
 
 bool _uw_equal_null      (UwValuePtr a, nullptr_t          b);
@@ -426,7 +436,7 @@ bool  uw_equal_cstr      (UwValuePtr a, char*              b);  // can't be used
 bool _uw_equal_u8_wrapper(UwValuePtr a, char*              b);
 bool _uw_equal_u8        (UwValuePtr a, char8_t*           b);
 bool _uw_equal_u32       (UwValuePtr a, char32_t*          b);
-bool _uw_equal_uw        (UwValuePtr a, UwValuePtr        b);
+bool _uw_equal_uw        (UwValuePtr a, UwValuePtr         b);
 
 bool _uw_string_eq(_UwString* a, _UwString* b);
 bool _uw_list_eq(_UwList* a, _UwList* b);
@@ -445,11 +455,11 @@ bool _uw_map_eq(_UwMap* a, _UwMap* b);
 void _uw_list_append(_UwList** list_ref, UwValueRef item);
 
 #define uw_list_append(list, item) \
-    do { \
+    ({ \
         uw_assert_list(list);  \
         uw_assert((list) != *(item));  \
         _uw_list_append(&(list)->list_value, (item));  \
-    } while(false)
+    })
 
 #define _uw_list_item_ref(list, index) \
     ({ uw_assert((index) < (list)->length); &(list)->items[(index)]; })
@@ -520,13 +530,13 @@ void uw_string_swap(UwValuePtr a, UwValuePtr b);
 /*
  * Append functions
  */
-#define uw_string_append(dest, src) _Generic((src),  \
-              char32_t: _uw_string_append_c32,   \
-                   int: _uw_string_append_c32,   \
-                 char*: _uw_string_append_u8_wrapper,  \
-              char8_t*: _uw_string_append_u8,    \
-             char32_t*: _uw_string_append_u32,   \
-            UwValuePtr: _uw_string_append_uw    \
+#define uw_string_append(dest, src) _Generic((src),   \
+              char32_t: _uw_string_append_c32,        \
+                   int: _uw_string_append_c32,        \
+                 char*: _uw_string_append_u8_wrapper, \
+              char8_t*: _uw_string_append_u8,         \
+             char32_t*: _uw_string_append_u32,        \
+            UwValuePtr: _uw_string_append_uw          \
     )((dest), (src))
 
 void uw_string_append_char(UwValuePtr dest, char c);  // can't be used in generic
@@ -555,9 +565,9 @@ void _uw_string_insert_many_c32(UwValuePtr str, size_t position, char32_t value,
  */
 #define uw_string_append_substring(dest, src, src_start_pos, src_end_pos) _Generic((src),     \
                  char*: _uw_string_append_substring_u8_wrapper,  \
-              char8_t*: _uw_string_append_substring_u8,    \
-             char32_t*: _uw_string_append_substring_u32,   \
-            UwValuePtr: _uw_string_append_substring_uw    \
+              char8_t*: _uw_string_append_substring_u8,          \
+             char32_t*: _uw_string_append_substring_u32,         \
+            UwValuePtr: _uw_string_append_substring_uw           \
     )((dest), (src), (src_start_pos), (src_end_pos))
 
 void uw_string_append_substring_cstr(UwValuePtr dest, char* src, size_t src_start_pos, size_t src_end_pos);  // can't be used in generic
@@ -585,9 +595,9 @@ UwValuePtr uw_string_get_substring(UwValuePtr str, size_t start_pos, size_t end_
  */
 #define uw_substring_eq(a, start_pos, end_pos, b) _Generic((b), \
              char*: _uw_substring_eq_u8_wrapper,  \
-          char8_t*: _uw_substring_eq_u8,     \
-         char32_t*: _uw_substring_eq_u32,    \
-        UwValuePtr: _uw_substring_eq_uw     \
+          char8_t*: _uw_substring_eq_u8,          \
+         char32_t*: _uw_substring_eq_u32,         \
+        UwValuePtr: _uw_substring_eq_uw           \
     )((a), (start_pos), (end_pos), (b))
 bool uw_substring_eq_cstr(UwValuePtr a, size_t start_pos, size_t end_pos, char* b);  // can't be used in generic
 bool _uw_substring_eq_u8_wrapper(UwValuePtr a, size_t start_pos, size_t end_pos, char* b);
@@ -696,7 +706,7 @@ uint8_t u32_char_size(char32_t* str, size_t max_len);
  * Return true if `c` is an ASCII digit.
  * Do not consider any other unicode digits because this function
  * is used in conjunction with standard C library which does
- * not support uniocode character classification.
+ * not support unicode character classification.
  */
 
 /****************************************************************
