@@ -125,7 +125,11 @@
 /*
  *  Default secret parameters.
  */
-RAPIDHASH_CONSTEXPR uint64_t rapid_secret[3] = {0x2d358dccaa6c78a5ull, 0x8bb84b93962eacc9ull, 0x4b33a62ed433d4a3ull};
+#define RAPID_SECRET_0  0x2d358dccaa6c78a5ull
+#define RAPID_SECRET_1  0x8bb84b93962eacc9ull
+#define RAPID_SECRET_2  0x4b33a62ed433d4a3ull
+
+RAPIDHASH_CONSTEXPR uint64_t rapid_secret[3] = {RAPID_SECRET_0, RAPID_SECRET_1, RAPID_SECRET_2};
 
 /*
  *  64*64 -> 128bit multiply function.
