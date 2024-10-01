@@ -484,15 +484,71 @@ void uw_map_update(UwValuePtr map, UwValueRef key, UwValueRef value);
  * Insert or assign key-value pair using move semantic.
  */
 
-bool uw_map_has_key(UwValuePtr map, UwValuePtr key);
 /*
  * Check `key` is in `map`.
  */
+#define uw_map_has_key(map, key) _Generic((key),    \
+             nullptr_t: _uw_map_has_key_null,       \
+                  bool: _uw_map_has_key_bool,       \
+                  char: _uw_map_has_key_int,        \
+         unsigned char: _uw_map_has_key_int,        \
+                 short: _uw_map_has_key_int,        \
+        unsigned short: _uw_map_has_key_int,        \
+                   int: _uw_map_has_key_int,        \
+          unsigned int: _uw_map_has_key_int,        \
+                  long: _uw_map_has_key_int,        \
+         unsigned long: _uw_map_has_key_int,        \
+             long long: _uw_map_has_key_int,        \
+    unsigned long long: _uw_map_has_key_int,        \
+                 float: _uw_map_has_key_float,      \
+                double: _uw_map_has_key_float,      \
+                 char*: _uw_map_has_key_u8_wrapper, \
+              char8_t*: _uw_map_has_key_u8,         \
+             char32_t*: _uw_map_has_key_u32,        \
+            UwValuePtr: _uw_map_has_key_uw          \
+    )((map), (key))
 
-UwValuePtr uw_map_get(UwValuePtr map, UwValuePtr key);
+bool _uw_map_has_key_null      (UwValuePtr map, UwType_Null key);
+bool _uw_map_has_key_bool      (UwValuePtr map, UwType_Bool key);
+bool _uw_map_has_key_int       (UwValuePtr map, UwType_Int key);
+bool _uw_map_has_key_float     (UwValuePtr map, UwType_Float key);
+bool _uw_map_has_key_u8_wrapper(UwValuePtr map, char* key);
+bool _uw_map_has_key_u8        (UwValuePtr map, char8_t* key);
+bool _uw_map_has_key_u32       (UwValuePtr map, char32_t* key);
+bool _uw_map_has_key_uw        (UwValuePtr map, UwValuePtr key);
+
 /*
  * Get value by `key`. Return nullptr if `key` is not in `map`.
  */
+#define uw_map_get(map, key) _Generic((key),      \
+             nullptr_t: _uw_map_get_null,       \
+                  bool: _uw_map_get_bool,       \
+                  char: _uw_map_get_int,        \
+         unsigned char: _uw_map_get_int,        \
+                 short: _uw_map_get_int,        \
+        unsigned short: _uw_map_get_int,        \
+                   int: _uw_map_get_int,        \
+          unsigned int: _uw_map_get_int,        \
+                  long: _uw_map_get_int,        \
+         unsigned long: _uw_map_get_int,        \
+             long long: _uw_map_get_int,        \
+    unsigned long long: _uw_map_get_int,        \
+                 float: _uw_map_get_float,      \
+                double: _uw_map_get_float,      \
+                 char*: _uw_map_get_u8_wrapper, \
+              char8_t*: _uw_map_get_u8,         \
+             char32_t*: _uw_map_get_u32,        \
+            UwValuePtr: _uw_map_get_uw          \
+    )((map), (key))
+
+UwValuePtr _uw_map_get_null      (UwValuePtr map, UwType_Null key);
+UwValuePtr _uw_map_get_bool      (UwValuePtr map, UwType_Bool key);
+UwValuePtr _uw_map_get_int       (UwValuePtr map, UwType_Int key);
+UwValuePtr _uw_map_get_float     (UwValuePtr map, UwType_Float key);
+UwValuePtr _uw_map_get_u8_wrapper(UwValuePtr map, char* key);
+UwValuePtr _uw_map_get_u8        (UwValuePtr map, char8_t* key);
+UwValuePtr _uw_map_get_u32       (UwValuePtr map, char32_t* key);
+UwValuePtr _uw_map_get_uw        (UwValuePtr map, UwValuePtr key);
 
 #define uw_map_length(map) \
     ({ uw_assert_map(map); _uw_list_length((map)->map_value->kv_pairs) >> 1; })

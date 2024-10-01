@@ -328,7 +328,49 @@ void uw_map_update(UwValuePtr map, UwValueRef key, UwValueRef value)
     update_map(map, key, value);
 }
 
-bool uw_map_has_key(UwValuePtr map, UwValuePtr key)
+bool _uw_map_has_key_null(UwValuePtr map, UwType_Null key)
+{
+    UwValue k = _uw_create_null(nullptr);
+    return _uw_map_has_key_uw(map, k);
+}
+
+bool _uw_map_has_key_bool(UwValuePtr map, UwType_Bool key)
+{
+    UwValue k = uw_create_bool(key);
+    return _uw_map_has_key_uw(map, k);
+}
+
+bool _uw_map_has_key_int(UwValuePtr map, UwType_Int key)
+{
+    UwValue k = uw_create_int(key);
+    return _uw_map_has_key_uw(map, k);
+}
+
+bool _uw_map_has_key_float(UwValuePtr map, UwType_Float key)
+{
+    UwValue k = uw_create_float(key);
+    return _uw_map_has_key_uw(map, k);
+}
+
+bool _uw_map_has_key_u8_wrapper(UwValuePtr map, char* key)
+{
+    UwValue k = _uw_create_string_u8_wrapper(key);
+    return _uw_map_has_key_uw(map, k);
+}
+
+bool _uw_map_has_key_u8(UwValuePtr map, char8_t* key)
+{
+    UwValue k = _uw_create_string_u8(key);
+    return _uw_map_has_key_uw(map, k);
+}
+
+bool _uw_map_has_key_u32(UwValuePtr map, char32_t* key)
+{
+    UwValue k = _uw_create_string_u32(key);
+    return _uw_map_has_key_uw(map, k);
+}
+
+bool _uw_map_has_key_uw(UwValuePtr map, UwValuePtr key)
 {
     uw_assert_map(map);
 
@@ -349,7 +391,49 @@ bool uw_map_has_key(UwValuePtr map, UwValuePtr key)
     return key_index != SIZE_MAX;
 }
 
-UwValuePtr uw_map_get(UwValuePtr map, UwValuePtr key)
+UwValuePtr _uw_map_get_null(UwValuePtr map, UwType_Null key)
+{
+    UwValue k = _uw_create_null(nullptr);
+    return _uw_map_get_uw(map, k);
+}
+
+UwValuePtr _uw_map_get_bool(UwValuePtr map, UwType_Bool key)
+{
+    UwValue k = uw_create_bool(key);
+    return _uw_map_get_uw(map, k);
+}
+
+UwValuePtr _uw_map_get_int(UwValuePtr map, UwType_Int key)
+{
+    UwValue k = uw_create_int(key);
+    return _uw_map_get_uw(map, k);
+}
+
+UwValuePtr _uw_map_get_float(UwValuePtr map, UwType_Float key)
+{
+    UwValue k = uw_create_float(key);
+    return _uw_map_get_uw(map, k);
+}
+
+UwValuePtr _uw_map_get_u8_wrapper(UwValuePtr map, char* key)
+{
+    UwValue k = _uw_create_string_u8_wrapper(key);
+    return _uw_map_get_uw(map, k);
+}
+
+UwValuePtr _uw_map_get_u8(UwValuePtr map, char8_t* key)
+{
+    UwValue k = _uw_create_string_u8(key);
+    return _uw_map_get_uw(map, k);
+}
+
+UwValuePtr _uw_map_get_u32(UwValuePtr map, char32_t* key)
+{
+    UwValue k = _uw_create_string_u32(key);
+    return _uw_map_get_uw(map, k);
+}
+
+UwValuePtr _uw_map_get_uw(UwValuePtr map, UwValuePtr key)
 {
     uw_assert_map(map);
 
