@@ -386,7 +386,7 @@ int _uw_compare_longlong (UwValuePtr a, long long          b);
 int _uw_compare_ulonglong(UwValuePtr a, unsigned long long b);
 int _uw_compare_float    (UwValuePtr a, float              b);
 int _uw_compare_double   (UwValuePtr a, double             b);
-int  uw_compare_cstr     (UwValuePtr a, char*              b);
+int  uw_compare_cstr     (UwValuePtr a, char*              b);  // can't be used in generic
 int _uw_compare_u8_wrapper(UwValuePtr a, char*             b);
 int _uw_compare_u8       (UwValuePtr a, char8_t*           b);
 int _uw_compare_u32      (UwValuePtr a, char32_t*          b);
