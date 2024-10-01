@@ -31,7 +31,7 @@ UwValuePtr _uw_create_null(nullptr_t dummy)
     return value;
 }
 
-UwValuePtr uw_create_bool(UwType_Bool initializer)
+UwValuePtr _uw_create_bool(UwType_Bool initializer)
 {
     UwValuePtr value = _uw_alloc_value();
     value->type_id = UwTypeId_Bool;
@@ -39,7 +39,7 @@ UwValuePtr uw_create_bool(UwType_Bool initializer)
     return value;
 }
 
-UwValuePtr uw_create_int(UwType_Int initializer)
+UwValuePtr _uw_create_int(UwType_Int initializer)
 {
     UwValuePtr value = _uw_alloc_value();
     value->type_id = UwTypeId_Int;
@@ -47,7 +47,7 @@ UwValuePtr uw_create_int(UwType_Int initializer)
     return value;
 }
 
-UwValuePtr uw_create_float(UwType_Float initializer)
+UwValuePtr _uw_create_float(UwType_Float initializer)
 {
     UwValuePtr value = _uw_alloc_value();
     value->type_id = UwTypeId_Float;
@@ -501,10 +501,10 @@ void _uw_calculate_hash(UwValuePtr value, UwHashContext* ctx)
 UwValuePtr uw_copy(UwValuePtr value)
 {
    switch(value->type_id) {
-        case UwTypeId_Null:   return uw_create_null();
-        case UwTypeId_Bool:   return uw_create_bool(value->bool_value);
-        case UwTypeId_Int:    return uw_create_int(value->int_value);
-        case UwTypeId_Float:  return uw_create_float(value->float_value);
+        case UwTypeId_Null:   return _uw_create_null(nullptr);
+        case UwTypeId_Bool:   return _uw_create_bool(value->bool_value);
+        case UwTypeId_Int:    return _uw_create_int(value->int_value);
+        case UwTypeId_Float:  return _uw_create_float(value->float_value);
         case UwTypeId_String: return _uw_copy_string(value->string_value);
         case UwTypeId_List:   return _uw_copy_list(value->list_value);
         case UwTypeId_Map:    return _uw_copy_map(value->map_value);

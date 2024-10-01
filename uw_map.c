@@ -336,19 +336,19 @@ bool _uw_map_has_key_null(UwValuePtr map, UwType_Null key)
 
 bool _uw_map_has_key_bool(UwValuePtr map, UwType_Bool key)
 {
-    UwValue k = uw_create_bool(key);
+    UwValue k = _uw_create_bool(key);
     return _uw_map_has_key_uw(map, k);
 }
 
 bool _uw_map_has_key_int(UwValuePtr map, UwType_Int key)
 {
-    UwValue k = uw_create_int(key);
+    UwValue k = _uw_create_int(key);
     return _uw_map_has_key_uw(map, k);
 }
 
 bool _uw_map_has_key_float(UwValuePtr map, UwType_Float key)
 {
-    UwValue k = uw_create_float(key);
+    UwValue k = _uw_create_float(key);
     return _uw_map_has_key_uw(map, k);
 }
 
@@ -399,19 +399,19 @@ UwValuePtr _uw_map_get_null(UwValuePtr map, UwType_Null key)
 
 UwValuePtr _uw_map_get_bool(UwValuePtr map, UwType_Bool key)
 {
-    UwValue k = uw_create_bool(key);
+    UwValue k = _uw_create_bool(key);
     return _uw_map_get_uw(map, k);
 }
 
 UwValuePtr _uw_map_get_int(UwValuePtr map, UwType_Int key)
 {
-    UwValue k = uw_create_int(key);
+    UwValue k = _uw_create_int(key);
     return _uw_map_get_uw(map, k);
 }
 
 UwValuePtr _uw_map_get_float(UwValuePtr map, UwType_Float key)
 {
-    UwValue k = uw_create_float(key);
+    UwValue k = _uw_create_float(key);
     return _uw_map_get_uw(map, k);
 }
 

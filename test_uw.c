@@ -25,19 +25,19 @@ void test_integral_types()
 {
     // Null values
     UwValue null_1 = uw_create(nullptr);
-    UwValue null_2 = uw_create_null();
+    UwValue null_2 = uw_create(nullptr);
     TEST(uw_is_null(null_1));
     TEST(uw_is_null(null_2));
 
     // Bool values
     UwValue bool_true  = uw_create(true);
-    UwValue bool_false = uw_create_bool(false);
+    UwValue bool_false = uw_create(false);
     TEST(uw_is_bool(bool_true));
     TEST(uw_is_bool(bool_false));
 
     // Int values
     UwValue int_0 = uw_create(0);
-    UwValue int_1 = uw_create_int(1);
+    UwValue int_1 = uw_create(1);
     UwValue int_1_1 = uw_create(1);
     UwValue int_neg1 = uw_create(-1);
     TEST(uw_is_int(int_0));
@@ -81,7 +81,7 @@ void test_integral_types()
 
     // Float values
     UwValue f_0 = uw_create(0.0);
-    UwValue f_1 = uw_create_float(1.0);
+    UwValue f_1 = _uw_create_float(1.0);
     UwValue f_1_1 = uw_create(1.0);
     UwValue f_neg1 = uw_create(-1.0);
     TEST(uw_is_float(f_0));
@@ -1142,7 +1142,7 @@ void test_list()
     TEST(uw_list_length(list) == 0);
 
     for(int i = 0; i < 1000; i++) {
-        UwValue item = uw_create_int(i);
+        UwValue item = uw_create(i);
 
         uw_list_append(list, &item);
 
@@ -1150,7 +1150,7 @@ void test_list()
         TEST(item == nullptr);
 
         UwValuePtr v = uw_list_item(list, i);
-        item = uw_create_int(i);
+        item = uw_create(i);
         TEST(uw_equal(v, item));
 
         uw_delete_value(&item);
@@ -1161,27 +1161,27 @@ void test_list()
 void test_map()
 {
     UwValue map = uw_create_map();
-    UwValue key = uw_create_int(0);
-    UwValue value = uw_create_bool(false);
+    UwValue key = uw_create(0);
+    UwValue value = uw_create(false);
 
     uw_map_update(map, &key, &value);
 
     uw_assert(key == nullptr);
     uw_assert(value == nullptr);
 
-    key = uw_create_int(0);
+    key = uw_create(0);
     TEST(uw_map_has_key(map, key));
 
     uw_delete_value(&key);
-    key = uw_create_null();
+    key = uw_create(nullptr);
     TEST(!uw_map_has_key(map, key));
 
     uw_delete_value(&key);
 
 //    uw_dump_value(map);
     for (int i = 1; i < 50; i++) {
-        key = uw_create_int(i);
-        value = uw_create_int(i);
+        key = uw_create(i);
+        value = uw_create(i);
         uw_map_update(map, &key, &value);
     }
 //    uw_dump_value(map);

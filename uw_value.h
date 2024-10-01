@@ -252,31 +252,29 @@ typedef CStringPtr* CStringRef;
 
 #define uw_create(initializer) _Generic((initializer), \
              nullptr_t: _uw_create_null,       \
-                  bool:  uw_create_bool,       \
-                  char:  uw_create_int,        \
-         unsigned char:  uw_create_int,        \
-                 short:  uw_create_int,        \
-        unsigned short:  uw_create_int,        \
-                   int:  uw_create_int,        \
-          unsigned int:  uw_create_int,        \
-                  long:  uw_create_int,        \
-         unsigned long:  uw_create_int,        \
-             long long:  uw_create_int,        \
-    unsigned long long:  uw_create_int,        \
-                 float:  uw_create_float,      \
-                double:  uw_create_float,      \
+                  bool: _uw_create_bool,       \
+                  char: _uw_create_int,        \
+         unsigned char: _uw_create_int,        \
+                 short: _uw_create_int,        \
+        unsigned short: _uw_create_int,        \
+                   int: _uw_create_int,        \
+          unsigned int: _uw_create_int,        \
+                  long: _uw_create_int,        \
+         unsigned long: _uw_create_int,        \
+             long long: _uw_create_int,        \
+    unsigned long long: _uw_create_int,        \
+                 float: _uw_create_float,      \
+                double: _uw_create_float,      \
                  char*: _uw_create_string_u8_wrapper,   \
               char8_t*: _uw_create_string_u8,  \
              char32_t*: _uw_create_string_u32, \
             UwValuePtr:  uw_copy               \
     )(initializer)
 
-#define uw_create_null()  _uw_create_null(nullptr)
-
 UwValuePtr _uw_create_null(nullptr_t dummy);
-UwValuePtr uw_create_bool(UwType_Bool initializer);
-UwValuePtr uw_create_int(UwType_Int initializer);
-UwValuePtr uw_create_float(UwType_Float initializer);
+UwValuePtr _uw_create_bool(UwType_Bool initializer);
+UwValuePtr _uw_create_int(UwType_Int initializer);
+UwValuePtr _uw_create_float(UwType_Float initializer);
 
 UwValuePtr uw_create_empty_string(size_t capacity, uint8_t char_size);
 
