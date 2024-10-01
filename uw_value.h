@@ -120,8 +120,6 @@ static_assert(sizeof(UwType_Int) == sizeof(UwType_Float));
 #define UwTypeId_List    5
 #define UwTypeId_Map     6
 
-extern char* uw_get_type_name(int type_id);
-
 // forward declaration
 struct _UwValue;
 
@@ -213,6 +211,23 @@ typedef CStringPtr* CStringRef;
 #define uw_is_string(value)  ((value)->type_id == UwTypeId_String)
 #define uw_is_list(value)    ((value)->type_id == UwTypeId_List)
 #define uw_is_map(value)     ((value)->type_id == UwTypeId_Map)
+
+#define uw_get_type_name(v) _Generic((v), \
+                  char: _uw_get_type_name_by_id, \
+         unsigned char: _uw_get_type_name_by_id, \
+                 short: _uw_get_type_name_by_id, \
+        unsigned short: _uw_get_type_name_by_id, \
+                   int: _uw_get_type_name_by_id, \
+          unsigned int: _uw_get_type_name_by_id, \
+                  long: _uw_get_type_name_by_id, \
+         unsigned long: _uw_get_type_name_by_id, \
+             long long: _uw_get_type_name_by_id, \
+    unsigned long long: _uw_get_type_name_by_id, \
+            UwValuePtr: _uw_get_type_name_from_value  \
+    )(v)
+
+char* _uw_get_type_name_from_value(UwValuePtr value);
+char* _uw_get_type_name_by_id(uint8_t type_id);
 
 /****************************************************************
  * Assertions

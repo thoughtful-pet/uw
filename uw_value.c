@@ -1,6 +1,6 @@
 #include "uw_value.h"
 
-char* uw_get_type_name(int type_id)
+char* _uw_get_type_name_by_id(uint8_t type_id)
 {
     switch (type_id) {
         case UwTypeId_Null:   return "Null";
@@ -13,6 +13,11 @@ char* uw_get_type_name(int type_id)
         default:
             return "UNKNOWN";
     }
+}
+
+char* _uw_get_type_name_from_value(UwValuePtr value)
+{
+    return _uw_get_type_name_by_id(value->type_id);
 }
 
 [[ noreturn ]]

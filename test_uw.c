@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "uw_value.h"
 #include "uw_string_capmeth.c"
@@ -23,11 +24,18 @@ bool print_ok = false;
 
 void test_integral_types()
 {
+    // generics test
+    TEST(strcmp(uw_get_type_name((char) UwTypeId_Bool), "Bool") == 0);
+    TEST(strcmp(uw_get_type_name((int) UwTypeId_Int), "Int") == 0);
+    TEST(strcmp(uw_get_type_name((unsigned long long) UwTypeId_Float), "Float") == 0);
+
     // Null values
     UwValue null_1 = uw_create(nullptr);
     UwValue null_2 = uw_create(nullptr);
     TEST(uw_is_null(null_1));
     TEST(uw_is_null(null_2));
+
+    TEST(strcmp(uw_get_type_name(null_1), "Null") == 0);  // generics test
 
     // Bool values
     UwValue bool_true  = uw_create(true);
