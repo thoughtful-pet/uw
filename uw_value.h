@@ -66,6 +66,21 @@ extern "C" {
         *(src) = nullptr;  \
     })
 
+/*
+ * Notes on generics
+ *
+ * Generics behave strangely with char* and char8_t*.
+ * Clang 16 uses char* version called with either string constant
+ * as initializer, but complains if char8_t* choice is not defined.
+ *
+ * As a workaround, using *_u8_wrapper(char*) functions which treat
+ * char* as char8_t* and call *_u8 version.
+ *
+ * Basically, *_cstr functions should be used for char*.
+ *
+ * Not checked with neither newer Clang nor GCC.
+ */
+
 /****************************************************************
  * Low level hash functions
  */
@@ -230,13 +245,7 @@ typedef CStringPtr* CStringRef;
  *
  * 1. uw_create('a') creates integer, use uw_create("a") for strings
  *
- * 2. Generics behave strangely with char* and char8_t*.
- *    Clang uses char* version called with either string constant
- *    as initializer, but complains if char8_t* choice is not defined.
- *
- *    Not checked with GCC.
- *
- *    For particular cases there's uw_create_string that accepts
+ * 2. For particular cases there's uw_create_string that accepts
  *    char* and UwValuePtr.
  */
 
