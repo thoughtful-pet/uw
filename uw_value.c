@@ -1,5 +1,20 @@
 #include "uw_value.h"
 
+char* uw_get_type_name(int type_id)
+{
+    switch (type_id) {
+        case UwTypeId_Null:   return "Null";
+        case UwTypeId_Bool:   return "Bool";
+        case UwTypeId_Int:    return "Int";
+        case UwTypeId_Float:  return "Float";
+        case UwTypeId_String: return "String";
+        case UwTypeId_List:   return "List";
+        case UwTypeId_Map:    return "Map";
+        default:
+            return "UNKNOWN";
+    }
+}
+
 [[ noreturn ]]
 static void bad_type_id(UwValuePtr value)
 {

@@ -105,6 +105,8 @@ static_assert(sizeof(UwType_Int) == sizeof(UwType_Float));
 #define UwTypeId_List    5
 #define UwTypeId_Map     6
 
+extern char* uw_get_type_name(int type_id);
+
 // forward declaration
 struct _UwValue;
 
