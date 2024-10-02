@@ -620,7 +620,7 @@ bool uw_map_item(UwValuePtr map, size_t index, UwValuePtr* key, UwValuePtr* valu
  * String functions
  */
 
-#define uw_string_char_size(s)  ((s)->string_value->char_size)
+#define uw_string_char_size(s)  ((s)->string_value->char_size + 1)
 
 size_t uw_strlen(UwValuePtr str);
 /*

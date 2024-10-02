@@ -1148,9 +1148,9 @@ void test_string()
         uw_list_append(list, u8"สวัสดี");
         uw_list_append(list, "Thanks");
         uw_list_append(list, U"mulțumesc");
-        UwValue v = uw_string_join("/", list);
+        UwValue v = uw_string_join('/', list);
         TEST(uw_equal(v, U"Hello/สวัสดี/Thanks/mulțumesc"));
-        uw_dump_value(v);
+        //uw_dump_value(v);
     }
 }
 
