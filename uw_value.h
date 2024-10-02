@@ -747,6 +747,24 @@ void uw_string_trim(UwValuePtr str);
 #endif
 
 /*
+ * Join list items. Return string value.
+ */
+#define uw_string_join(separator, list) _Generic((separator), \
+              char32_t: _uw_string_join_c32,        \
+                   int: _uw_string_join_c32,        \
+                 char*: _uw_string_join_u8_wrapper, \
+              char8_t*: _uw_string_join_u8,         \
+             char32_t*: _uw_string_join_u32,        \
+            UwValuePtr: _uw_string_join_uw          \
+    )((separator), (list))
+
+UwValuePtr _uw_string_join_c32       (char32_t   separator, UwValuePtr list);
+UwValuePtr _uw_string_join_u8_wrapper(char*      separator, UwValuePtr list);
+UwValuePtr _uw_string_join_u8        (char8_t*   separator, UwValuePtr list);
+UwValuePtr _uw_string_join_u32       (char32_t*  separator, UwValuePtr list);
+UwValuePtr _uw_string_join_uw        (UwValuePtr separator, UwValuePtr list);
+
+/*
  * Miiscellaneous helper functions.
  */
 

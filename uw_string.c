@@ -1911,6 +1911,73 @@ void uw_string_trim(UwValuePtr str)
     uw_string_ltrim(str);
 }
 
+UwValuePtr _uw_string_join_c32(char32_t separator, UwValuePtr list)
+{
+    char32_t s[2] = {separator, 0};
+    UwValue sep = uw_create(s);
+    return _uw_string_join_uw(sep, list);
+}
+
+UwValuePtr _uw_string_join_u8_wrapper(char* separator, UwValuePtr list)
+{
+    UwValue sep = uw_create(separator);
+    return _uw_string_join_uw(sep, list);
+}
+
+UwValuePtr _uw_string_join_u8(char8_t* separator, UwValuePtr list)
+{
+    UwValue sep = uw_create(separator);
+    return _uw_string_join_uw(sep, list);
+}
+
+UwValuePtr _uw_string_join_u32(char32_t*  separator, UwValuePtr list)
+{
+    UwValue sep = uw_create(separator);
+    return _uw_string_join_uw(sep, list);
+}
+
+UwValuePtr _uw_string_join_uw(UwValuePtr separator, UwValuePtr list)
+{
+    // XXX skipping non-string values
+
+    size_t num_items = uw_list_length(list);
+    size_t separator_len = uw_strlen(separator);
+    bool item_added;
+
+    // calculate total length and max char width
+    size_t result_len = 0;
+    uint8_t max_char_size = uw_string_char_size(separator);
+    item_added = false;
+    for (size_t i = 0; i < num_items; i++) {
+        UwValuePtr item = uw_list_item(list, i);
+        if (uw_is_string(item)) {
+            if (item_added) {
+                result_len += separator_len;
+            }
+            uint8_t char_size = uw_string_char_size(item);
+            if (max_char_size < char_size) {
+                max_char_size = char_size;
+            }
+            result_len += uw_strlen(item);
+            item_added = true;
+        }
+    }
+    // join list items
+    UwValue result = uw_create_empty_string(result_len, max_char_size);
+    item_added = false;
+    for (size_t i = 0; i < num_items; i++) {
+        UwValuePtr item = uw_list_item(list, i);
+        if (uw_is_string(item)) {
+            if (item_added) {
+                uw_string_append(result, separator);
+            }
+            uw_string_append(result, item);
+            item_added = true;
+        }
+    }
+    return uw_ptr(result);
+}
+
 #ifdef DEBUG
 
 static void putchar32_utf8(char32_t codepoint)

@@ -1141,6 +1141,17 @@ void test_string()
         TEST(uw_equal(v, u8"สวัสดี"));
         TEST(uw_strlen(v) == 6);
     }
+
+    { // test join
+        UwValue list = uw_create_list();
+        uw_list_append(list, "Hello");
+        uw_list_append(list, u8"สวัสดี");
+        uw_list_append(list, "Thanks");
+        uw_list_append(list, U"mulțumesc");
+        UwValue v = uw_string_join("/", list);
+        TEST(uw_equal(v, U"Hello/สวัสดี/Thanks/mulțumesc"));
+        uw_dump_value(v);
+    }
 }
 
 void test_list()
