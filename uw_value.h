@@ -244,13 +244,13 @@ char* _uw_get_type_name_by_id(uint8_t type_id);
         }  \
     })
 
-#define uw_assert_null  (value)  uw_assert(uw_is_null  (value))
-#define uw_assert_bool  (value)  uw_assert(uw_is_bool  (value))
-#define uw_assert_int   (value)  uw_assert(uw_is_int   (value))
-#define uw_assert_float (value)  uw_assert(uw_is_float (value))
-#define uw_assert_string(value)  uw_assert(uw_is_string(value))
-#define uw_assert_list  (value)  uw_assert(uw_is_list  (value))
-#define uw_assert_map   (value)  uw_assert(uw_is_map   (value))
+#define uw_assert_null(value)   uw_assert(uw_is_null  (value))
+#define uw_assert_bool(value)   uw_assert(uw_is_bool  (value))
+#define uw_assert_int(value)    uw_assert(uw_is_int   (value))
+#define uw_assert_float(value)  uw_assert(uw_is_float (value))
+#define uw_assert_string(value) uw_assert(uw_is_string(value))
+#define uw_assert_list(value)   uw_assert(uw_is_list  (value))
+#define uw_assert_map(value)    uw_assert(uw_is_map   (value))
 
 
 /****************************************************************
