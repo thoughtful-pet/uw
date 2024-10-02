@@ -173,6 +173,19 @@ UwValuePtr _uw_copy_list(_UwList* list)
     return new_list;
 }
 
+UwValuePtr uw_list_pop(UwValuePtr list)
+{
+    uw_assert_list(list);
+
+    _UwList* _list = list->list_value;
+    if (_list->length == 0) {
+        return nullptr;
+    } else {
+        _list->length--;
+        return _list->items[_list->length];
+    }
+}
+
 #ifdef DEBUG
 
 void _uw_dump_list(_UwList* list, int indent)

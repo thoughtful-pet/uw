@@ -522,6 +522,12 @@ void _uw_list_append(_UwList** list_ref, UwValueRef item);
 #define uw_list_item(list, index) \
     ({ uw_assert_list(list); *_uw_list_item_ref((list)->list_value, (index)); })
 
+UwValuePtr uw_list_pop(UwValuePtr list);
+/*
+ * Extract last item from the list.
+ * It's the caller's responsibility to destroy returned value.
+ * Not assigning it to a UwValue leads to memory leak.
+ */
 
 /****************************************************************
  * Map functions
