@@ -204,13 +204,13 @@ typedef CStringPtr* CStringRef;
  * Type checking
  */
 
-#define uw_is_null(value)    ((value)->type_id == UwTypeId_Null)
-#define uw_is_bool(value)    ((value)->type_id == UwTypeId_Bool)
-#define uw_is_int(value)     ((value)->type_id == UwTypeId_Int)
-#define uw_is_float(value)   ((value)->type_id == UwTypeId_Float)
-#define uw_is_string(value)  ((value)->type_id == UwTypeId_String)
-#define uw_is_list(value)    ((value)->type_id == UwTypeId_List)
-#define uw_is_map(value)     ((value)->type_id == UwTypeId_Map)
+#define uw_is_null(value)    ((value) && ((value)->type_id == UwTypeId_Null))
+#define uw_is_bool(value)    ((value) && ((value)->type_id == UwTypeId_Bool))
+#define uw_is_int(value)     ((value) && ((value)->type_id == UwTypeId_Int))
+#define uw_is_float(value)   ((value) && ((value)->type_id == UwTypeId_Float))
+#define uw_is_string(value)  ((value) && ((value)->type_id == UwTypeId_String))
+#define uw_is_list(value)    ((value) && ((value)->type_id == UwTypeId_List))
+#define uw_is_map(value)     ((value) && ((value)->type_id == UwTypeId_Map))
 
 #define uw_get_type_name(v) _Generic((v),        \
                   char: _uw_get_type_name_by_id, \
