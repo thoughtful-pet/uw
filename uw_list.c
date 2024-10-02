@@ -90,6 +90,55 @@ void _uw_list_hash(_UwList* list, UwHashContext* ctx)
     }
 }
 
+void _uw_list_append_null(UwValuePtr list, UwType_Null item)
+{
+    UwValue v = _uw_create_null(nullptr);
+    _uw_list_append_uw(list, &v);
+}
+
+void _uw_list_append_bool(UwValuePtr list, UwType_Bool item)
+{
+    UwValue v = _uw_create_bool(item);
+    _uw_list_append_uw(list, &v);
+}
+
+void _uw_list_append_int(UwValuePtr list, UwType_Int item)
+{
+    UwValue v = _uw_create_int(item);
+    _uw_list_append_uw(list, &v);
+}
+
+void _uw_list_append_float(UwValuePtr list, UwType_Float item)
+{
+    UwValue v = _uw_create_float(item);
+    _uw_list_append_uw(list, &v);
+}
+
+void _uw_list_append_u8_wrapper(UwValuePtr list, char* item)
+{
+    UwValue v = _uw_create_string_u8_wrapper(item);
+    _uw_list_append_uw(list, &v);
+}
+
+void _uw_list_append_u8(UwValuePtr list, char8_t* item)
+{
+    UwValue v = _uw_create_string_u8(item);
+    _uw_list_append_uw(list, &v);
+}
+
+void _uw_list_append_u32(UwValuePtr list, char32_t* item)
+{
+    UwValue v = _uw_create_string_u32(item);
+    _uw_list_append_uw(list, &v);
+}
+
+void _uw_list_append_uw(UwValuePtr list, UwValueRef item)
+{
+    uw_assert_list(list);
+    uw_assert((list) != *(item));
+    _uw_list_append(&(list)->list_value, (item));
+}
+
 void _uw_list_append(_UwList** list_ref, UwValueRef item)
 {
     _UwList* list = *list_ref;

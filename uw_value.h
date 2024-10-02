@@ -476,14 +476,40 @@ bool _uw_map_eq(_UwMap* a, _UwMap* b);
 #define uw_list_length(list) \
     ({ uw_assert_list(list); _uw_list_length((list)->list_value); })
 
-void _uw_list_append(_UwList** list_ref, UwValueRef item);
+#define uw_list_append(list, item) _Generic((item), \
+             nullptr_t: _uw_list_append_null,       \
+                  bool: _uw_list_append_bool,       \
+                  char: _uw_list_append_int,        \
+         unsigned char: _uw_list_append_int,        \
+                 short: _uw_list_append_int,        \
+        unsigned short: _uw_list_append_int,        \
+                   int: _uw_list_append_int,        \
+          unsigned int: _uw_list_append_int,        \
+                  long: _uw_list_append_int,        \
+         unsigned long: _uw_list_append_int,        \
+             long long: _uw_list_append_int,        \
+    unsigned long long: _uw_list_append_int,        \
+                 float: _uw_list_append_float,      \
+                double: _uw_list_append_float,      \
+                 char*: _uw_list_append_u8_wrapper, \
+              char8_t*: _uw_list_append_u8,         \
+             char32_t*: _uw_list_append_u32,        \
+            UwValueRef: _uw_list_append_uw          \
+    )((list), (item))
 
-#define uw_list_append(list, item) \
-    ({ \
-        uw_assert_list(list);  \
-        uw_assert((list) != *(item));  \
-        _uw_list_append(&(list)->list_value, (item));  \
-    })
+void _uw_list_append_null      (UwValuePtr list, UwType_Null  item);
+void _uw_list_append_bool      (UwValuePtr list, UwType_Bool  item);
+void _uw_list_append_int       (UwValuePtr list, UwType_Int   item);
+void _uw_list_append_float     (UwValuePtr list, UwType_Float item);
+void _uw_list_append_u8_wrapper(UwValuePtr list, char*        item);
+void _uw_list_append_u8        (UwValuePtr list, char8_t*     item);
+void _uw_list_append_u32       (UwValuePtr list, char32_t*    item);
+void _uw_list_append_uw        (UwValuePtr list, UwValueRef   item);
+
+void _uw_list_append(_UwList** list_ref, UwValueRef item);
+/*
+ * Internal append function, also used by map implementation.
+ */
 
 #define _uw_list_item_ref(list, index) \
     ({ uw_assert((index) < (list)->length); &(list)->items[(index)]; })
