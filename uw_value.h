@@ -212,7 +212,7 @@ typedef CStringPtr* CStringRef;
 #define uw_is_list(value)    ((value)->type_id == UwTypeId_List)
 #define uw_is_map(value)     ((value)->type_id == UwTypeId_Map)
 
-#define uw_get_type_name(v) _Generic((v), \
+#define uw_get_type_name(v) _Generic((v),        \
                   char: _uw_get_type_name_by_id, \
          unsigned char: _uw_get_type_name_by_id, \
                  short: _uw_get_type_name_by_id, \
@@ -244,13 +244,13 @@ char* _uw_get_type_name_by_id(uint8_t type_id);
         }  \
     })
 
-#define uw_assert_null(value)    uw_assert(uw_is_null  (value))
-#define uw_assert_bool(value)    uw_assert(uw_is_bool  (value))
-#define uw_assert_int(value)     uw_assert(uw_is_int   (value))
-#define uw_assert_float(value)   uw_assert(uw_is_float (value))
+#define uw_assert_null  (value)  uw_assert(uw_is_null  (value))
+#define uw_assert_bool  (value)  uw_assert(uw_is_bool  (value))
+#define uw_assert_int   (value)  uw_assert(uw_is_int   (value))
+#define uw_assert_float (value)  uw_assert(uw_is_float (value))
 #define uw_assert_string(value)  uw_assert(uw_is_string(value))
-#define uw_assert_list(value)    uw_assert(uw_is_list  (value))
-#define uw_assert_map(value)     uw_assert(uw_is_map   (value))
+#define uw_assert_list  (value)  uw_assert(uw_is_list  (value))
+#define uw_assert_map   (value)  uw_assert(uw_is_map   (value))
 
 
 /****************************************************************
@@ -289,15 +289,15 @@ char* _uw_get_type_name_by_id(uint8_t type_id);
     unsigned long long: _uw_create_int,        \
                  float: _uw_create_float,      \
                 double: _uw_create_float,      \
-                 char*: _uw_create_string_u8_wrapper,   \
+                 char*: _uw_create_string_u8_wrapper, \
               char8_t*: _uw_create_string_u8,  \
              char32_t*: _uw_create_string_u32, \
             UwValuePtr:  uw_copy               \
     )(initializer)
 
-UwValuePtr _uw_create_null(nullptr_t dummy);
-UwValuePtr _uw_create_bool(UwType_Bool initializer);
-UwValuePtr _uw_create_int(UwType_Int initializer);
+UwValuePtr _uw_create_null (nullptr_t    dummy);
+UwValuePtr _uw_create_bool (UwType_Bool  initializer);
+UwValuePtr _uw_create_int  (UwType_Int   initializer);
 UwValuePtr _uw_create_float(UwType_Float initializer);
 
 UwValuePtr uw_create_empty_string(size_t capacity, uint8_t char_size);
@@ -311,11 +311,11 @@ UwValuePtr uw_create_empty_string(size_t capacity, uint8_t char_size);
         UwValuePtr: _uw_create_string_uw   \
     )(initializer)
 
-UwValuePtr _uw_create_string_c(char* initializer);
-UwValuePtr _uw_create_string_u8_wrapper(char* initializer);
-UwValuePtr _uw_create_string_u8(char8_t* initializer);
-UwValuePtr _uw_create_string_u32(char32_t* initializer);
-UwValuePtr _uw_create_string_uw(UwValuePtr str);  // XXX convert value of other UW types to string?
+UwValuePtr _uw_create_string_c         (char*      initializer);
+UwValuePtr _uw_create_string_u8_wrapper(char*      initializer);
+UwValuePtr _uw_create_string_u8        (char8_t*   initializer);
+UwValuePtr _uw_create_string_u32       (char32_t*  initializer);
+UwValuePtr _uw_create_string_uw        (UwValuePtr str);  // XXX convert value of other UW types to string?
 
 UwValuePtr uw_create_string_c(char* initializer);
 
@@ -324,10 +324,10 @@ UwValuePtr uw_create_map();
 
 _UwList* _uw_alloc_list(size_t capacity);  // used by lists and maps
 
-UwValuePtr uw_copy(UwValuePtr value);
+UwValuePtr  uw_copy       (UwValuePtr value);
 UwValuePtr _uw_copy_string(_UwString* str);
-UwValuePtr _uw_copy_list(_UwList* list);
-UwValuePtr _uw_copy_map(_UwMap* map);
+UwValuePtr _uw_copy_list  (_UwList*   list);
+UwValuePtr _uw_copy_map   (_UwMap*    map);
 
 /****************************************************************
  * Destructors
@@ -338,8 +338,8 @@ void uw_delete_cstring(CStringRef str);
 
 // helper functions for uw_delete_value
 void _uw_delete_string(_UwString* str);
-void _uw_delete_list(_UwList* list);
-void _uw_delete_map(_UwMap* map);
+void _uw_delete_list  (_UwList*   list);
+void _uw_delete_map   (_UwMap*    map);
 
 /****************************************************************
  * Hash functions
@@ -351,8 +351,8 @@ UwType_Hash uw_hash(UwValuePtr value);
  */
 
 void _uw_calculate_hash(UwValuePtr value, UwHashContext* ctx);
-void _uw_string_hash(_UwString* str, UwHashContext* ctx);
-void _uw_list_hash(_UwList* list, UwHashContext* ctx);
+void _uw_string_hash   (_UwString* str,   UwHashContext* ctx);
+void _uw_list_hash     (_UwList*   list,  UwHashContext* ctx);
 #define _uw_map_hash(map, ctx)  _uw_list_hash((map)->kv_pairs, (ctx))
 /*
  * Helper functions for uw_hash for complex types.
@@ -394,29 +394,29 @@ void _uw_list_hash(_UwList* list, UwHashContext* ctx);
             UwValuePtr: _uw_compare_uw          \
     )((a), (b))
 
-int _uw_compare_null     (UwValuePtr a, nullptr_t          b);
-int _uw_compare_bool     (UwValuePtr a, bool               b);
-int _uw_compare_char     (UwValuePtr a, char               b);
-int _uw_compare_uchar    (UwValuePtr a, unsigned char      b);
-int _uw_compare_short    (UwValuePtr a, short              b);
-int _uw_compare_ushort   (UwValuePtr a, unsigned short     b);
-int _uw_compare_int      (UwValuePtr a, int                b);
-int _uw_compare_uint     (UwValuePtr a, unsigned int       b);
-int _uw_compare_long     (UwValuePtr a, long               b);
-int _uw_compare_ulong    (UwValuePtr a, unsigned long      b);
-int _uw_compare_longlong (UwValuePtr a, long long          b);
-int _uw_compare_ulonglong(UwValuePtr a, unsigned long long b);
-int _uw_compare_float    (UwValuePtr a, float              b);
-int _uw_compare_double   (UwValuePtr a, double             b);
-int  uw_compare_cstr     (UwValuePtr a, char*              b);  // can't be used in generic
-int _uw_compare_u8_wrapper(UwValuePtr a, char*             b);
-int _uw_compare_u8       (UwValuePtr a, char8_t*           b);
-int _uw_compare_u32      (UwValuePtr a, char32_t*          b);
-int _uw_compare_uw       (UwValuePtr a, UwValuePtr         b);
+int _uw_compare_null      (UwValuePtr a, nullptr_t          b);
+int _uw_compare_bool      (UwValuePtr a, bool               b);
+int _uw_compare_char      (UwValuePtr a, char               b);
+int _uw_compare_uchar     (UwValuePtr a, unsigned char      b);
+int _uw_compare_short     (UwValuePtr a, short              b);
+int _uw_compare_ushort    (UwValuePtr a, unsigned short     b);
+int _uw_compare_int       (UwValuePtr a, int                b);
+int _uw_compare_uint      (UwValuePtr a, unsigned int       b);
+int _uw_compare_long      (UwValuePtr a, long               b);
+int _uw_compare_ulong     (UwValuePtr a, unsigned long      b);
+int _uw_compare_longlong  (UwValuePtr a, long long          b);
+int _uw_compare_ulonglong (UwValuePtr a, unsigned long long b);
+int _uw_compare_float     (UwValuePtr a, float              b);
+int _uw_compare_double    (UwValuePtr a, double             b);
+int  uw_compare_cstr      (UwValuePtr a, char*              b);  // can't be used in generic
+int _uw_compare_u8_wrapper(UwValuePtr a, char*              b);
+int _uw_compare_u8        (UwValuePtr a, char8_t*           b);
+int _uw_compare_u32       (UwValuePtr a, char32_t*          b);
+int _uw_compare_uw        (UwValuePtr a, UwValuePtr         b);
 
 int _uw_string_cmp(_UwString* a, _UwString* b);
-int _uw_list_cmp(_UwList* a, _UwList* b);
-int _uw_map_cmp(_UwMap* a, _UwMap* b);
+int _uw_list_cmp  (_UwList*   a, _UwList*   b);
+int _uw_map_cmp   (_UwMap*    a, _UwMap*    b);
 
 /*
  * Simplified comparison for equality.
@@ -463,8 +463,8 @@ bool _uw_equal_u32       (UwValuePtr a, char32_t*          b);
 bool _uw_equal_uw        (UwValuePtr a, UwValuePtr         b);
 
 bool _uw_string_eq(_UwString* a, _UwString* b);
-bool _uw_list_eq(_UwList* a, _UwList* b);
-bool _uw_map_eq(_UwMap* a, _UwMap* b);
+bool _uw_list_eq  (_UwList*   a, _UwList*   b);
+bool _uw_map_eq   (_UwMap*    a, _UwMap*    b);
 
 /****************************************************************
  * List functions
@@ -556,19 +556,19 @@ void uw_map_update(UwValuePtr map, UwValueRef key, UwValueRef value);
             UwValuePtr: _uw_map_has_key_uw          \
     )((map), (key))
 
-bool _uw_map_has_key_null      (UwValuePtr map, UwType_Null key);
-bool _uw_map_has_key_bool      (UwValuePtr map, UwType_Bool key);
-bool _uw_map_has_key_int       (UwValuePtr map, UwType_Int key);
+bool _uw_map_has_key_null      (UwValuePtr map, UwType_Null  key);
+bool _uw_map_has_key_bool      (UwValuePtr map, UwType_Bool  key);
+bool _uw_map_has_key_int       (UwValuePtr map, UwType_Int   key);
 bool _uw_map_has_key_float     (UwValuePtr map, UwType_Float key);
-bool _uw_map_has_key_u8_wrapper(UwValuePtr map, char* key);
-bool _uw_map_has_key_u8        (UwValuePtr map, char8_t* key);
-bool _uw_map_has_key_u32       (UwValuePtr map, char32_t* key);
-bool _uw_map_has_key_uw        (UwValuePtr map, UwValuePtr key);
+bool _uw_map_has_key_u8_wrapper(UwValuePtr map, char*        key);
+bool _uw_map_has_key_u8        (UwValuePtr map, char8_t*     key);
+bool _uw_map_has_key_u32       (UwValuePtr map, char32_t*    key);
+bool _uw_map_has_key_uw        (UwValuePtr map, UwValuePtr   key);
 
 /*
  * Get value by `key`. Return nullptr if `key` is not in `map`.
  */
-#define uw_map_get(map, key) _Generic((key),      \
+#define uw_map_get(map, key) _Generic((key),    \
              nullptr_t: _uw_map_get_null,       \
                   bool: _uw_map_get_bool,       \
                   char: _uw_map_get_int,        \
@@ -589,14 +589,14 @@ bool _uw_map_has_key_uw        (UwValuePtr map, UwValuePtr key);
             UwValuePtr: _uw_map_get_uw          \
     )((map), (key))
 
-UwValuePtr _uw_map_get_null      (UwValuePtr map, UwType_Null key);
-UwValuePtr _uw_map_get_bool      (UwValuePtr map, UwType_Bool key);
-UwValuePtr _uw_map_get_int       (UwValuePtr map, UwType_Int key);
+UwValuePtr _uw_map_get_null      (UwValuePtr map, UwType_Null  key);
+UwValuePtr _uw_map_get_bool      (UwValuePtr map, UwType_Bool  key);
+UwValuePtr _uw_map_get_int       (UwValuePtr map, UwType_Int   key);
 UwValuePtr _uw_map_get_float     (UwValuePtr map, UwType_Float key);
-UwValuePtr _uw_map_get_u8_wrapper(UwValuePtr map, char* key);
-UwValuePtr _uw_map_get_u8        (UwValuePtr map, char8_t* key);
-UwValuePtr _uw_map_get_u32       (UwValuePtr map, char32_t* key);
-UwValuePtr _uw_map_get_uw        (UwValuePtr map, UwValuePtr key);
+UwValuePtr _uw_map_get_u8_wrapper(UwValuePtr map, char*        key);
+UwValuePtr _uw_map_get_u8        (UwValuePtr map, char8_t*     key);
+UwValuePtr _uw_map_get_u32       (UwValuePtr map, char32_t*    key);
+UwValuePtr _uw_map_get_uw        (UwValuePtr map, UwValuePtr   key);
 
 #define uw_map_length(map) \
     ({ uw_assert_map(map); _uw_list_length((map)->map_value->kv_pairs) >> 1; })
@@ -645,19 +645,19 @@ void uw_string_swap(UwValuePtr a, UwValuePtr b);
             UwValuePtr: _uw_string_append_uw          \
     )((dest), (src))
 
-void uw_string_append_char(UwValuePtr dest, char c);  // can't be used in generic
-void uw_string_append_cstr(UwValuePtr dest, char* src);
-void _uw_string_append_c32(UwValuePtr dest, char32_t c);
-void _uw_string_append_u8_wrapper(UwValuePtr dest, char* src);
-void _uw_string_append_u8(UwValuePtr dest, char8_t* src);
-void _uw_string_append_u32(UwValuePtr dest, char32_t* src);
-void _uw_string_append_uw(UwValuePtr dest, UwValuePtr src);
+void  uw_string_append_char      (UwValuePtr dest, char       c);  // can't be used in generic
+void  uw_string_append_cstr      (UwValuePtr dest, char*      src);
+void _uw_string_append_c32       (UwValuePtr dest, char32_t   c);
+void _uw_string_append_u8_wrapper(UwValuePtr dest, char*      src);
+void _uw_string_append_u8        (UwValuePtr dest, char8_t*   src);
+void _uw_string_append_u32       (UwValuePtr dest, char32_t*  src);
+void _uw_string_append_uw        (UwValuePtr dest, UwValuePtr src);
 
 /*
  * Insert functions
  * TODO other types
  */
-#define uw_string_insert_chars(str, position, value, n) _Generic((value),  \
+#define uw_string_insert_chars(str, position, value, n) _Generic((value), \
               char32_t: _uw_string_insert_many_c32,   \
                    int: _uw_string_insert_many_c32    \
     )((str), (position), (value), (n))
@@ -669,18 +669,18 @@ void _uw_string_insert_many_c32(UwValuePtr str, size_t position, char32_t value,
  *
  * Append `src` substring starting from `src_start_pos` to `src_end_pos`.
  */
-#define uw_string_append_substring(dest, src, src_start_pos, src_end_pos) _Generic((src),     \
+#define uw_string_append_substring(dest, src, src_start_pos, src_end_pos) _Generic((src), \
                  char*: _uw_string_append_substring_u8_wrapper,  \
               char8_t*: _uw_string_append_substring_u8,          \
              char32_t*: _uw_string_append_substring_u32,         \
             UwValuePtr: _uw_string_append_substring_uw           \
     )((dest), (src), (src_start_pos), (src_end_pos))
 
-void uw_string_append_substring_cstr(UwValuePtr dest, char* src, size_t src_start_pos, size_t src_end_pos);  // can't be used in generic
-void _uw_string_append_substring_u8_wrapper(UwValuePtr dest, char* src, size_t src_start_pos, size_t src_end_pos);
-void _uw_string_append_substring_u8(UwValuePtr dest, char8_t* src, size_t src_start_pos, size_t src_end_pos);
-void _uw_string_append_substring_u32 (UwValuePtr dest, char32_t* src, size_t src_start_pos, size_t src_end_pos);
-void _uw_string_append_substring_uw(UwValuePtr dest, UwValuePtr src, size_t src_start_pos, size_t src_end_pos);
+void  uw_string_append_substring_cstr      (UwValuePtr dest, char*      src, size_t src_start_pos, size_t src_end_pos);  // can't be used in generic
+void _uw_string_append_substring_u8_wrapper(UwValuePtr dest, char*      src, size_t src_start_pos, size_t src_end_pos);
+void _uw_string_append_substring_u8        (UwValuePtr dest, char8_t*   src, size_t src_start_pos, size_t src_end_pos);
+void _uw_string_append_substring_u32       (UwValuePtr dest, char32_t*  src, size_t src_start_pos, size_t src_end_pos);
+void _uw_string_append_substring_uw        (UwValuePtr dest, UwValuePtr src, size_t src_start_pos, size_t src_end_pos);
 
 size_t uw_string_append_utf8(UwValuePtr dest, char8_t* buffer, size_t size);
 /*
@@ -705,11 +705,11 @@ UwValuePtr uw_string_get_substring(UwValuePtr str, size_t start_pos, size_t end_
          char32_t*: _uw_substring_eq_u32,         \
         UwValuePtr: _uw_substring_eq_uw           \
     )((a), (start_pos), (end_pos), (b))
-bool uw_substring_eq_cstr(UwValuePtr a, size_t start_pos, size_t end_pos, char* b);  // can't be used in generic
-bool _uw_substring_eq_u8_wrapper(UwValuePtr a, size_t start_pos, size_t end_pos, char* b);
-bool _uw_substring_eq_u8(UwValuePtr a, size_t start_pos, size_t end_pos, char8_t* b);
-bool _uw_substring_eq_u32(UwValuePtr a, size_t start_pos, size_t end_pos, char32_t* b);
-bool _uw_substring_eq_uw(UwValuePtr a, size_t start_pos, size_t end_pos, UwValuePtr b);
+bool  uw_substring_eq_cstr      (UwValuePtr a, size_t start_pos, size_t end_pos, char*      b);  // can't be used in generic
+bool _uw_substring_eq_u8_wrapper(UwValuePtr a, size_t start_pos, size_t end_pos, char*      b);
+bool _uw_substring_eq_u8        (UwValuePtr a, size_t start_pos, size_t end_pos, char8_t*   b);
+bool _uw_substring_eq_u32       (UwValuePtr a, size_t start_pos, size_t end_pos, char32_t*  b);
+bool _uw_substring_eq_uw        (UwValuePtr a, size_t start_pos, size_t end_pos, UwValuePtr b);
 
 char32_t uw_string_at(UwValuePtr str, size_t position);
 /*
@@ -839,11 +839,12 @@ uint8_t u32_char_size(char32_t* str, size_t max_len);
 
 #ifdef DEBUG
 
-void uw_dump_value(UwValuePtr value);
-void _uw_dump_value(UwValuePtr value, int indent, char* label);
-void _uw_dump_string(_UwString* str, int indent);
-void _uw_dump_list(_UwList* list, int indent);
-void _uw_dump_map(_UwMap* map, int indent);
+void  uw_dump_value (UwValuePtr value);
+void _uw_dump_value (UwValuePtr value, int indent, char* label);
+void _uw_dump_string(_UwString* str,   int indent);
+void _uw_dump_list  (_UwList*   list,  int indent);
+void _uw_dump_map   (_UwMap*    map,   int indent);
+
 void _uw_print_indent(int indent);
 
 #endif
