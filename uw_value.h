@@ -1,6 +1,7 @@
 #pragma once
 
 #include <limits.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -252,6 +253,35 @@ char* _uw_get_type_name_by_id(uint8_t type_id);
 #define uw_assert_list(value)   uw_assert(uw_is_list  (value))
 #define uw_assert_map(value)    uw_assert(uw_is_map   (value))
 
+/****************************************************************
+ * C type identifiers
+ *
+ * These identifiers are used to provide type info
+ * to variadic functions.
+ */
+
+#define uw_nullptr    0  // nullptr_t
+#define uw_bool       1  // bool
+#define uw_char       2  // char
+#define uw_uchar      3  // unsigned char
+#define uw_short      4  // short
+#define uw_ushort     5  // unsigned short
+#define uw_int        6  // int
+#define uw_uint       7  // unsigned int
+#define uw_long       8  // long
+#define uw_ulong      9  // unsigned long
+#define uw_longlong  10  // long long
+#define uw_ulonglong 11  // unsigned long long
+#define uw_int32     12  // int32_t
+#define uw_uint32    13  // uint32_t
+#define uw_int64     14  // int64_t
+#define uw_uint64    15  // uint64_t
+#define uw_float     16  // float
+#define uw_double    17  // double
+#define uw_charptr   18  // char*
+#define uw_char8ptr  19  // char8_t*
+#define uw_char32ptr 20  // char32_t*
+#define uw_uw        21  // UwValuePtr
 
 /****************************************************************
  * Constructors
@@ -321,6 +351,8 @@ UwValuePtr uw_create_string_c(char* initializer);
 
 UwValuePtr uw_create_list();
 UwValuePtr uw_create_map();
+UwValuePtr uw_create_map2(...);
+UwValuePtr uw_create_map_va(va_list args);
 
 _UwList* _uw_alloc_list(size_t capacity);  // used by lists and maps
 
@@ -328,6 +360,14 @@ UwValuePtr  uw_copy       (UwValuePtr value);
 UwValuePtr _uw_copy_string(_UwString* str);
 UwValuePtr _uw_copy_list  (_UwList*   list);
 UwValuePtr _uw_copy_map   (_UwMap*    map);
+
+UwValuePtr uw_create_from_ctype(int ctype, va_list args);
+/*
+ * Helper function for variadic constructors.
+ * Create UwValue from C type returned by va_arg(args).
+ * See C type identifiers.
+ * For uw_uw return UwValuePtr as is.
+ */
 
 /****************************************************************
  * Destructors
@@ -529,6 +569,15 @@ UwValuePtr uw_list_pop(UwValuePtr list);
  * Not assigning it to a UwValue leads to memory leak.
  */
 
+void uw_list_del(UwValuePtr list, size_t start_index, size_t end_index);
+/*
+ * Delete items from list.
+ * `end_index` is inclusive.
+ */
+
+void _uw_list_del(_UwList* list, size_t start_index, size_t end_index);
+// internal function
+
 /****************************************************************
  * Map functions
  */
@@ -603,6 +652,39 @@ UwValuePtr _uw_map_get_u8_wrapper(UwValuePtr map, char*        key);
 UwValuePtr _uw_map_get_u8        (UwValuePtr map, char8_t*     key);
 UwValuePtr _uw_map_get_u32       (UwValuePtr map, char32_t*    key);
 UwValuePtr _uw_map_get_uw        (UwValuePtr map, UwValuePtr   key);
+
+/*
+ * Delete item from map by `key`.
+ */
+#define uw_map_del(map, key) _Generic((key),    \
+             nullptr_t: _uw_map_del_null,       \
+                  bool: _uw_map_del_bool,       \
+                  char: _uw_map_del_int,        \
+         unsigned char: _uw_map_del_int,        \
+                 short: _uw_map_del_int,        \
+        unsigned short: _uw_map_del_int,        \
+                   int: _uw_map_del_int,        \
+          unsigned int: _uw_map_del_int,        \
+                  long: _uw_map_del_int,        \
+         unsigned long: _uw_map_del_int,        \
+             long long: _uw_map_del_int,        \
+    unsigned long long: _uw_map_del_int,        \
+                 float: _uw_map_del_float,      \
+                double: _uw_map_del_float,      \
+                 char*: _uw_map_del_u8_wrapper, \
+              char8_t*: _uw_map_del_u8,         \
+             char32_t*: _uw_map_del_u32,        \
+            UwValuePtr: _uw_map_del_uw          \
+    )((map), (key))
+
+void _uw_map_del_null      (UwValuePtr map, UwType_Null  key);
+void _uw_map_del_bool      (UwValuePtr map, UwType_Bool  key);
+void _uw_map_del_int       (UwValuePtr map, UwType_Int   key);
+void _uw_map_del_float     (UwValuePtr map, UwType_Float key);
+void _uw_map_del_u8_wrapper(UwValuePtr map, char*        key);
+void _uw_map_del_u8        (UwValuePtr map, char8_t*     key);
+void _uw_map_del_u32       (UwValuePtr map, char32_t*    key);
+void _uw_map_del_uw        (UwValuePtr map, UwValuePtr   key);
 
 #define uw_map_length(map) \
     ({ uw_assert_map(map); _uw_list_length((map)->map_value->kv_pairs) >> 1; })

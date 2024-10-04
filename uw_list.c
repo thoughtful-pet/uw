@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "uw_value.h"
 
 #define UWLIST_INITIAL_CAPACITY    16
@@ -182,8 +184,38 @@ UwValuePtr uw_list_pop(UwValuePtr list)
         return nullptr;
     } else {
         _list->length--;
-        return _list->items[_list->length];
+        return uw_ptr(_list->items[_list->length]);
     }
+}
+
+void uw_list_del(UwValuePtr list, size_t start_index, size_t end_index)
+{
+    uw_assert_list(list);
+    _uw_list_del(list->list_value, start_index, end_index);
+}
+
+void _uw_list_del(_UwList* list, size_t start_index, size_t end_index)
+{
+    if (list->length == 0) {
+        return;
+    }
+    if (end_index >= list->length) {
+        end_index = list->length - 1;
+    }
+    if (start_index > end_index) {
+        return;
+    }
+
+    for (size_t i = start_index; i <= end_index; i++) {
+        uw_delete_value(&list->items[i]);
+    }
+
+    size_t tail_len = (list->length - 1 - end_index) * sizeof(UwValuePtr);
+    if (tail_len) {
+        memmove(&list->items[start_index], &list->items[end_index + 1], tail_len);
+    }
+
+    list->length -= (end_index - start_index) + 1;
 }
 
 #ifdef DEBUG

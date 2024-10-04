@@ -5,6 +5,9 @@
 // capacity must be power of two, it doubles when map needs to grow
 #define UWMAP_INITIAL_CAPACITY  8  // must be power of two
 
+// forward declaration
+static void update_map(UwValuePtr map, UwValueRef key, UwValueRef value);
+
 /*
  * optimized methods for acessing hash table
  */
@@ -135,6 +138,36 @@ UwValuePtr uw_create_map()
     return value;
 }
 
+UwValuePtr uw_create_map2(...)
+{
+    va_list args;
+    va_start(args);
+    UwValuePtr map = uw_create_map_va(args);
+    va_end(args);
+    return map;
+}
+
+UwValuePtr uw_create_map_va(va_list args)
+{
+    UwValue map = uw_create_map();
+    for (;;) {
+        int ctype = va_arg(args, int);
+        if (ctype == -1) {
+            break;
+        }
+        UwValue key = uw_create_from_ctype(ctype, args);
+
+        ctype = va_arg(args, int);
+        if (ctype == -1) {
+            break;
+        }
+        UwValue value = uw_create_from_ctype(ctype, args);
+
+        update_map(map, &key, &value);
+    }
+    return uw_ptr(map);
+}
+
 void _uw_delete_map(_UwMap* map)
 {
     _uw_delete_list(map->kv_pairs);
@@ -159,29 +192,33 @@ bool _uw_map_eq(_UwMap* a, _UwMap* b)
     return _uw_list_eq(a->kv_pairs, b->kv_pairs);
 }
 
-static UwType_Hash lookup(_UwMap* map, UwType_Hash ht_index, UwValuePtr key,
-                           size_t* key_index, size_t* ht_offset)
+static size_t lookup(_UwMap* map, UwValuePtr key, size_t* ht_index, size_t* ht_offset)
 /*
- * Lookup key starting from `ht_index`.
+ * Lookup key starting from index = key->hash.
  *
- * Return index of hash table item where lookup has stopped.
+ * Return index of key in kv_pairs or SIZE_MAX if hash table has no item matching `key`.
  *
- * Write index of key in kv_pairs to `key_index` or SIZE_MAX if hash table has no item matching `key`.
- * Write the difference from final `ht_index` and initial `ht_index` to `ht_offset`;
+ * If `ht_index` is not `nullptr`: write index of hash table item at which lookup has stopped.
+ * If `ht_offset` is not `nullptr`: write the difference from final `ht_index` and initial `ht_index` to `ht_offset`;
  */
 {
     _UwHashTable* hash_table = &map->hash_table;
     UwType_Hash key_hash = key->hash;
+    UwType_Hash index = key_hash & hash_table->hash_bitmask;
     size_t offset = 0;
 
     do {
-        size_t kv_index = hash_table->get_item(hash_table, ht_index);
+        size_t kv_index = hash_table->get_item(hash_table, index);
 
         if (kv_index == 0) {
             // no entry matching key
-            *key_index = SIZE_MAX;
-            *ht_offset = offset;
-            return ht_index;
+            if (ht_index) {
+                *ht_index = index;
+            }
+            if (ht_offset) {
+                *ht_offset = offset;
+            }
+            return SIZE_MAX;
         }
 
         // make index 0-based
@@ -193,20 +230,24 @@ static UwType_Hash lookup(_UwMap* map, UwType_Hash ht_index, UwValuePtr key,
         if (k->hash == key_hash) {
             if (uw_equal(k, key)) {
                 // found key
-                *key_index = kv_index * 2;
-                *ht_offset = offset;
-                return ht_index;
+                if (ht_index) {
+                    *ht_index = index;
+                }
+                if (ht_offset) {
+                    *ht_offset = offset;
+                }
+                return kv_index * 2;
             }
         }
 
         // probe next item
-        ht_index = (ht_index + 1) & hash_table->hash_bitmask;
+        index = (index + 1) & hash_table->hash_bitmask;
         offset++;
 
     } while (true);
 }
 
-static void set_hash_table_item(_UwHashTable* hash_table, UwType_Hash ht_index, size_t kv_index)
+static void set_hash_table_item(_UwHashTable* hash_table, size_t ht_index, size_t kv_index)
 /*
  * Assign `kv_index` to `hash_table` at position `ht_index` & hash_bitmask.
  * If the position is already occupied, try next one.
@@ -239,7 +280,7 @@ static inline _UwMap* double_hash_table(_UwMap* map)
 
     // rebuild hash table
     UwValueRef key = _uw_list_item_ref(new_map->kv_pairs, 0);
-    size_t kv_index = 0;
+    size_t kv_index = 1;
     size_t n = _uw_list_length(new_map->kv_pairs);
     uw_assert((n & 1) == 0);
     while (n) {
@@ -267,10 +308,8 @@ static void update_map(UwValuePtr map, UwValueRef key, UwValueRef value)
 
     // lookup key in the map
 
-    UwType_Hash ht_index = key_hash & hash_table->hash_bitmask;
     size_t ht_offset;
-    size_t key_index;
-    ht_index = lookup(m, ht_index, *key, &key_index, &ht_offset);
+    size_t key_index = lookup(m, *key, nullptr, &ht_offset);
 
     if (key_index != SIZE_MAX) {
         // found key, update value
@@ -306,7 +345,6 @@ static void update_map(UwValuePtr map, UwValueRef key, UwValueRef value)
         // update changed stuff
         map->map_value = m;
         hash_table = &m->hash_table;
-        ht_index = key_hash & hash_table->hash_bitmask;
     }
 
     size_t kv_index = _uw_list_length(m->kv_pairs) / 2;
@@ -383,12 +421,7 @@ bool _uw_map_has_key_uw(UwValuePtr map, UwValuePtr key)
 
     // lookup key in the map
 
-    UwType_Hash ht_index = key_hash & hash_table->hash_bitmask;
-    size_t ht_offset;
-    size_t key_index;
-    ht_index = lookup(m, ht_index, key, &key_index, &ht_offset);
-
-    return key_index != SIZE_MAX;
+    return lookup(m, key, nullptr, nullptr) != SIZE_MAX;
 }
 
 UwValuePtr _uw_map_get_null(UwValuePtr map, UwType_Null key)
@@ -446,10 +479,7 @@ UwValuePtr _uw_map_get_uw(UwValuePtr map, UwValuePtr key)
 
     // lookup key in the map
 
-    UwType_Hash ht_index = key_hash & hash_table->hash_bitmask;
-    size_t ht_offset;
-    size_t key_index;
-    ht_index = lookup(m, ht_index, key, &key_index, &ht_offset);
+    size_t key_index = lookup(m, key, nullptr, nullptr);
 
     if (key_index == SIZE_MAX) {
         // key not found
@@ -459,6 +489,90 @@ UwValuePtr _uw_map_get_uw(UwValuePtr map, UwValuePtr key)
     // return value
     size_t value_index = key_index + 1;
     return *_uw_list_item_ref(m->kv_pairs, value_index);
+}
+
+void _uw_map_del_null(UwValuePtr map, UwType_Null key)
+{
+    UwValue k = _uw_create_null(nullptr);
+    _uw_map_del_uw(map, k);
+}
+
+void _uw_map_del_bool(UwValuePtr map, UwType_Bool key)
+{
+    UwValue k = _uw_create_bool(key);
+    _uw_map_del_uw(map, k);
+}
+
+void _uw_map_del_int(UwValuePtr map, UwType_Int key)
+{
+    UwValue k = _uw_create_int(key);
+    _uw_map_del_uw(map, k);
+}
+
+void _uw_map_del_float(UwValuePtr map, UwType_Float key)
+{
+    UwValue k = _uw_create_float(key);
+    _uw_map_del_uw(map, k);
+}
+
+void _uw_map_del_u8_wrapper(UwValuePtr map, char* key)
+{
+    UwValue k = _uw_create_string_u8_wrapper(key);
+    _uw_map_del_uw(map, k);
+}
+
+void _uw_map_del_u8(UwValuePtr map, char8_t* key)
+{
+    UwValue k = _uw_create_string_u8(key);
+    _uw_map_del_uw(map, k);
+}
+
+void _uw_map_del_u32(UwValuePtr map, char32_t* key)
+{
+    UwValue k = _uw_create_string_u32(key);
+    _uw_map_del_uw(map, k);
+}
+
+void _uw_map_del_uw(UwValuePtr map, UwValuePtr key)
+{
+    uw_assert_map(map);
+
+    // calculate key hash and store it in `key` for lookup
+    UwType_Hash key_hash = uw_hash(key);
+    key->hash = key_hash;
+
+    _UwMap* m = map->map_value;
+    _UwHashTable* hash_table = &m->hash_table;
+
+    // lookup key in the map
+
+    size_t ht_index;
+    size_t key_index = lookup(m, key, &ht_index, nullptr);
+
+    if (key_index == SIZE_MAX) {
+        // key not found
+        return;
+    }
+
+    // delete item from hash table
+    hash_table->set_item(hash_table, ht_index, 0);
+    hash_table->items_used--;
+
+    // delete key-value pair
+    _uw_list_del(m->kv_pairs, key_index, key_index + 1);
+
+    if (key_index + 2 < m->kv_pairs->length) {
+        // key-value was not the last pair in the list,
+        // decrement indexes in the hash table that are greater than index of the deleted pair
+        size_t threshold = (key_index + 2) >> 1;
+        threshold++; // kv_indexes in hash table are 1-based
+        for (size_t i = 0; i < hash_table->capacity; i++) {
+            size_t kv_index = hash_table->get_item(hash_table, i);
+            if (kv_index >= threshold) {
+                hash_table->set_item(hash_table, i, kv_index - 1);
+            }
+        }
+    }
 }
 
 bool uw_map_item(UwValuePtr map, size_t index, UwValuePtr* key, UwValuePtr* value)

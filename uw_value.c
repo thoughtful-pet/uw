@@ -518,6 +518,38 @@ UwValuePtr uw_copy(UwValuePtr value)
     }
 }
 
+UwValuePtr uw_create_from_ctype(int ctype, va_list args)
+{
+    switch (ctype) {
+        case uw_nullptr:   va_arg(args, void*); return uw_create(nullptr);  // XXX something I don't get about nullptr_t
+        case uw_bool:      return uw_create((bool) va_arg(args, int /*bool*/));
+        case uw_char:      return uw_create(va_arg(args, int /*char*/));
+        case uw_uchar:     return uw_create(va_arg(args, unsigned int /*char*/));
+        case uw_short:     return uw_create(va_arg(args, int /*short*/));
+        case uw_ushort:    return uw_create(va_arg(args, unsigned int /*short*/));
+        case uw_int:       return uw_create(va_arg(args, int));
+        case uw_uint:      return uw_create(va_arg(args, unsigned int));
+        case uw_long:      return uw_create(va_arg(args, long));
+        case uw_ulong:     return uw_create(va_arg(args, unsigned long));
+        case uw_longlong:  return uw_create(va_arg(args, long long));
+        case uw_ulonglong: return uw_create(va_arg(args, unsigned long long));
+        case uw_int32:     return uw_create(va_arg(args, int32_t));
+        case uw_uint32:    return uw_create(va_arg(args, uint32_t));
+        case uw_int64:     return uw_create(va_arg(args, int64_t));
+        case uw_uint64:    return uw_create(va_arg(args, uint64_t));
+        case uw_float:     return uw_create(va_arg(args, double /*float*/));
+        case uw_double:    return uw_create(va_arg(args, double));
+        case uw_charptr:   return uw_create_string(va_arg(args, char*));
+        case uw_char8ptr:  return uw_create(va_arg(args, char8_t*));
+        case uw_char32ptr: return uw_create(va_arg(args, char32_t*));
+        case uw_uw:        return va_arg(args, UwValuePtr);
+        default:
+            // panic
+            fprintf(stderr, "%s: bad C type identifier %d\n", __func__, ctype);
+            exit(1);
+    }
+}
+
 #ifdef DEBUG
 
 void _uw_print_indent(int indent)

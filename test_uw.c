@@ -1175,35 +1175,76 @@ void test_list()
         uw_delete_value(&item);
         TEST(item == nullptr);
     }
+
+    uw_list_del(list, 100, 199);
+
+    TEST(uw_list_length(list) == 900);
+    {
+        UwValuePtr item = uw_list_item(list, 99);
+        UwValue v = uw_create(99);
+        TEST(uw_equal(v, item));
+        uw_delete_value(&v);
+
+        item = uw_list_item(list, 100);
+        v = uw_create(200);
+        TEST(uw_equal(v, item));
+        uw_delete_value(&v);
+    }
 }
 
 void test_map()
 {
-    UwValue map = uw_create_map();
-    UwValue key = uw_create(0);
-    UwValue value = uw_create(false);
+    {
+        UwValue map = uw_create_map();
+        UwValue key = uw_create(0);
+        UwValue value = uw_create(false);
 
-    uw_map_update(map, &key, &value);
-
-    uw_assert(key == nullptr);
-    uw_assert(value == nullptr);
-
-    key = uw_create(0);
-    TEST(uw_map_has_key(map, key));
-
-    uw_delete_value(&key);
-    key = uw_create(nullptr);
-    TEST(!uw_map_has_key(map, key));
-
-    uw_delete_value(&key);
-
-//    uw_dump_value(map);
-    for (int i = 1; i < 50; i++) {
-        key = uw_create(i);
-        value = uw_create(i);
         uw_map_update(map, &key, &value);
+
+        uw_assert(key == nullptr);
+        uw_assert(value == nullptr);
+
+        key = uw_create(0);
+        TEST(uw_map_has_key(map, key));
+
+        uw_delete_value(&key);
+        key = uw_create(nullptr);
+        TEST(!uw_map_has_key(map, key));
+
+        uw_delete_value(&key);
+
+//        uw_dump_value(map);
+        for (int i = 1; i < 50; i++) {
+            key = uw_create(i);
+            value = uw_create(i);
+            uw_map_update(map, &key, &value);
+        }
+        uw_map_del(map, 25);
+
+        TEST(uw_map_length(map) == 49);
+
+//        uw_dump_value(map);
     }
-//    uw_dump_value(map);
+    {
+        UwValue map = uw_create_map2(
+            uw_charptr,  "let's",       uw_charptr,   "go!",
+            uw_nullptr,  nullptr,       uw_bool,      true,
+            uw_bool,     true,          uw_charptr,   "true",
+            uw_char,     -10,           uw_bool,      false,
+            uw_uchar,    'b',           uw_short,     -42,
+            uw_ushort,   42,            uw_int,       -1000,
+            uw_uint,     100,           uw_long,      -1000000L,
+            uw_ulong,      9UL,         uw_longlong,  10LL,
+            uw_ulonglong, 100000000ULL, uw_int32,     -500000,
+            uw_uint32,    700,          uw_int64,     -1000000000000ULL,
+            uw_uint64,    300000000ULL, uw_float,     1.23,
+            uw_double,   3.45,          uw_charptr,   "hello",
+            uw_char8ptr, u8"สวัสดี",      uw_char32ptr, U"สบาย",
+            uw_charptr,  "finally",     uw_uw,        uw_create_map2(uw_charptr, "ok", uw_charptr, "done", -1),
+            -1
+        );
+//        uw_dump_value(map);
+    }
 }
 
 int main(int argc, char* argv[])
