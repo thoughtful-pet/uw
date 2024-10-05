@@ -150,21 +150,7 @@ UwValuePtr uw_create_map2(...)
 UwValuePtr uw_create_map_va(va_list args)
 {
     UwValue map = uw_create_map();
-    for (;;) {
-        int ctype = va_arg(args, int);
-        if (ctype == -1) {
-            break;
-        }
-        UwValue key = uw_create_from_ctype(ctype, args);
-
-        ctype = va_arg(args, int);
-        if (ctype == -1) {
-            break;
-        }
-        UwValue value = uw_create_from_ctype(ctype, args);
-
-        update_map(map, &key, &value);
-    }
+    uw_map_update_va(map, args);
     return uw_ptr(map);
 }
 
@@ -364,6 +350,35 @@ void uw_map_update(UwValuePtr map, UwValueRef key, UwValueRef value)
     uw_assert(*value != map);
 
     update_map(map, key, value);
+}
+
+void uw_map_update2(UwValuePtr map, ...)
+{
+    va_list args;
+    va_start(args);
+    uw_map_update_va(map, args);
+    va_end(args);
+}
+
+void uw_map_update_va(UwValuePtr map, va_list args)
+{
+    uw_assert_map(map);
+
+    for (;;) {
+        int ctype = va_arg(args, int);
+        if (ctype == -1) {
+            break;
+        }
+        UwValue key = uw_create_from_ctype(ctype, args);
+
+        ctype = va_arg(args, int);
+        if (ctype == -1) {
+            break;
+        }
+        UwValue value = uw_create_from_ctype(ctype, args);
+
+        update_map(map, &key, &value);
+    }
 }
 
 bool _uw_map_has_key_null(UwValuePtr map, UwType_Null key)

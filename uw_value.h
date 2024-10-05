@@ -282,6 +282,7 @@ char* _uw_get_type_name_by_id(uint8_t type_id);
 #define uw_char8ptr  19  // char8_t*
 #define uw_char32ptr 20  // char32_t*
 #define uw_uw        21  // UwValuePtr
+#define uw_uwref     22  // UwValueRef
 
 /****************************************************************
  * Constructors
@@ -367,6 +368,10 @@ UwValuePtr uw_create_from_ctype(int ctype, va_list args);
  * Create UwValue from C type returned by va_arg(args).
  * See C type identifiers.
  * For uw_uw return UwValuePtr as is.
+ * For uw_uwptr return UwValuePtr using move semantic. The caller
+ *    must call uw_delete_value either explicitly, or by assigning
+ *    it to an auto-cleaned variable, or by passing to a function
+ *    using move semantic.
  */
 
 /****************************************************************
@@ -583,6 +588,8 @@ void _uw_list_del(_UwList* list, size_t start_index, size_t end_index);
  */
 
 void uw_map_update(UwValuePtr map, UwValueRef key, UwValueRef value);
+void uw_map_update2(UwValuePtr map, ...);
+void uw_map_update_va(UwValuePtr map, va_list args);
 /*
  * Insert or assign key-value pair using move semantic.
  */

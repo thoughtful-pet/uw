@@ -543,6 +543,10 @@ UwValuePtr uw_create_from_ctype(int ctype, va_list args)
         case uw_char8ptr:  return uw_create(va_arg(args, char8_t*));
         case uw_char32ptr: return uw_create(va_arg(args, char32_t*));
         case uw_uw:        return va_arg(args, UwValuePtr);
+        case uw_uwref: {
+            UwValueRef vref = va_arg(args, UwValueRef);
+            return uw_ptr(*vref);
+        }
         default:
             // panic
             fprintf(stderr, "%s: bad C type identifier %d\n", __func__, ctype);
