@@ -25,6 +25,22 @@ UwValuePtr uw_create_list()
     return value;
 }
 
+UwValuePtr uw_create_list2(...)
+{
+    va_list args;
+    va_start(args);
+    UwValue list = uw_create_list_va(args);
+    va_end(args);
+    return uw_ptr(list);
+}
+
+UwValuePtr uw_create_list_va(va_list args)
+{
+    UwValue list = uw_create_list();
+    uw_list_append_va(list, args);
+    return uw_ptr(list);
+}
+
 void _uw_delete_list(_UwList* list)
 {
     for (size_t i = 0; i < list->length; i++) {
@@ -159,6 +175,29 @@ void _uw_list_append(_UwList** list_ref, UwValueRef item)
     }
     list->items[list->length++] = *item;
     *item = nullptr;
+}
+
+void uw_list_append2(UwValuePtr list, ...)
+{
+    va_list args;
+    va_start(args);
+    uw_list_append_va(list, args);
+    va_end(args);
+}
+
+void uw_list_append_va(UwValuePtr list, va_list args)
+{
+    uw_assert_list(list);
+
+    for (;;) {
+        int ctype = va_arg(args, int);
+        if (ctype == -1) {
+            break;
+        }
+        UwValue item = uw_create_from_ctype(ctype, args);
+
+        _uw_list_append(&(list)->list_value, &item);
+    }
 }
 
 UwValuePtr _uw_copy_list(_UwList* list)

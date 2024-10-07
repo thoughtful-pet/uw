@@ -351,6 +351,8 @@ UwValuePtr _uw_create_string_uw        (UwValuePtr str);  // XXX convert value o
 UwValuePtr uw_create_string_c(char* initializer);
 
 UwValuePtr uw_create_list();
+UwValuePtr uw_create_list2(...);
+UwValuePtr uw_create_list_va(va_list args);
 UwValuePtr uw_create_map();
 UwValuePtr uw_create_map2(...);
 UwValuePtr uw_create_map_va(va_list args);
@@ -555,6 +557,9 @@ void _uw_list_append(_UwList** list_ref, UwValueRef item);
 /*
  * Internal append function, also used by map implementation.
  */
+
+void uw_list_append2(UwValuePtr list, ...);
+void uw_list_append_va(UwValuePtr list, va_list args);
 
 #define _uw_list_item_ref(list, index) \
     ({ uw_assert((index) < (list)->length); &(list)->items[(index)]; })
