@@ -164,9 +164,13 @@ typedef struct {
 
 // okay, here it is, at last:
 
+#ifndef UW_TYPE_BITWIDTH
+#   define UW_TYPE_BITWIDTH  8
+#endif
+
 struct _UwValue {
-    uint64_t type_id: 8,
-             hash:56;  // used internally for map keys only, it's not automagically calculated for all values.
+    uint64_t type_id: UW_TYPE_BITWIDTH,
+             hash:(64 - UW_TYPE_BITWIDTH);  // used internally for map keys only, it's not automagically calculated for all values.
     union {
         UwType_Null   null_value;
         UwType_Bool   bool_value;
