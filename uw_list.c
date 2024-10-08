@@ -25,19 +25,19 @@ UwValuePtr uw_create_list()
     return value;
 }
 
-UwValuePtr uw_create_list2(...)
+UwValuePtr uw_create_list_va(...)
 {
-    va_list args;
-    va_start(args);
-    UwValue list = uw_create_list_va(args);
-    va_end(args);
+    va_list ap;
+    va_start(ap);
+    UwValue list = uw_create_list_ap(ap);
+    va_end(ap);
     return uw_ptr(list);
 }
 
-UwValuePtr uw_create_list_va(va_list args)
+UwValuePtr uw_create_list_ap(va_list ap)
 {
     UwValue list = uw_create_list();
-    uw_list_append_va(list, args);
+    uw_list_append_ap(list, ap);
     return uw_ptr(list);
 }
 
@@ -177,24 +177,24 @@ void _uw_list_append(_UwList** list_ref, UwValueRef item)
     *item = nullptr;
 }
 
-void uw_list_append2(UwValuePtr list, ...)
+void uw_list_append_va(UwValuePtr list, ...)
 {
-    va_list args;
-    va_start(args);
-    uw_list_append_va(list, args);
-    va_end(args);
+    va_list ap;
+    va_start(ap);
+    uw_list_append_ap(list, ap);
+    va_end(ap);
 }
 
-void uw_list_append_va(UwValuePtr list, va_list args)
+void uw_list_append_ap(UwValuePtr list, va_list ap)
 {
     uw_assert_list(list);
 
     for (;;) {
-        int ctype = va_arg(args, int);
+        int ctype = va_arg(ap, int);
         if (ctype == -1) {
             break;
         }
-        UwValue item = uw_create_from_ctype(ctype, args);
+        UwValue item = uw_create_from_ctype(ctype, ap);
 
         _uw_list_append(&(list)->list_value, &item);
     }

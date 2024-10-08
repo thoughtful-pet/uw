@@ -1226,7 +1226,7 @@ void test_map()
 //        uw_dump_value(map);
     }
     {
-        UwValue map = uw_create_map2(
+        UwValue map = uw_create_map_va(
             uw_charptr,  "let's",       uw_charptr,   "go!",
             uw_nullptr,  nullptr,       uw_bool,      true,
             uw_bool,     true,          uw_charptr,   "true",
@@ -1240,7 +1240,7 @@ void test_map()
             uw_uint64,    300000000ULL, uw_float,     1.23,
             uw_double,   3.45,          uw_charptr,   "hello",
             uw_char8ptr, u8"สวัสดี",      uw_char32ptr, U"สบาย",
-            uw_charptr,  "finally",     uw_uw,        uw_create_map2(uw_charptr, "ok", uw_charptr, "done", -1),
+            uw_charptr,  "finally",     uw_uw,        uw_create_map_va(uw_charptr, "ok", uw_charptr, "done", -1),
             -1
         );
 //        uw_dump_value(map);

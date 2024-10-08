@@ -355,11 +355,11 @@ UwValuePtr _uw_create_string_uw        (UwValuePtr str);  // XXX convert value o
 UwValuePtr uw_create_string_c(char* initializer);
 
 UwValuePtr uw_create_list();
-UwValuePtr uw_create_list2(...);
-UwValuePtr uw_create_list_va(va_list args);
+UwValuePtr uw_create_list_va(...);
+UwValuePtr uw_create_list_ap(va_list ap);
 UwValuePtr uw_create_map();
-UwValuePtr uw_create_map2(...);
-UwValuePtr uw_create_map_va(va_list args);
+UwValuePtr uw_create_map_va(...);
+UwValuePtr uw_create_map_ap(va_list ap);
 
 _UwList* _uw_alloc_list(size_t capacity);  // used by lists and maps
 
@@ -562,8 +562,8 @@ void _uw_list_append(_UwList** list_ref, UwValueRef item);
  * Internal append function, also used by map implementation.
  */
 
-void uw_list_append2(UwValuePtr list, ...);
-void uw_list_append_va(UwValuePtr list, va_list args);
+void uw_list_append_va(UwValuePtr list, ...);
+void uw_list_append_ap(UwValuePtr list, va_list ap);
 
 #define _uw_list_item_ref(list, index) \
     ({ uw_assert((index) < (list)->length); &(list)->items[(index)]; })
@@ -597,8 +597,8 @@ void _uw_list_del(_UwList* list, size_t start_index, size_t end_index);
  */
 
 void uw_map_update(UwValuePtr map, UwValueRef key, UwValueRef value);
-void uw_map_update2(UwValuePtr map, ...);
-void uw_map_update_va(UwValuePtr map, va_list args);
+void uw_map_update_va(UwValuePtr map, ...);
+void uw_map_update_ap(UwValuePtr map, va_list ap);
 /*
  * Insert or assign key-value pair using move semantic.
  */
