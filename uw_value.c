@@ -424,7 +424,7 @@ bool _uw_equal_uw(UwValuePtr a, UwValuePtr b)
                 case UwTypeId_Bool:  return a->bool_value == b->bool_value;
                 case UwTypeId_Int:   return a->bool_value == (UwType_Bool) b->int_value;
                 case UwTypeId_Float: return a->bool_value == (UwType_Bool) b->float_value;
-                default:              return false;
+                default:             return false;
             }
 
         case UwTypeId_Int:
@@ -433,7 +433,7 @@ bool _uw_equal_uw(UwValuePtr a, UwValuePtr b)
                 case UwTypeId_Bool:  return ((UwType_Bool) a->int_value) == b->bool_value;
                 case UwTypeId_Int:   return a->int_value == b->int_value;
                 case UwTypeId_Float: return ((UwType_Float) a->int_value) == b->float_value;
-                default:              return false;
+                default:             return false;
             }
 
         case UwTypeId_Float:
@@ -442,7 +442,7 @@ bool _uw_equal_uw(UwValuePtr a, UwValuePtr b)
                 case UwTypeId_Bool:  return ((UwType_Bool) a->float_value) == b->bool_value;
                 case UwTypeId_Int:   return a->float_value == (UwType_Float) b->int_value;
                 case UwTypeId_Float: return a->float_value == b->float_value;
-                default:              return false;
+                default:             return false;
             }
 
         case UwTypeId_String:
