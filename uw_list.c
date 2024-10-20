@@ -62,8 +62,8 @@ int _uw_list_cmp(_UwList* a, _UwList* b)
         return UW_NEQ;
     }
 
-    UwValuePtr* a_vptr = _uw_list_item_ptr(a, 0);
-    UwValuePtr* b_vptr = _uw_list_item_ptr(b, 0);
+    UwValuePtr* a_vptr = a->items;
+    UwValuePtr* b_vptr = b->items;
     while (n) {
         if (uw_compare(*a_vptr, *b_vptr) != UW_EQ) {
             return UW_NEQ;
@@ -88,8 +88,8 @@ bool _uw_list_eq(_UwList* a, _UwList* b)
         return false;
     }
 
-    UwValuePtr* a_vptr = _uw_list_item_ptr(a, 0);
-    UwValuePtr* b_vptr = _uw_list_item_ptr(b, 0);
+    UwValuePtr* a_vptr = a->items;
+    UwValuePtr* b_vptr = b->items;
     while (n) {
         if (!uw_equal(*a_vptr, *b_vptr)) {
             return false;
@@ -197,6 +197,21 @@ void uw_list_append_ap(UwValuePtr list, va_list ap)
 
         _uw_list_append(&(list)->list_value, item);
     }
+}
+
+UwValuePtr uw_list_item(UwValuePtr list, ssize_t index)
+{
+    uw_assert_list(list);
+
+    _UwList* _list = list->list_value;
+
+    if (index < 0) {
+        index = _list->length + index;
+        uw_assert(index >= 0);
+    } else {
+        uw_assert(index < _list->length);
+    }
+    return  uw_makeref(_list->items[index]);
 }
 
 UwValuePtr _uw_copy_list(_UwList* list)

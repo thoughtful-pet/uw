@@ -560,22 +560,18 @@ void _uw_list_append(_UwList** list_ref, UwValuePtr item);
 void uw_list_append_va(UwValuePtr list, ...);
 void uw_list_append_ap(UwValuePtr list, va_list ap);
 
-#define _uw_list_item_ptr(list, index) \
-    ({ uw_assert((index) < (list)->length); &(list)->items[(index)]; })
+UwValuePtr uw_list_item(UwValuePtr list, ssize_t index);
 /*
- * Reference to list item.
- * Helper for `uw_list_item`, also used by map implementation.
+ * Return reference to list item. Negative indexes are allowed: -1 last item.
+ * It's the caller's responsibility to destroy returned value to avoid memory leaks.
+ * The simplest way is assigning it to an UwValue.
  */
-
-//UwValuePtr uw_list_item(UwValuePtr list, size_t index);
-#define uw_list_item(list, index) \
-    ({ uw_assert_list(list); *_uw_list_item_ptr((list)->list_value, (index)); })
 
 UwValuePtr uw_list_pop(UwValuePtr list);
 /*
  * Extract last item from the list.
- * It's the caller's responsibility to destroy returned value.
- * Not assigning it to a UwValue leads to memory leak.
+ * It's the caller's responsibility to destroy returned value to avoid memory leaks.
+ * The simplest way is assigning it to an UwValue.
  */
 
 void uw_list_del(UwValuePtr list, size_t start_index, size_t end_index);
@@ -633,6 +629,9 @@ bool _uw_map_has_key_uw        (UwValuePtr map, UwValuePtr   key);
 
 /*
  * Get value by `key`. Return nullptr if `key` is not in `map`.
+ *
+ * It's the caller's responsibility to destroy returned value to avoid memory leaks.
+ * The simplest way is assigning it to UwValue.
  */
 #define uw_map_get(map, key) _Generic((key),    \
              nullptr_t: _uw_map_get_null,       \
@@ -704,6 +703,8 @@ bool uw_map_item(UwValuePtr map, size_t index, UwValuePtr* key, UwValuePtr* valu
 /*
  * Get key-value pair from the map.
  * Return true if `index` is valid.
+ * It's the caller's responsibility to destroy returned key-value to avoid memory leaks.
+ * The simplest way is passing pointers to UwValue.
  */
 
 /****************************************************************

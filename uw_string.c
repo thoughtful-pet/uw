@@ -1949,30 +1949,34 @@ UwValuePtr _uw_string_join_uw(UwValuePtr separator, UwValuePtr list)
     uint8_t max_char_size = uw_string_char_size(separator);
     item_added = false;
     for (size_t i = 0; i < num_items; i++) {
-        UwValuePtr item = uw_list_item(list, i);
-        if (uw_is_string(item)) {
-            if (item_added) {
-                result_len += separator_len;
+        {   // context for autocleaning item
+            UwValue item = uw_list_item(list, i);
+            if (uw_is_string(item)) {
+                if (item_added) {
+                    result_len += separator_len;
+                }
+                uint8_t char_size = uw_string_char_size(item);
+                if (max_char_size < char_size) {
+                    max_char_size = char_size;
+                }
+                result_len += uw_strlen(item);
+                item_added = true;
             }
-            uint8_t char_size = uw_string_char_size(item);
-            if (max_char_size < char_size) {
-                max_char_size = char_size;
-            }
-            result_len += uw_strlen(item);
-            item_added = true;
         }
     }
     // join list items
     UwValue result = uw_create_empty_string(result_len, max_char_size);
     item_added = false;
     for (size_t i = 0; i < num_items; i++) {
-        UwValuePtr item = uw_list_item(list, i);
-        if (uw_is_string(item)) {
-            if (item_added) {
-                uw_string_append(result, separator);
+        {   // context for autocleaning item
+            UwValue item = uw_list_item(list, i);
+            if (uw_is_string(item)) {
+                if (item_added) {
+                    uw_string_append(result, separator);
+                }
+                uw_string_append(result, item);
+                item_added = true;
             }
-            uw_string_append(result, item);
-            item_added = true;
         }
     }
     return uw_ptr(result);

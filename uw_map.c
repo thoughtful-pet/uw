@@ -209,7 +209,7 @@ static size_t lookup(_UwMap* map, UwValuePtr key, size_t* ht_index, size_t* ht_o
         // make index 0-based
         kv_index--;
 
-        UwValuePtr k = *_uw_list_item_ptr(map->kv_pairs, kv_index * 2);
+        UwValuePtr k = map->kv_pairs->items[kv_index * 2];
 
         // compare keys
         if (uw_equal(k, key)) {
@@ -262,7 +262,7 @@ static inline _UwMap* double_hash_table(_UwMap* map)
     _UwHashTable* hash_table = &new_map->hash_table;
 
     // rebuild hash table
-    UwValuePtr* key_ptr = _uw_list_item_ptr(new_map->kv_pairs, 0);
+    UwValuePtr* key_ptr = new_map->kv_pairs->items;
     size_t kv_index = 1;
     size_t n = _uw_list_length(new_map->kv_pairs);
     uw_assert((n & 1) == 0);
@@ -293,7 +293,7 @@ static void update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value)
         // found key, update value
 
         size_t value_index = key_index + 1;
-        UwValuePtr* v_ptr = _uw_list_item_ptr(m->kv_pairs, value_index);
+        UwValuePtr* v_ptr = &m->kv_pairs->items[value_index];
 
         // update only if value is different
         if (*v_ptr != value) {
@@ -482,7 +482,7 @@ UwValuePtr _uw_map_get_uw(UwValuePtr map, UwValuePtr key)
 
     // return value
     size_t value_index = key_index + 1;
-    UwValuePtr v = *_uw_list_item_ptr(m->kv_pairs, value_index);
+    UwValuePtr v = m->kv_pairs->items[value_index];
     return uw_makeref(v);
 }
 
@@ -575,7 +575,7 @@ bool uw_map_item(UwValuePtr map, size_t index, UwValuePtr* key, UwValuePtr* valu
     index <<= 1;
 
     if (index < _uw_list_length(m->kv_pairs)) {
-        UwValuePtr* ptr = _uw_list_item_ptr(m->kv_pairs, index);
+        UwValuePtr* ptr = &m->kv_pairs->items[index];
         *key = uw_makeref(*ptr);
         ptr++;
         *value = uw_makeref(*ptr);

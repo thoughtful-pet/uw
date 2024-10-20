@@ -1161,35 +1161,40 @@ void test_list()
     TEST(uw_list_length(list) == 0);
 
     for(int i = 0; i < 1000; i++) {
-        UwValue item = uw_create(i);
+        {
+            UwValue item = uw_create(i);
 
-        uw_list_append(list, item);
-        TEST(item->refcount == 2);
-        uw_delete(&item);
+            uw_list_append(list, item);
+            TEST(item->refcount == 2);
+        }
 
         TEST(uw_list_length(list) == i + 1);
 
-        UwValuePtr v = uw_list_item(list, i);
-        item = uw_create(i);
-        TEST(uw_equal(v, item));
+        {
+            UwValue v = uw_list_item(list, i);
+            UwValue item = uw_create(i);
+            TEST(uw_equal(v, item));
+        }
+    }
 
-        uw_delete(&item);
-        TEST(item == nullptr);
+    {
+        UwValue item = uw_list_item(list, -2);
+        UwValue v = uw_create(998);
+        TEST(uw_equal(v, item));
     }
 
     uw_list_del(list, 100, 199);
-
     TEST(uw_list_length(list) == 900);
+
     {
-        UwValuePtr item = uw_list_item(list, 99);
+        UwValue item = uw_list_item(list, 99);
         UwValue v = uw_create(99);
         TEST(uw_equal(v, item));
-        uw_delete(&v);
-
-        item = uw_list_item(list, 100);
-        v = uw_create(200);
+    }
+    {
+        UwValue item = uw_list_item(list, 100);
+        UwValue v = uw_create(200);
         TEST(uw_equal(v, item));
-        uw_delete(&v);
     }
 }
 
