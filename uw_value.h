@@ -60,8 +60,10 @@ extern "C" {
 // make new reference
 #define uw_makeref(v) \
     ({ \
-        uw_assert((v)->refcount < UW_MAX_REFCOUNT); \
-        (v)->refcount++; \
+        if (v) { \
+            uw_assert((v)->refcount < UW_MAX_REFCOUNT); \
+            (v)->refcount++; \
+        } \
         (v); \
     })
 
