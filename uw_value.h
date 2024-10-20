@@ -57,14 +57,12 @@ extern "C" {
         tmp;  \
     })
 
-// move one value to another, src and dest must be UwValueRef
-#define uw_move(dest, src) \
-    ({  \
-        if (*dest) {  \
-            uw_delete_value(dest);  \
-        }  \
-        *(dest) = *(src);  \
-        *(src) = nullptr;  \
+// make new reference
+#define uw_makeref(v) \
+    ({ \
+        uw_assert((v)->refcount < UW_MAX_REFCOUNT); \
+        (v)->refcount++; \
+        (v); \
     })
 
 /*
@@ -158,7 +156,7 @@ typedef struct __UwHashTable {
 } _UwHashTable;
 
 typedef struct {
-    _UwList* kv_pairs;
+    _UwList* kv_pairs;        // key-value pairs in the insertion order
     _UwHashTable hash_table;
 } _UwMap;
 
@@ -168,9 +166,12 @@ typedef struct {
 #   define UW_TYPE_BITWIDTH  8
 #endif
 
+#define UW_REFCOUNT_BITWIDTH  (64 - UW_TYPE_BITWIDTH)
+#define UW_MAX_REFCOUNT       ((1ULL << UW_REFCOUNT_BITWIDTH) - 1)
+
 struct _UwValue {
     uint64_t type_id: UW_TYPE_BITWIDTH,
-             hash:(64 - UW_TYPE_BITWIDTH);  // used internally for map keys only, it's not automagically calculated for all values.
+             refcount: UW_REFCOUNT_BITWIDTH;
     union {
         UwType_Null   null_value;
         UwType_Bool   bool_value;
@@ -187,9 +188,6 @@ struct _UwValue {
 
 // the raw pointer
 typedef struct _UwValue* UwValuePtr;
-
-// reference to the value
-typedef UwValuePtr* UwValueRef;
 
 /****************************************************************
  * C strings
@@ -286,7 +284,6 @@ char* _uw_get_type_name_by_id(uint8_t type_id);
 #define uw_char8ptr  19  // char8_t*
 #define uw_char32ptr 20  // char32_t*
 #define uw_uw        21  // UwValuePtr
-#define uw_uwref     22  // UwValueRef
 
 /****************************************************************
  * Constructors
@@ -306,6 +303,7 @@ char* _uw_get_type_name_by_id(uint8_t type_id);
             perror(__func__); \
             exit(1); \
         } \
+        value->refcount = 1; \
         value; \
     })
 
@@ -384,7 +382,7 @@ UwValuePtr uw_create_from_ctype(int ctype, va_list args);
  * Destructors
  */
 
-void uw_delete_value(UwValueRef value);
+void uw_delete_value(UwValuePtr* value);
 void uw_delete_cstring(CStringRef str);
 
 // helper functions for uw_delete_value
@@ -545,7 +543,7 @@ bool _uw_map_eq   (_UwMap*    a, _UwMap*    b);
                  char*: _uw_list_append_u8_wrapper, \
               char8_t*: _uw_list_append_u8,         \
              char32_t*: _uw_list_append_u32,        \
-            UwValueRef: _uw_list_append_uw          \
+            UwValuePtr: _uw_list_append_uw          \
     )((list), (item))
 
 void _uw_list_append_null      (UwValuePtr list, UwType_Null  item);
@@ -555,9 +553,9 @@ void _uw_list_append_float     (UwValuePtr list, UwType_Float item);
 void _uw_list_append_u8_wrapper(UwValuePtr list, char*        item);
 void _uw_list_append_u8        (UwValuePtr list, char8_t*     item);
 void _uw_list_append_u32       (UwValuePtr list, char32_t*    item);
-void _uw_list_append_uw        (UwValuePtr list, UwValueRef   item);
+void _uw_list_append_uw        (UwValuePtr list, UwValuePtr   item);
 
-void _uw_list_append(_UwList** list_ref, UwValueRef item);
+void _uw_list_append(_UwList** list_ref, UwValuePtr item);
 /*
  * Internal append function, also used by map implementation.
  */
@@ -565,7 +563,7 @@ void _uw_list_append(_UwList** list_ref, UwValueRef item);
 void uw_list_append_va(UwValuePtr list, ...);
 void uw_list_append_ap(UwValuePtr list, va_list ap);
 
-#define _uw_list_item_ref(list, index) \
+#define _uw_list_item_ptr(list, index) \
     ({ uw_assert((index) < (list)->length); &(list)->items[(index)]; })
 /*
  * Reference to list item.
@@ -574,7 +572,7 @@ void uw_list_append_ap(UwValuePtr list, va_list ap);
 
 //UwValuePtr uw_list_item(UwValuePtr list, size_t index);
 #define uw_list_item(list, index) \
-    ({ uw_assert_list(list); *_uw_list_item_ref((list)->list_value, (index)); })
+    ({ uw_assert_list(list); *_uw_list_item_ptr((list)->list_value, (index)); })
 
 UwValuePtr uw_list_pop(UwValuePtr list);
 /*
@@ -596,7 +594,7 @@ void _uw_list_del(_UwList* list, size_t start_index, size_t end_index);
  * Map functions
  */
 
-void uw_map_update(UwValuePtr map, UwValueRef key, UwValueRef value);
+void uw_map_update(UwValuePtr map, UwValuePtr key, UwValuePtr value);
 void uw_map_update_va(UwValuePtr map, ...);
 void uw_map_update_ap(UwValuePtr map, va_list ap);
 /*
@@ -709,9 +707,6 @@ bool uw_map_item(UwValuePtr map, size_t index, UwValuePtr* key, UwValuePtr* valu
 /*
  * Get key-value pair from the map.
  * Return true if `index` is valid.
- *
- * The type UwValuePtr* is intentionally used for key and value instead of UwValueRef,
- * because the latter implies move semantic, which is not the case for this function.
  */
 
 /****************************************************************

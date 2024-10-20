@@ -6,7 +6,7 @@
 #define UWMAP_INITIAL_CAPACITY  8  // must be power of two
 
 // forward declaration
-static void update_map(UwValuePtr map, UwValueRef key, UwValueRef value);
+static void update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value);
 
 /*
  * optimized methods for acessing hash table
@@ -209,7 +209,7 @@ static size_t lookup(_UwMap* map, UwValuePtr key, size_t* ht_index, size_t* ht_o
         // make index 0-based
         kv_index--;
 
-        UwValuePtr k = *_uw_list_item_ref(map->kv_pairs, kv_index * 2);
+        UwValuePtr k = *_uw_list_item_ptr(map->kv_pairs, kv_index * 2);
 
         // compare keys
         if (uw_equal(k, key)) {
@@ -262,13 +262,13 @@ static inline _UwMap* double_hash_table(_UwMap* map)
     _UwHashTable* hash_table = &new_map->hash_table;
 
     // rebuild hash table
-    UwValueRef key = _uw_list_item_ref(new_map->kv_pairs, 0);
+    UwValuePtr* key_ptr = _uw_list_item_ptr(new_map->kv_pairs, 0);
     size_t kv_index = 1;
     size_t n = _uw_list_length(new_map->kv_pairs);
     uw_assert((n & 1) == 0);
     while (n) {
-        set_hash_table_item(hash_table, uw_hash(*key), kv_index);
-        key += 2;
+        set_hash_table_item(hash_table, uw_hash(*key_ptr), kv_index);
+        key_ptr += 2;
         n -= 2;
         kv_index++;
     }
@@ -279,7 +279,7 @@ static inline _UwMap* double_hash_table(_UwMap* map)
     return new_map;
 }
 
-static void update_map(UwValuePtr map, UwValueRef key, UwValueRef value)
+static void update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value)
 {
     _UwMap* m = map->map_value;
     _UwHashTable* hash_table = &m->hash_table;
@@ -287,30 +287,23 @@ static void update_map(UwValuePtr map, UwValueRef key, UwValueRef value)
     // lookup key in the map
 
     size_t ht_offset;
-    size_t key_index = lookup(m, *key, nullptr, &ht_offset);
+    size_t key_index = lookup(m, key, nullptr, &ht_offset);
 
     if (key_index != SIZE_MAX) {
         // found key, update value
 
         size_t value_index = key_index + 1;
-        UwValueRef v = _uw_list_item_ref(m->kv_pairs, value_index);
+        UwValuePtr* v_ptr = _uw_list_item_ptr(m->kv_pairs, value_index);
 
         // update only if value is different
-        if (*v != *value) {
-            uw_move(v, value);
+        if (*v_ptr != value) {
+            uw_delete_value(v_ptr);
+            *v_ptr = uw_makeref(value);
         }
         return;
     }
 
     // key not found, insert
-
-    UwValuePtr key_copy;
-
-    if (*key == *value) {
-        // make copy of key, although in some cases it can take more memory than value
-        key_copy = uw_copy(*key);
-        key = &key_copy;
-    }
 
     size_t quarter_cap = hash_table->capacity / 4;
     if (ht_offset > quarter_cap || (hash_table->capacity - hash_table->items_used) < quarter_cap) {
@@ -326,7 +319,7 @@ static void update_map(UwValuePtr map, UwValueRef key, UwValueRef value)
 
     size_t kv_index = _uw_list_length(m->kv_pairs) / 2;
 
-    set_hash_table_item(hash_table, uw_hash(*key), kv_index + 1);
+    set_hash_table_item(hash_table, uw_hash(key), kv_index + 1);
 
     _uw_list_append(&m->kv_pairs, key);
     _uw_list_append(&m->kv_pairs, value);
@@ -334,11 +327,11 @@ static void update_map(UwValuePtr map, UwValueRef key, UwValueRef value)
     hash_table->items_used++;
 }
 
-void uw_map_update(UwValuePtr map, UwValueRef key, UwValueRef value)
+void uw_map_update(UwValuePtr map, UwValuePtr key, UwValuePtr value)
 {
     uw_assert_map(map);
-    uw_assert(*key != map);
-    uw_assert(*value != map);
+    uw_assert(key != map);
+    uw_assert(value != map);
 
     update_map(map, key, value);
 }
@@ -368,7 +361,10 @@ void uw_map_update_ap(UwValuePtr map, va_list ap)
         }
         UwValue value = uw_create_from_ctype(ctype, ap);
 
-        update_map(map, &key, &value);
+        update_map(map, key, value);
+
+        uw_delete_value(&key);
+        uw_delete_value(&value);
     }
 }
 
@@ -486,7 +482,8 @@ UwValuePtr _uw_map_get_uw(UwValuePtr map, UwValuePtr key)
 
     // return value
     size_t value_index = key_index + 1;
-    return *_uw_list_item_ref(m->kv_pairs, value_index);
+    UwValuePtr v = *_uw_list_item_ptr(m->kv_pairs, value_index);
+    return uw_makeref(v);
 }
 
 void _uw_map_del_null(UwValuePtr map, UwType_Null key)
@@ -578,9 +575,12 @@ bool uw_map_item(UwValuePtr map, size_t index, UwValuePtr* key, UwValuePtr* valu
     index <<= 1;
 
     if (index < _uw_list_length(m->kv_pairs)) {
-        *key = *_uw_list_item_ref(m->kv_pairs, index);
-        *value = *_uw_list_item_ref(m->kv_pairs, index + 1);
+        UwValuePtr* ptr = _uw_list_item_ptr(m->kv_pairs, index);
+        *key = uw_makeref(*ptr);
+        ptr++;
+        *value = uw_makeref(*ptr);
         return true;
+
     } else {
         *key = nullptr;
         *value = nullptr;
@@ -609,7 +609,9 @@ UwValuePtr _uw_copy_map(_UwMap* map)
     for (size_t i = 0; i < length;) {
         UwValuePtr key = uw_copy(map->kv_pairs->items[i++]);
         UwValuePtr value = uw_copy(map->kv_pairs->items[i++]);
-        update_map(new_map, &key, &value);
+        update_map(new_map, key, value);
+        uw_delete_value(&key);
+        uw_delete_value(&value);
     }
     return new_map;
 }

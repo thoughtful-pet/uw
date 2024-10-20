@@ -62,15 +62,15 @@ int _uw_list_cmp(_UwList* a, _UwList* b)
         return UW_NEQ;
     }
 
-    UwValueRef a_vref = _uw_list_item_ref(a, 0);
-    UwValueRef b_vref = _uw_list_item_ref(b, 0);
+    UwValuePtr* a_vptr = _uw_list_item_ptr(a, 0);
+    UwValuePtr* b_vptr = _uw_list_item_ptr(b, 0);
     while (n) {
-        if (uw_compare(*a_vref, *b_vref) != UW_EQ) {
+        if (uw_compare(*a_vptr, *b_vptr) != UW_EQ) {
             return UW_NEQ;
         }
         n--;
-        a_vref++;
-        b_vref++;
+        a_vptr++;
+        b_vptr++;
     }
     return UW_EQ;
 }
@@ -88,15 +88,15 @@ bool _uw_list_eq(_UwList* a, _UwList* b)
         return false;
     }
 
-    UwValueRef a_vref = _uw_list_item_ref(a, 0);
-    UwValueRef b_vref = _uw_list_item_ref(b, 0);
+    UwValuePtr* a_vptr = _uw_list_item_ptr(a, 0);
+    UwValuePtr* b_vptr = _uw_list_item_ptr(b, 0);
     while (n) {
-        if (!uw_equal(*a_vref, *b_vref)) {
+        if (!uw_equal(*a_vptr, *b_vptr)) {
             return false;
         }
         n--;
-        a_vref++;
-        b_vref++;
+        a_vptr++;
+        b_vptr++;
     }
     return true;
 }
@@ -111,57 +111,57 @@ void _uw_list_hash(_UwList* list, UwHashContext* ctx)
 void _uw_list_append_null(UwValuePtr list, UwType_Null item)
 {
     UwValue v = _uw_create_null(nullptr);
-    _uw_list_append_uw(list, &v);
+    _uw_list_append_uw(list, v);
 }
 
 void _uw_list_append_bool(UwValuePtr list, UwType_Bool item)
 {
     UwValue v = _uw_create_bool(item);
-    _uw_list_append_uw(list, &v);
+    _uw_list_append_uw(list, v);
 }
 
 void _uw_list_append_int(UwValuePtr list, UwType_Int item)
 {
     UwValue v = _uw_create_int(item);
-    _uw_list_append_uw(list, &v);
+    _uw_list_append_uw(list, v);
 }
 
 void _uw_list_append_float(UwValuePtr list, UwType_Float item)
 {
     UwValue v = _uw_create_float(item);
-    _uw_list_append_uw(list, &v);
+    _uw_list_append_uw(list, v);
 }
 
 void _uw_list_append_u8_wrapper(UwValuePtr list, char* item)
 {
     UwValue v = _uw_create_string_u8_wrapper(item);
-    _uw_list_append_uw(list, &v);
+    _uw_list_append_uw(list, v);
 }
 
 void _uw_list_append_u8(UwValuePtr list, char8_t* item)
 {
     UwValue v = _uw_create_string_u8(item);
-    _uw_list_append_uw(list, &v);
+    _uw_list_append_uw(list, v);
 }
 
 void _uw_list_append_u32(UwValuePtr list, char32_t* item)
 {
     UwValue v = _uw_create_string_u32(item);
-    _uw_list_append_uw(list, &v);
+    _uw_list_append_uw(list, v);
 }
 
-void _uw_list_append_uw(UwValuePtr list, UwValueRef item)
+void _uw_list_append_uw(UwValuePtr list, UwValuePtr item)
 {
     uw_assert_list(list);
-    uw_assert((list) != *(item));
-    _uw_list_append(&(list)->list_value, (item));
+    uw_assert(list != item);
+    _uw_list_append(&list->list_value, item);
 }
 
-void _uw_list_append(_UwList** list_ref, UwValueRef item)
+void _uw_list_append(_UwList** list_ref, UwValuePtr item)
 {
     _UwList* list = *list_ref;
 
-    uw_assert(*item);  // item should not be nullptr
+    uw_assert(item);  // item should not be nullptr
     uw_assert(list->length <= list->capacity);
 
     if (list->length == list->capacity) {
@@ -173,8 +173,7 @@ void _uw_list_append(_UwList** list_ref, UwValueRef item)
         }
         list = *list_ref;
     }
-    list->items[list->length++] = *item;
-    *item = nullptr;
+    list->items[list->length++] = uw_makeref(item);
 }
 
 void uw_list_append_va(UwValuePtr list, ...)
@@ -196,7 +195,7 @@ void uw_list_append_ap(UwValuePtr list, va_list ap)
         }
         UwValue item = uw_create_from_ctype(ctype, ap);
 
-        _uw_list_append(&(list)->list_value, &item);
+        _uw_list_append(&(list)->list_value, item);
     }
 }
 

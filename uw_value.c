@@ -60,32 +60,40 @@ UwValuePtr _uw_create_float(UwType_Float initializer)
     return value;
 }
 
-void uw_delete_value(UwValueRef value)
+void uw_delete_value(UwValuePtr* value)
 {
-    if (!*value) {
+    if (!value) {
         return;
     }
+
     UwValuePtr v = *value;
-    switch (v->type_id) {
-        case UwTypeId_Null:
-        case UwTypeId_Bool:
-        case UwTypeId_Int:
-        case UwTypeId_Float:
-            break;
-        case UwTypeId_String:
-            _uw_delete_string(v->string_value);
-            break;
-        case UwTypeId_List:
-            _uw_delete_list(v->list_value);
-            break;
-        case UwTypeId_Map:
-            _uw_delete_map(v->map_value);
-            break;
-        default:
-            uw_assert(false);
-            break;
+    if (!v) {
+        return;
     }
-    free(v);
+
+    uw_assert(v->refcount);
+    if (0 == --v->refcount) {
+        switch (v->type_id) {
+            case UwTypeId_Null:
+            case UwTypeId_Bool:
+            case UwTypeId_Int:
+            case UwTypeId_Float:
+                break;
+            case UwTypeId_String:
+                _uw_delete_string(v->string_value);
+                break;
+            case UwTypeId_List:
+                _uw_delete_list(v->list_value);
+                break;
+            case UwTypeId_Map:
+                _uw_delete_map(v->map_value);
+                break;
+            default:
+                uw_assert(false);
+                break;
+        }
+        free(v);
+    }
     *value = nullptr;
 }
 
@@ -543,10 +551,6 @@ UwValuePtr uw_create_from_ctype(int ctype, va_list args)
         case uw_char8ptr:  return uw_create(va_arg(args, char8_t*));
         case uw_char32ptr: return uw_create(va_arg(args, char32_t*));
         case uw_uw:        return va_arg(args, UwValuePtr);
-        case uw_uwref: {
-            UwValueRef vref = va_arg(args, UwValueRef);
-            return uw_ptr(*vref);
-        }
         default:
             // panic
             fprintf(stderr, "%s: bad C type identifier %d\n", __func__, ctype);

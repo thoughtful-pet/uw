@@ -1163,10 +1163,11 @@ void test_list()
     for(int i = 0; i < 1000; i++) {
         UwValue item = uw_create(i);
 
-        uw_list_append(list, &item);
+        uw_list_append(list, item);
+        TEST(item->refcount == 2);
+        uw_delete_value(&item);
 
         TEST(uw_list_length(list) == i + 1);
-        TEST(item == nullptr);
 
         UwValuePtr v = uw_list_item(list, i);
         item = uw_create(i);
@@ -1199,10 +1200,11 @@ void test_map()
         UwValue key = uw_create(0);
         UwValue value = uw_create(false);
 
-        uw_map_update(map, &key, &value);
-
-        uw_assert(key == nullptr);
-        uw_assert(value == nullptr);
+        uw_map_update(map, key, value);
+        TEST(key->refcount == 2);
+        TEST(value->refcount == 2);
+        uw_delete_value(&key);
+        uw_delete_value(&value);
 
         key = uw_create(0);
         TEST(uw_map_has_key(map, key));
@@ -1217,7 +1219,11 @@ void test_map()
         for (int i = 1; i < 50; i++) {
             key = uw_create(i);
             value = uw_create(i);
-            uw_map_update(map, &key, &value);
+            uw_map_update(map, key, value);
+            TEST(key->refcount == 2);
+            TEST(value->refcount == 2);
+            uw_delete_value(&key);
+            uw_delete_value(&value);
         }
         uw_map_del(map, 25);
 
