@@ -1520,7 +1520,7 @@ CStringPtr uw_string_to_cstring(UwValuePtr str)
     return result;
 }
 
-void uw_delete_cstring(CStringRef str)
+void uw_delete_cstring(CStringPtr* str)
 {
     free(*str);
     *str = nullptr;

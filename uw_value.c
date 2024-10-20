@@ -60,7 +60,7 @@ UwValuePtr _uw_create_float(UwType_Float initializer)
     return value;
 }
 
-void uw_delete_value(UwValuePtr* value)
+void uw_delete(UwValuePtr* value)
 {
     if (!value) {
         return;

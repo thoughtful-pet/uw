@@ -297,7 +297,7 @@ static void update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value)
 
         // update only if value is different
         if (*v_ptr != value) {
-            uw_delete_value(v_ptr);
+            uw_delete(v_ptr);
             *v_ptr = uw_makeref(value);
         }
         return;
@@ -363,8 +363,8 @@ void uw_map_update_ap(UwValuePtr map, va_list ap)
 
         update_map(map, key, value);
 
-        uw_delete_value(&key);
-        uw_delete_value(&value);
+        uw_delete(&key);
+        uw_delete(&value);
     }
 }
 
@@ -610,8 +610,8 @@ UwValuePtr _uw_copy_map(_UwMap* map)
         UwValuePtr key = uw_copy(map->kv_pairs->items[i++]);
         UwValuePtr value = uw_copy(map->kv_pairs->items[i++]);
         update_map(new_map, key, value);
-        uw_delete_value(&key);
-        uw_delete_value(&value);
+        uw_delete(&key);
+        uw_delete(&value);
     }
     return new_map;
 }

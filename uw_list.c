@@ -44,7 +44,7 @@ UwValuePtr uw_create_list_ap(va_list ap)
 void _uw_delete_list(_UwList* list)
 {
     for (size_t i = 0; i < list->length; i++) {
-        uw_delete_value(&list->items[i]);
+        uw_delete(&list->items[i]);
     }
     free(list);
 }
@@ -245,7 +245,7 @@ void _uw_list_del(_UwList* list, size_t start_index, size_t end_index)
     }
 
     for (size_t i = start_index; i <= end_index; i++) {
-        uw_delete_value(&list->items[i]);
+        uw_delete(&list->items[i]);
     }
 
     size_t tail_len = (list->length - 1 - end_index) * sizeof(UwValuePtr);
