@@ -180,7 +180,7 @@ bool _uw_map_eq(_UwMap* a, _UwMap* b)
 
 static size_t lookup(_UwMap* map, UwValuePtr key, size_t* ht_index, size_t* ht_offset)
 /*
- * Lookup key starting from index = key->hash.
+ * Lookup key starting from index = hash(key).
  *
  * Return index of key in kv_pairs or SIZE_MAX if hash table has no item matching `key`.
  *
@@ -189,8 +189,7 @@ static size_t lookup(_UwMap* map, UwValuePtr key, size_t* ht_index, size_t* ht_o
  */
 {
     _UwHashTable* hash_table = &map->hash_table;
-    UwType_Hash key_hash = key->hash;
-    UwType_Hash index = key_hash & hash_table->hash_bitmask;
+    UwType_Hash index = uw_hash(key) & hash_table->hash_bitmask;
     size_t offset = 0;
 
     do {
@@ -213,17 +212,15 @@ static size_t lookup(_UwMap* map, UwValuePtr key, size_t* ht_index, size_t* ht_o
         UwValuePtr k = *_uw_list_item_ref(map->kv_pairs, kv_index * 2);
 
         // compare keys
-        if (k->hash == key_hash) {
-            if (uw_equal(k, key)) {
-                // found key
-                if (ht_index) {
-                    *ht_index = index;
-                }
-                if (ht_offset) {
-                    *ht_offset = offset;
-                }
-                return kv_index * 2;
+        if (uw_equal(k, key)) {
+            // found key
+            if (ht_index) {
+                *ht_index = index;
             }
+            if (ht_offset) {
+                *ht_offset = offset;
+            }
+            return kv_index * 2;
         }
 
         // probe next item
@@ -270,7 +267,7 @@ static inline _UwMap* double_hash_table(_UwMap* map)
     size_t n = _uw_list_length(new_map->kv_pairs);
     uw_assert((n & 1) == 0);
     while (n) {
-        set_hash_table_item(hash_table, (*key)->hash, kv_index);
+        set_hash_table_item(hash_table, uw_hash(*key), kv_index);
         key += 2;
         n -= 2;
         kv_index++;
@@ -285,11 +282,6 @@ static inline _UwMap* double_hash_table(_UwMap* map)
 static void update_map(UwValuePtr map, UwValueRef key, UwValueRef value)
 {
     _UwMap* m = map->map_value;
-
-    // calculate key hash and store it in `key`
-    UwType_Hash key_hash = uw_hash(*key);
-    (*key)->hash = key_hash;
-
     _UwHashTable* hash_table = &m->hash_table;
 
     // lookup key in the map
@@ -317,7 +309,6 @@ static void update_map(UwValuePtr map, UwValueRef key, UwValueRef value)
     if (*key == *value) {
         // make copy of key, although in some cases it can take more memory than value
         key_copy = uw_copy(*key);
-        key_copy->hash = key_hash;
         key = &key_copy;
     }
 
@@ -335,10 +326,10 @@ static void update_map(UwValuePtr map, UwValueRef key, UwValueRef value)
 
     size_t kv_index = _uw_list_length(m->kv_pairs) / 2;
 
+    set_hash_table_item(hash_table, uw_hash(*key), kv_index + 1);
+
     _uw_list_append(&m->kv_pairs, key);
     _uw_list_append(&m->kv_pairs, value);
-
-    set_hash_table_item(hash_table, key_hash, kv_index + 1);
 
     hash_table->items_used++;
 }
@@ -427,10 +418,6 @@ bool _uw_map_has_key_uw(UwValuePtr map, UwValuePtr key)
 {
     uw_assert_map(map);
 
-    // calculate key hash and store it in `key` for lookup
-    UwType_Hash key_hash = uw_hash(key);
-    key->hash = key_hash;
-
     _UwMap* m = map->map_value;
     _UwHashTable* hash_table = &m->hash_table;
 
@@ -484,10 +471,6 @@ UwValuePtr _uw_map_get_u32(UwValuePtr map, char32_t* key)
 UwValuePtr _uw_map_get_uw(UwValuePtr map, UwValuePtr key)
 {
     uw_assert_map(map);
-
-    // calculate key hash and store it in `key` for lookup
-    UwType_Hash key_hash = uw_hash(key);
-    key->hash = key_hash;
 
     _UwMap* m = map->map_value;
     _UwHashTable* hash_table = &m->hash_table;
@@ -551,10 +534,6 @@ void _uw_map_del_u32(UwValuePtr map, char32_t* key)
 void _uw_map_del_uw(UwValuePtr map, UwValuePtr key)
 {
     uw_assert_map(map);
-
-    // calculate key hash and store it in `key` for lookup
-    UwType_Hash key_hash = uw_hash(key);
-    key->hash = key_hash;
 
     _UwMap* m = map->map_value;
     _UwHashTable* hash_table = &m->hash_table;
@@ -645,7 +624,7 @@ void _uw_dump_map(_UwMap* map, int indent)
     indent += 4;
     for (size_t i = 0; i < map->kv_pairs->length; i++) {
         char label[64];
-        sprintf(label, "Key (hash: %llx): ", (unsigned long long) map->kv_pairs->items[i]->hash);
+        sprintf(label, "Key : ");
         _uw_dump_value(map->kv_pairs->items[i], indent, label);
         i++;
         sprintf(label, "Value: ");
