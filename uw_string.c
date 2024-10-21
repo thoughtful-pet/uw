@@ -1979,7 +1979,7 @@ UwValuePtr _uw_string_join_uw(UwValuePtr separator, UwValuePtr list)
             }
         }
     }
-    return uw_ptr(result);
+    return uw_move(result);
 }
 
 #ifdef DEBUG

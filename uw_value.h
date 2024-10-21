@@ -43,14 +43,14 @@ extern "C" {
  *      If a function deletes value or transfers ownership
  *      it must assign nullptr to the referenced pointer.
  *
- * Finally, uw_ptr() macro transfers ownership from automatically cleaned
+ * Finally, uw_move() macro transfers ownership from automatically cleaned
  * variable to a standalone `typename`Ptr
  *
- * caveat: uw_ptr() uses a GNU extension "Statements and Declarations in Expressions"
+ * caveat: uw_move() uses a GNU extension "Statements and Declarations in Expressions"
  *         which, however, is supported in clang as well
  */
 
-#define uw_ptr(var) \
+#define uw_move(var) \
     ({  \
         typeof(var) tmp = (var);  \
         (var) = nullptr;  \
@@ -282,7 +282,8 @@ char* _uw_get_type_name_by_id(uint8_t type_id);
 #define uw_charptr   18  // char*
 #define uw_char8ptr  19  // char8_t*
 #define uw_char32ptr 20  // char32_t*
-#define uw_uw        21  // UwValuePtr
+#define uw_value     21  // UwValue
+#define uw_ptr       22  // UwValuePtr
 
 /****************************************************************
  * Constructors
@@ -370,11 +371,8 @@ UwValuePtr uw_create_from_ctype(int ctype, va_list args);
  * Helper function for variadic constructors.
  * Create UwValue from C type returned by va_arg(args).
  * See C type identifiers.
- * For uw_uw return UwValuePtr as is.
- * For uw_uwptr return UwValuePtr using move semantic. The caller
- *    must call uw_delete either explicitly, or by assigning
- *    it to an auto-cleaned variable, or by passing to a function
- *    using move semantic.
+ * For uw_value return reference to the orginal value using uw_makeref.
+ * For uw_ptr return the orginal value as is.
  */
 
 /****************************************************************

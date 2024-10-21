@@ -151,7 +151,7 @@ UwValuePtr uw_create_map_ap(va_list ap)
 {
     UwValue map = uw_create_map();
     uw_map_update_ap(map, ap);
-    return uw_ptr(map);
+    return uw_move(map);
 }
 
 void _uw_delete_map(_UwMap* map)
@@ -353,18 +353,12 @@ void uw_map_update_ap(UwValuePtr map, va_list ap)
         if (ctype == -1) {
             break;
         }
-        UwValue key = uw_create_from_ctype(ctype, ap);
-
-        ctype = va_arg(ap, int);
-        if (ctype == -1) {
-            break;
+        {   // context for autocleaning
+            UwValue key = uw_create_from_ctype(ctype, ap);
+            ctype = va_arg(ap, int);
+            UwValue value = uw_create_from_ctype(ctype, ap);
+            update_map(map, key, value);
         }
-        UwValue value = uw_create_from_ctype(ctype, ap);
-
-        update_map(map, key, value);
-
-        uw_delete(&key);
-        uw_delete(&value);
     }
 }
 

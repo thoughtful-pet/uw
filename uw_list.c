@@ -31,14 +31,14 @@ UwValuePtr uw_create_list_va(...)
     va_start(ap);
     UwValue list = uw_create_list_ap(ap);
     va_end(ap);
-    return uw_ptr(list);
+    return uw_move(list);
 }
 
 UwValuePtr uw_create_list_ap(va_list ap)
 {
     UwValue list = uw_create_list();
     uw_list_append_ap(list, ap);
-    return uw_ptr(list);
+    return uw_move(list);
 }
 
 void _uw_delete_list(_UwList* list)
@@ -193,9 +193,10 @@ void uw_list_append_ap(UwValuePtr list, va_list ap)
         if (ctype == -1) {
             break;
         }
-        UwValue item = uw_create_from_ctype(ctype, ap);
-
-        _uw_list_append(&(list)->list_value, item);
+        {   // context for autocleaning
+            UwValue item = uw_create_from_ctype(ctype, ap);
+            _uw_list_append(&(list)->list_value, item);
+        }
     }
 }
 
@@ -237,7 +238,7 @@ UwValuePtr uw_list_pop(UwValuePtr list)
         return nullptr;
     } else {
         _list->length--;
-        return uw_ptr(_list->items[_list->length]);
+        return uw_move(_list->items[_list->length]);
     }
 }
 

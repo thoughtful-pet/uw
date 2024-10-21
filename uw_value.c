@@ -550,7 +550,8 @@ UwValuePtr uw_create_from_ctype(int ctype, va_list args)
         case uw_charptr:   return uw_create_string(va_arg(args, char*));
         case uw_char8ptr:  return uw_create(va_arg(args, char8_t*));
         case uw_char32ptr: return uw_create(va_arg(args, char32_t*));
-        case uw_uw:        return va_arg(args, UwValuePtr);
+        case uw_value:     { UwValuePtr v = va_arg(args, UwValuePtr); return uw_makeref(v); }
+        case uw_ptr:       return va_arg(args, UwValuePtr);
         default:
             // panic
             fprintf(stderr, "%s: bad C type identifier %d\n", __func__, ctype);
@@ -586,7 +587,7 @@ void _uw_dump(UwValuePtr value, int indent, char* label)
         return;
     }
 
-    printf("%s%p %s refcount=%zu", label, value,
+    printf("%s%p %s refcount=%zu; ", label, value,
            (value->type_id <= UwTypeId_Map)? type_ids[value->type_id] : "BAD TYPE\n",
            value->refcount);
 
