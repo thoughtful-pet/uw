@@ -280,7 +280,7 @@ void _uw_dump_list(_UwList* list, int indent)
 
     indent += 4;
     for (size_t i = 0; i < list->length; i++) {
-        _uw_dump_value(list->items[i], indent, "");
+        _uw_dump(list->items[i], indent, "");
     }
 }
 

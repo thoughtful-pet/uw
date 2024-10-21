@@ -627,10 +627,10 @@ void _uw_dump_map(_UwMap* map, int indent)
     for (size_t i = 0; i < map->kv_pairs->length; i++) {
         char label[64];
         sprintf(label, "Key : ");
-        _uw_dump_value(map->kv_pairs->items[i], indent, label);
+        _uw_dump(map->kv_pairs->items[i], indent, label);
         i++;
         sprintf(label, "Value: ");
-        _uw_dump_value(map->kv_pairs->items[i], indent, label);
+        _uw_dump(map->kv_pairs->items[i], indent, label);
     }
 
     _uw_print_indent(indent);

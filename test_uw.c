@@ -707,7 +707,7 @@ void test_string()
         TEST(s->char_size == 0);
         TEST(s->cap_size == 0);
         TEST(s->block_count == 7);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
     { // testing allocation
         UwValue v = uw_create_empty_string(254, 1);
@@ -718,7 +718,7 @@ void test_string()
         TEST(s->char_size == 0);
         TEST(s->cap_size == 1);
         TEST(s->block_count == 7);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
     { // testing cap_size=1 char_size=1
         UwValue v = uw_create_empty_string(0, 1);
@@ -729,7 +729,7 @@ void test_string()
         TEST(s->char_size == 0);
         TEST(s->cap_size == 0);
         TEST(s->block_count == 0);
-        //uw_dump_value(v);
+        //uw_dump(v);
 
         uw_string_append(v, "hello");
 
@@ -739,7 +739,7 @@ void test_string()
         TEST(capmeth->get_length(s) == 5);
         TEST(capmeth->get_capacity(s) == 5);
         TEST(s->block_count == 0);
-        //uw_dump_value(v);
+        //uw_dump(v);
 
         uw_string_append(v, '!');
 
@@ -749,7 +749,7 @@ void test_string()
         TEST(capmeth->get_length(s) == 6);
         TEST(capmeth->get_capacity(s) == 13);
         TEST(s->block_count == 1);
-        //uw_dump_value(s_1_1);
+        //uw_dump(s_1_1);
 
         // increase capacity to 2 bytes
         for (int i = 0; i < 250; i++) {
@@ -763,7 +763,7 @@ void test_string()
         TEST(s->char_size == 0);
         TEST(s->cap_size == 1);
         TEST(s->block_count == 7);
-        //uw_dump_value(v);
+        //uw_dump(v);
 
         uw_string_append(v, "everybody");
         uw_string_erase(v, 5, 255);
@@ -825,7 +825,7 @@ void test_string()
         capmeth = get_cap_methods(s);
         TEST(capmeth->get_length(s) == 0);
         TEST(capmeth->get_capacity(s) == 266);
-        //uw_dump_value(v);
+        //uw_dump(v);
 
         // test append substring
         uw_string_append_substring(v, "0123456789", 3, 7);
@@ -846,7 +846,7 @@ void test_string()
         TEST(s->char_size == 1);
         TEST(s->cap_size == 0);
         TEST(uw_equal(v, u8"สวัสดี"));
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // testing cap_size=2 char_size=1
@@ -858,7 +858,7 @@ void test_string()
         TEST(s->char_size == 0);
         TEST(s->cap_size == 1);
         TEST(s->block_count == 0);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // testing cap_size=4 char_size=1
@@ -870,7 +870,7 @@ void test_string()
         TEST(s->char_size == 0);
         TEST(s->cap_size == 3);
         TEST(s->block_count == 1);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // testing cap_size=8 char_size=1
@@ -882,7 +882,7 @@ void test_string()
         TEST(s->char_size == 0);
         TEST(s->cap_size == 7);
         TEST(s->block_count == 3);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // testing cap_size=1 char_size=2
@@ -894,14 +894,14 @@ void test_string()
         TEST(s->char_size == 1);
         TEST(s->cap_size == 0);
         TEST(s->block_count == 0);
-        //uw_dump_value(v);
+        //uw_dump(v);
 
         uw_string_append(v, u8"สบาย");
 
         TEST(capmeth->get_length(s) == 4);
         TEST(capmeth->get_capacity(s) == 6);
         TEST(s->block_count == 1);
-        //uw_dump_value(v);
+        //uw_dump(v);
 
         uw_string_append(v, 0x0e14);
         uw_string_append(v, 0x0e35);
@@ -910,7 +910,7 @@ void test_string()
         TEST(capmeth->get_capacity(s) == 6);
         TEST(s->block_count == 1);
         TEST(uw_equal(v, u8"สบายดี"));
-        //uw_dump_value(v);
+        //uw_dump(v);
 
         // test truncate
         uw_string_truncate(v, 4);
@@ -929,7 +929,7 @@ void test_string()
         TEST(s->char_size == 1);
         TEST(s->cap_size == 1);
         TEST(s->block_count == 7);
-        //uw_dump_value(v);
+        //uw_dump(v);
 
         uw_string_append(v, U"สบาย");
         uw_string_erase(v, 4, 255);
@@ -982,7 +982,7 @@ void test_string()
         capmeth = get_cap_methods(s);
         TEST(capmeth->get_length(s) == 0);
         TEST(capmeth->get_capacity(s) == 261);
-        //uw_dump_value(v);
+        //uw_dump(v);
 
 /*
         // change char size to 2-byte by appending wider chars
@@ -995,7 +995,7 @@ void test_string()
         TEST(s->char_size == 1);
         TEST(s->cap_size == 0);
         TEST(uw_equal(v, u8"สวัสดี"));
-        //uw_dump_value(v);
+        //uw_dump(v);
 */
     }
 
@@ -1008,7 +1008,7 @@ void test_string()
         TEST(s->char_size == 1);
         TEST(s->cap_size == 1);
         TEST(s->block_count == 0);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // testing cap_size=4 char_size=2
@@ -1020,12 +1020,12 @@ void test_string()
         TEST(s->char_size == 1);
         TEST(s->cap_size == 3);
         TEST(s->block_count == 1);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // testing cap_size=8 char_size=2
         UwValue v = uw_create_empty_string2(8, 2);
-        //uw_dump_value(s_8_2);
+        //uw_dump(s_8_2);
         s = v->string_value;
         capmeth = get_cap_methods(s);
         TEST(capmeth->get_length(s) == 0);
@@ -1033,7 +1033,7 @@ void test_string()
         TEST(s->char_size == 1);
         TEST(s->cap_size == 7);
         TEST(s->block_count == 3);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // testing cap_size=1 char_size=3
@@ -1045,7 +1045,7 @@ void test_string()
         TEST(s->char_size == 2);
         TEST(s->cap_size == 0);
         TEST(s->block_count == 0);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // testing cap_size=2 char_size=3
@@ -1057,7 +1057,7 @@ void test_string()
         TEST(s->char_size == 2);
         TEST(s->cap_size == 1);
         TEST(s->block_count == 1);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // testing cap_size=4 char_size=3
@@ -1069,7 +1069,7 @@ void test_string()
         TEST(s->char_size == 2);
         TEST(s->cap_size == 3);
         TEST(s->block_count == 1);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // testing cap_size=8 char_size=3
@@ -1081,7 +1081,7 @@ void test_string()
         TEST(s->char_size == 2);
         TEST(s->cap_size == 7);
         TEST(s->block_count == 3);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // testing cap_size=1 char_size=4
@@ -1093,7 +1093,7 @@ void test_string()
         TEST(s->char_size == 3);
         TEST(s->cap_size == 0);
         TEST(s->block_count == 0);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // testing cap_size=2 char_size=4
@@ -1105,7 +1105,7 @@ void test_string()
         TEST(s->char_size == 3);
         TEST(s->cap_size == 1);
         TEST(s->block_count == 1);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // testing cap_size=4 char_size=4
@@ -1117,7 +1117,7 @@ void test_string()
         TEST(s->char_size == 3);
         TEST(s->cap_size == 3);
         TEST(s->block_count == 1);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // testing cap_size=8 char_size=4
@@ -1129,7 +1129,7 @@ void test_string()
         TEST(s->char_size == 3);
         TEST(s->cap_size == 7);
         TEST(s->block_count == 3);
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 
     { // test trimming
@@ -1150,7 +1150,7 @@ void test_string()
         uw_list_append(list, U"mulțumesc");
         UwValue v = uw_string_join('/', list);
         TEST(uw_equal(v, U"Hello/สวัสดี/Thanks/mulțumesc"));
-        //uw_dump_value(v);
+        //uw_dump(v);
     }
 }
 
@@ -1220,7 +1220,7 @@ void test_map()
 
         uw_delete(&key);
 
-//        uw_dump_value(map);
+//        uw_dump(map);
         for (int i = 1; i < 50; i++) {
             key = uw_create(i);
             value = uw_create(i);
@@ -1234,7 +1234,7 @@ void test_map()
 
         TEST(uw_map_length(map) == 49);
 
-//        uw_dump_value(map);
+//        uw_dump(map);
     }
     {
         UwValue map = uw_create_map_va(
@@ -1254,7 +1254,7 @@ void test_map()
             uw_charptr,  "finally",     uw_uw,        uw_create_map_va(uw_charptr, "ok", uw_charptr, "done", -1),
             -1
         );
-//        uw_dump_value(map);
+//        uw_dump(map);
     }
 }
 

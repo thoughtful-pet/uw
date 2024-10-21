@@ -567,7 +567,7 @@ void _uw_print_indent(int indent)
     }
 }
 
-void _uw_dump_value(UwValuePtr value, int indent, char* label)
+void _uw_dump(UwValuePtr value, int indent, char* label)
 {
     static char* type_ids[] = {
         "Null",
@@ -605,9 +605,9 @@ void _uw_dump_value(UwValuePtr value, int indent, char* label)
     }
 }
 
-void uw_dump_value(UwValuePtr value)
+void uw_dump(UwValuePtr value)
 {
-    _uw_dump_value(value, 0, "");
+    _uw_dump(value, 0, "");
 }
 
 #endif

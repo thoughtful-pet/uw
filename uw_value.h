@@ -938,8 +938,8 @@ uint8_t u32_char_size(char32_t* str, size_t max_len);
 
 #ifdef DEBUG
 
-void  uw_dump_value (UwValuePtr value);
-void _uw_dump_value (UwValuePtr value, int indent, char* label);
+void  uw_dump(UwValuePtr value);
+void _uw_dump(UwValuePtr value, int indent, char* label);
 void _uw_dump_string(_UwString* str,   int indent);
 void _uw_dump_list  (_UwList*   list,  int indent);
 void _uw_dump_map   (_UwMap*    map,   int indent);
