@@ -586,7 +586,9 @@ void _uw_dump_value(UwValuePtr value, int indent, char* label)
         return;
     }
 
-    printf("%s%p %s ", label, value, (value->type_id <= UwTypeId_Map)? type_ids[value->type_id] : "BAD TYPE\n");
+    printf("%s%p %s refcount=%zu", label, value,
+           (value->type_id <= UwTypeId_Map)? type_ids[value->type_id] : "BAD TYPE\n",
+           value->refcount);
 
     switch(value->type_id) {
 
