@@ -193,7 +193,7 @@ void uw_list_append_ap(UwValuePtr list, va_list ap)
         if (ctype == -1) {
             break;
         }
-        {   // context for autocleaning
+        {   // nested scope for autocleaning
             UwValue item = uw_create_from_ctype(ctype, ap);
             _uw_list_append(&(list)->list_value, item);
         }

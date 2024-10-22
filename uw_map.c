@@ -353,7 +353,7 @@ void uw_map_update_ap(UwValuePtr map, va_list ap)
         if (ctype == -1) {
             break;
         }
-        {   // context for autocleaning
+        {   // nested scope for autocleaning
             UwValue key = uw_create_from_ctype(ctype, ap);
             ctype = va_arg(ap, int);
             UwValue value = uw_create_from_ctype(ctype, ap);

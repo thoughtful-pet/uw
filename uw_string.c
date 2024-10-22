@@ -1949,7 +1949,7 @@ UwValuePtr _uw_string_join_uw(UwValuePtr separator, UwValuePtr list)
     uint8_t max_char_size = uw_string_char_size(separator);
     item_added = false;
     for (size_t i = 0; i < num_items; i++) {
-        {   // context for autocleaning item
+        {   // nested scope for autocleaning item
             UwValue item = uw_list_item(list, i);
             if (uw_is_string(item)) {
                 if (item_added) {
@@ -1968,7 +1968,7 @@ UwValuePtr _uw_string_join_uw(UwValuePtr separator, UwValuePtr list)
     UwValue result = uw_create_empty_string(result_len, max_char_size);
     item_added = false;
     for (size_t i = 0; i < num_items; i++) {
-        {   // context for autocleaning item
+            // nested scope for autocleaning item
             UwValue item = uw_list_item(list, i);
             if (uw_is_string(item)) {
                 if (item_added) {

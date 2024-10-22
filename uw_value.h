@@ -49,9 +49,9 @@ extern "C" {
  *
  * Tips:
  *
- *   1. Use contexts for autocleaning, especially in loop bodies.
- *      Variables are cleaned only at context exit, that's not a pure destructor!
- *      Without contexts in loops you'd have to call `uw_delete` on each iteration.
+ *   1. Use blocks for autocleaning, especially in loop bodies.
+ *      Variables are cleaned only at scope exit, that's not a pure destructor!
+ *      Without scopes in loops you'd have to call `uw_delete` on each iteration.
  *
  *   2. Never pass newly created value to a function that increments refcount,
  *      i.e. the following would cause memory leak:
@@ -60,14 +60,14 @@ extern "C" {
  *
  *      use a temporary variable instead:
  *
- *      {   // context for autocleaning
+ *      {   // new scope for autocleaning
  *          UwValue v = uw_create(1);
  *          uw_list_append(mylist, v);
  *      }
  *
  *      The only exception is *_va function where uw_ptr designator allows that:
  *
- *      uw_list_append_va(uw_ptr, uw_create(1), uw_ptr, uw_create(2), -1);
+ *      uw_list_append_va(mylist, uw_ptr, uw_create(1), uw_ptr, uw_create(2), -1);
  *
  * Yes, C is weird. C++ could handle this better bit it's weird in its own way.
  */
