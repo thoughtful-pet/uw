@@ -15,7 +15,7 @@ extern "C" {
 #endif
 
 /*
- * Safe dynamic memory management is based on three definitions:
+ * Safe dynamic memory management is based on a couple of definitions:
  *
  *   1. `typename`
  *      This is a shortest name for automatically cleaned variables.
@@ -35,19 +35,41 @@ extern "C" {
  *      This is an alias for `typename`, however, it is not
  *      automatically cleaned because that does not work for arguments.
  *
- *   3. `typename`Ref
- *      Value reference. It's a pointer to pointer that points
- *      to an allocated block. That's what passed as an argument
- *      to the cleanup function.
- *
- *      If a function deletes value or transfers ownership
- *      it must assign nullptr to the referenced pointer.
- *
- * Finally, uw_move() macro transfers ownership from automatically cleaned
+ * uw_move() macro transfers ownership from automatically cleaned
  * variable to a standalone `typename`Ptr
  *
- * caveat: uw_move() uses a GNU extension "Statements and Declarations in Expressions"
+ * uw_makeref() macro increments reference counter
+ *
+ * uw_destroy() always zeroes pointer to the value, even if decremented
+ *              refcount is still above zero.
+ *
+ * caveat: uw_move() and other macros use a GNU extension
+ *         "Statements and Declarations in Expressions"
  *         which, however, is supported in clang as well
+ *
+ * Tips:
+ *
+ *   1. Use contexts for autocleaning, especially in loop bodies.
+ *      Variables are cleaned only at context exit, that's not a pure destructor!
+ *      Without contexts in loops you'd have to call `uw_delete` on each iteration.
+ *
+ *   2. Never pass newly created value to a function that increments refcount,
+ *      i.e. the following would cause memory leak:
+ *
+ *      uw_list_append(mylist, uw_create(1));
+ *
+ *      use a temporary variable instead:
+ *
+ *      {   // context for autocleaning
+ *          UwValue v = uw_create(1);
+ *          uw_list_append(mylist, v);
+ *      }
+ *
+ *      The only exception is *_va function where uw_ptr designator allows that:
+ *
+ *      uw_list_append_va(uw_ptr, uw_create(1), uw_ptr, uw_create(2), -1);
+ *
+ * Yes, C is weird. C++ could handle this better bit it's weird in its own way.
  */
 
 #define uw_move(var) \
