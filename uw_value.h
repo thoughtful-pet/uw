@@ -17,7 +17,7 @@ extern "C" {
 /*
  * Safe dynamic memory management is based on a couple of definitions:
  *
- *   1. `typename`
+ *   1. `typename`, e.g. UwValue and CString
  *      This is a shortest name for automatically cleaned variables.
  *      This is actually a pointer that can be either nullptr
  *      or point to an allocated block.
@@ -30,7 +30,7 @@ extern "C" {
  *      caveat: automatically cleaned values is a GNU extension
  *              which, however, is supported in clang as well
  *
- *   2. `typename`Ptr
+ *   2. `typename`Ptr, e.g. UwValuePtr and CStringPtr
  *      Raw pointer for constant arguments and return values.
  *      This is an alias for `typename`, however, it is not
  *      automatically cleaned because that does not work for arguments.
@@ -70,6 +70,20 @@ extern "C" {
  *      uw_list_append_va(mylist, uw_ptr, uw_create(1), uw_ptr, uw_create(2), -1);
  *
  * Yes, C is weird. C++ could handle this better bit it's weird in its own way.
+ *
+ * But what if constructors returned values with zero refcount?
+ * Then:
+ *
+ *   1. We'd have to increment refcount manually after assigning to a variable.
+ *
+ *   2. The memory would still leak:
+ *
+ *      uw_list_append(mylist, uw_create(1));
+ *
+ *      because no one would free the value returned by uw_create: cleanup attribute
+ *      cannot be applied to them.
+ *
+ * Yeah, function arguments in C is an ephemeral thing.
  */
 
 #define uw_move(var) \
