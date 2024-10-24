@@ -1920,6 +1920,59 @@ void uw_string_trim(UwValuePtr str)
     uw_string_ltrim(str);
 }
 
+UwValuePtr _uw_string_split_c32(UwValuePtr str, char32_t splitter)
+{
+    uw_assert_string(str);
+
+    _UwString* s = str->string_value;
+    StrMethods* strmeth = get_str_methods(s);
+
+    size_t len = get_cap_methods(s)->get_length(s);
+    uint8_t char_size = s->char_size + 1;
+
+    UwValue result = uw_create_list();
+
+    char8_t* ptr = get_char_ptr(s, 0);
+    char8_t* start = ptr;
+    size_t i = 0;
+    size_t start_i = 0;
+
+    while (i < len) {
+        char32_t c = strmeth->get_char(ptr);
+        if (c == splitter) {
+            // create substring
+            size_t substr_len = i - start_i;
+            UwValuePtr substr = uw_create_empty_string(substr_len, char_size);
+            if (substr_len) {
+                _UwString* subs = substr->string_value;
+                strmeth->copy_to(start, subs, 0, substr_len);
+                get_cap_methods(subs)->set_length(subs, substr_len);
+            }
+
+            uw_list_append(result, substr);
+
+            start_i = i + 1;
+            start = ptr + char_size;
+        }
+        i++;
+        ptr += char_size;
+    }
+    // create final substring
+    {
+        size_t substr_len = i - start_i;
+        UwValuePtr substr = uw_create_empty_string(substr_len, char_size);
+        if (substr_len) {
+            _UwString* subs = substr->string_value;
+            strmeth->copy_to(start, subs, 0, substr_len);
+            get_cap_methods(subs)->set_length(subs, substr_len);
+        }
+
+        uw_list_append(result, substr);
+    }
+
+    return uw_move(result);
+}
+
 UwValuePtr _uw_string_join_c32(char32_t separator, UwValuePtr list)
 {
     char32_t s[2] = {separator, 0};

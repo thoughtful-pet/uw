@@ -912,8 +912,7 @@ UwValuePtr uw_string_split(UwValuePtr str);  // split by spaces
             UwValuePtr: _uw_string_split_any_uw          \
     )((str), (splitters))
 
-UwValuePtr  uw_string_split_char      (UwValuePtr str, char       c);  // can't be used in generic
-UwValuePtr _uw_string_split_c32       (UwValuePtr str, char32_t   c);
+UwValuePtr _uw_string_split_c32(UwValuePtr str, char32_t splitter);
 
 UwValuePtr  uw_string_split_any_cstr      (UwValuePtr str, char*      splitters);  // can't be used in generic
 UwValuePtr _uw_string_split_any_u8_wrapper(UwValuePtr str, char*      splitters);

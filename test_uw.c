@@ -1156,6 +1156,13 @@ void test_string()
         TEST(uw_equal(v, U"Hello/สวัสดี/Thanks/mulțumesc"));
         //uw_dump(v);
     }
+    { // test split/join
+        UwValue str = uw_create(U"สบาย/สบาย/yo/yo");
+        UwValue list = uw_string_split(str, '/');
+        //uw_dump(list);
+        UwValue v = uw_string_join('/', list);
+        TEST(uw_equal(v, U"สบาย/สบาย/yo/yo"));
+    }
 }
 
 void test_list()
