@@ -793,6 +793,10 @@ void test_string()
         UwValue v3 = uw_create("hello everybody");
         TEST(uw_eq_fast(v2->string_value, v3->string_value));
 
+        // test C string
+        UW_CSTRING_LOCAL(cv3, v3);
+        TEST(strcmp(cv3, "hello everybody") == 0);
+
         // test substring
         TEST(uw_substring_eq_cstr(v, 4, 7, "o e"));
         TEST(!uw_substring_eq_cstr(v, 4, 7, ""));

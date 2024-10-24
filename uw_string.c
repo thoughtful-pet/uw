@@ -1520,6 +1520,15 @@ CStringPtr uw_string_to_cstring(UwValuePtr str)
     return result;
 }
 
+void uw_string_copy_buf(UwValuePtr str, char* buffer)
+{
+    uw_assert_string(str);
+
+    _UwString* s = str->string_value;
+    size_t length = get_cap_methods(s)->get_length(s);
+    get_str_methods(s)->copy_to_cstr(get_char_ptr(s, 0), buffer, length);
+}
+
 void uw_delete_cstring(CStringPtr* str)
 {
     free(*str);
@@ -1968,7 +1977,7 @@ UwValuePtr _uw_string_join_uw(UwValuePtr separator, UwValuePtr list)
     UwValue result = uw_create_empty_string(result_len, max_char_size);
     item_added = false;
     for (size_t i = 0; i < num_items; i++) {
-            // nested scope for autocleaning item
+        {   // nested scope for autocleaning item
             UwValue item = uw_list_item(list, i);
             if (uw_is_string(item)) {
                 if (item_added) {

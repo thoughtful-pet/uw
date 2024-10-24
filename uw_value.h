@@ -757,7 +757,20 @@ size_t uw_strlen(UwValuePtr str);
 CStringPtr uw_string_to_cstring(UwValuePtr str);
 /*
  * Create C string.
+ * XXX decode multibyte ???
  */
+
+void uw_string_copy_buf(UwValuePtr str, char* buffer);
+/*
+ * Copy string to buffer, appending terminating 0.
+ * Use carefully. The caller is responsible to allocate the buffer.
+ * XXX decode multibyte ???
+ */
+
+// somewhat ugly macro to define a local variable initialized with a copy of uw string:
+#define UW_CSTRING_LOCAL(variable, str) \
+    char variable[uw_strlen(str) + 1]; \
+    uw_string_copy_buf((str), variable)
 
 void uw_string_swap(UwValuePtr a, UwValuePtr b);
 /*
