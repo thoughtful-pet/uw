@@ -256,35 +256,35 @@ void _uw_list_del(_UwList* list, size_t start_index, size_t end_index)
     if (list->length == 0) {
         return;
     }
-    if (end_index >= list->length) {
-        end_index = list->length - 1;
+    if (end_index > list->length) {
+        end_index = list->length;
     }
-    if (start_index > end_index) {
+    if (start_index >= end_index) {
         return;
     }
 
-    for (size_t i = start_index; i <= end_index; i++) {
+    for (size_t i = start_index; i < end_index; i++) {
         uw_delete(&list->items[i]);
     }
 
-    size_t tail_len = (list->length - 1 - end_index) * sizeof(UwValuePtr);
+    size_t tail_len = (list->length - end_index) * sizeof(UwValuePtr);
     if (tail_len) {
-        memmove(&list->items[start_index], &list->items[end_index + 1], tail_len);
+        memmove(&list->items[start_index], &list->items[end_index], tail_len);
     }
 
-    list->length -= (end_index - start_index) + 1;
+    list->length -= end_index - start_index;
 }
 
 UwValuePtr uw_list_slice(UwValuePtr list, size_t start_index, size_t end_index)
 {
     size_t length = uw_list_length(list);
 
-    if (start_index >= length || start_index >= end_index) {
+    if (end_index > length) {
+        end_index = length;
+    }
+    if (start_index >= end_index) {
         // return empty list
         return uw_create_list();
-    }
-    if (end_index >= length) {
-        end_index = length;
     }
     size_t slice_len = end_index - start_index;
 

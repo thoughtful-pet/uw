@@ -613,7 +613,7 @@ UwValuePtr uw_list_pop(UwValuePtr list);
 void uw_list_del(UwValuePtr list, size_t start_index, size_t end_index);
 /*
  * Delete items from list.
- * `end_index` is inclusive.
+ * `end_index` is exclusive, i.e. the number of items to delete equals to end_index - start_index..
  */
 
 void _uw_list_del(_UwList* list, size_t start_index, size_t end_index);

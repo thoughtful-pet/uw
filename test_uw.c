@@ -1187,7 +1187,7 @@ void test_list()
         TEST(uw_equal(v, item));
     }
 
-    uw_list_del(list, 100, 199);
+    uw_list_del(list, 100, 200);
     TEST(uw_list_length(list) == 900);
 
     {

@@ -544,7 +544,7 @@ void _uw_map_del_uw(UwValuePtr map, UwValuePtr key)
     hash_table->items_used--;
 
     // delete key-value pair
-    _uw_list_del(m->kv_pairs, key_index, key_index + 1);
+    _uw_list_del(m->kv_pairs, key_index, key_index + 2);
 
     if (key_index + 2 < m->kv_pairs->length) {
         // key-value was not the last pair in the list,
