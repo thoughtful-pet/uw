@@ -619,6 +619,11 @@ void uw_list_del(UwValuePtr list, size_t start_index, size_t end_index);
 void _uw_list_del(_UwList* list, size_t start_index, size_t end_index);
 // internal function
 
+UwValuePtr uw_list_slice(UwValuePtr list, size_t start_index, size_t end_index);
+/*
+ * Return shallow copy of the given range of list.
+ */
+
 /****************************************************************
  * Map functions
  */

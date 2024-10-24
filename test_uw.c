@@ -1200,6 +1200,19 @@ void test_list()
         UwValue v = uw_create(200);
         TEST(uw_equal(v, item));
     }
+
+    {
+        UwValue slice = uw_list_slice(list, 750, 850);
+        TEST(uw_list_length(slice) == 100);
+        {
+            UwValue item = uw_list_item(slice, 1);
+            TEST(uw_equal(item, 851));
+        }
+        {
+            UwValue item = uw_list_item(slice, 98);
+            TEST(uw_equal(item, 948));
+        }
+    }
 }
 
 void test_map()

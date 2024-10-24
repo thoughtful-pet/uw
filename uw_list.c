@@ -2,11 +2,14 @@
 
 #include "uw_value.h"
 
+// the following constants must be power of two:
 #define UWLIST_INITIAL_CAPACITY    16
 #define UWLIST_CAPACITY_INCREMENT  16
 
 _UwList* _uw_alloc_list(size_t capacity)
 {
+    capacity = (capacity + UWLIST_CAPACITY_INCREMENT - 1) & ~(UWLIST_CAPACITY_INCREMENT - 1);
+
     _UwList* list = malloc(sizeof(_UwList) + capacity * sizeof(UwValuePtr));
     if (!list) {
         perror(__func__);
@@ -270,6 +273,33 @@ void _uw_list_del(_UwList* list, size_t start_index, size_t end_index)
     }
 
     list->length -= (end_index - start_index) + 1;
+}
+
+UwValuePtr uw_list_slice(UwValuePtr list, size_t start_index, size_t end_index)
+{
+    size_t length = uw_list_length(list);
+
+    if (start_index >= length || start_index >= end_index) {
+        // return empty list
+        return uw_create_list();
+    }
+    if (end_index >= length) {
+        end_index = length;
+    }
+    size_t slice_len = end_index - start_index;
+
+    UwValuePtr result = _uw_alloc_value();
+    result->type_id = UwTypeId_List;
+    result->list_value = _uw_alloc_list(slice_len);
+
+    _UwList* _list   = list->list_value;
+    _UwList* _result = result->list_value;
+
+    for (size_t i = start_index, j = 0; i < end_index; i++, j++) {
+        _result->items[j] = uw_makeref(_list->items[i]);
+    }
+    _result->length = slice_len;
+    return result;
 }
 
 #ifdef DEBUG
