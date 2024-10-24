@@ -376,17 +376,15 @@ UwValuePtr uw_create_empty_string(size_t capacity, uint8_t char_size);
 #endif
 
 #define uw_create_string(initializer) _Generic((initializer), \
-             char*: _uw_create_string_c,   \
+             char*:  uw_create_string_c,   \
         UwValuePtr: _uw_create_string_uw   \
     )(initializer)
 
-UwValuePtr _uw_create_string_c         (char*      initializer);
+UwValuePtr  uw_create_string_c         (char*      initializer);
 UwValuePtr _uw_create_string_u8_wrapper(char*      initializer);
 UwValuePtr _uw_create_string_u8        (char8_t*   initializer);
 UwValuePtr _uw_create_string_u32       (char32_t*  initializer);
 UwValuePtr _uw_create_string_uw        (UwValuePtr str);  // XXX convert value of other UW types to string?
-
-UwValuePtr uw_create_string_c(char* initializer);
 
 UwValuePtr uw_create_list();
 UwValuePtr uw_create_list_va(...);

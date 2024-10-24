@@ -1192,7 +1192,7 @@ UwValuePtr uw_create_empty_string(size_t capacity, uint8_t char_size)
     }
 #endif
 
-UwValuePtr _uw_create_string_c(char* initializer)
+UwValuePtr uw_create_string_c(char* initializer)
 {
     size_t capacity = 0;
 
