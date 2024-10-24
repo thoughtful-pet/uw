@@ -796,8 +796,8 @@ void uw_string_swap(UwValuePtr a, UwValuePtr b);
             UwValuePtr: _uw_string_append_uw          \
     )((dest), (src))
 
-void  uw_string_append_char      (UwValuePtr dest, char       c);  // can't be used in generic
-void  uw_string_append_cstr      (UwValuePtr dest, char*      src);
+void  uw_string_append_char      (UwValuePtr dest, char       c);    // can't be used in generic
+void  uw_string_append_cstr      (UwValuePtr dest, char*      src);  // can't be used in generic
 void _uw_string_append_c32       (UwValuePtr dest, char32_t   c);
 void _uw_string_append_u8_wrapper(UwValuePtr dest, char*      src);
 void _uw_string_append_u8        (UwValuePtr dest, char8_t*   src);
@@ -896,6 +896,45 @@ void uw_string_trim(UwValuePtr str);
 #ifdef DEBUG
     bool uw_eq_fast(_UwString* a, _UwString* b);
 #endif
+
+/*
+ * Split functions.
+ * Return list of strings.
+ */
+UwValuePtr uw_string_split(UwValuePtr str);  // split by spaces
+
+#define uw_string_split(str, splitters) _Generic((splitters),  \
+              char32_t: _uw_string_split_c32,            \
+                   int: _uw_string_split_c32,            \
+                 char*: _uw_string_split_any_u8_wrapper, \
+              char8_t*: _uw_string_split_any_u8,         \
+             char32_t*: _uw_string_split_any_u32,        \
+            UwValuePtr: _uw_string_split_any_uw          \
+    )((str), (splitters))
+
+UwValuePtr  uw_string_split_char      (UwValuePtr str, char       c);  // can't be used in generic
+UwValuePtr _uw_string_split_c32       (UwValuePtr str, char32_t   c);
+
+UwValuePtr  uw_string_split_any_cstr      (UwValuePtr str, char*      splitters);  // can't be used in generic
+UwValuePtr _uw_string_split_any_u8_wrapper(UwValuePtr str, char*      splitters);
+UwValuePtr _uw_string_split_any_u8        (UwValuePtr str, char8_t*   splitters);
+UwValuePtr _uw_string_split_any_u32       (UwValuePtr str, char32_t*  splitters);
+UwValuePtr _uw_string_split_any_uw        (UwValuePtr str, UwValuePtr splitters);
+
+#define uw_string_split_strict(str, splitter) _Generic((splitter),  \
+              char32_t: _uw_string_split_c32,               \
+                   int: _uw_string_split_c32,               \
+                 char*: _uw_string_split_strict_u8_wrapper, \
+              char8_t*: _uw_string_split_strict_u8,         \
+             char32_t*: _uw_string_split_strict_u32,        \
+            UwValuePtr: _uw_string_split_strict_uw          \
+    )((str), (splitter))
+
+UwValuePtr  uw_string_split_strict_cstr      (UwValuePtr str, char*      splitter);  // can't be used in generic
+UwValuePtr _uw_string_split_strict_u8_wrapper(UwValuePtr str, char*      splitter);
+UwValuePtr _uw_string_split_strict_u8        (UwValuePtr str, char8_t*   splitter);
+UwValuePtr _uw_string_split_strict_u32       (UwValuePtr str, char32_t*  splitter);
+UwValuePtr _uw_string_split_strict_uw        (UwValuePtr str, UwValuePtr splitter);
 
 /*
  * Join list items. Return string value.
