@@ -12,7 +12,7 @@
  *     But it can be uncommented for testing against the original implementation.
  */
 
-#include "uw_value.h"
+#include "uw_value_base.h"
 
 #include "rapidhash.h"
 
