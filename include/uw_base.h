@@ -143,6 +143,7 @@ static inline UwValuePtr _uw_alloc_value(UwTypeId type_id)
     if (value) {
         value->type_id  = type_id;
         value->refcount = 1;
+        value->alloc_id = _uw_allocator.id;
     }
     return value;
 }
