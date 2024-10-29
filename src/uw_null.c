@@ -1,6 +1,6 @@
 #include <stdarg.h>
 
-#include "include/uw_value_base.h"
+#include "include/uw_base.h"
 #include "src/uw_null_internal.h"
 
 UwValuePtr _uw_create_null()

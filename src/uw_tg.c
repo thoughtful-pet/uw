@@ -2,7 +2,7 @@
  * Type-generic helper functions.
  */
 
-#include "include/uw_value.h"
+#include "include/uw_c.h"
 #include "src/uw_string_internal.h"  // for _uw_copy_string
 
 char* _uw_get_type_name_by_id(uint8_t type_id)

@@ -14,7 +14,7 @@ struct _UwHashContext {
 };
 
 void _uw_hash_init(UwHashContext* ctx /*, size_t len */);
-void _uw_hash_uint64(UwHashContext* ctx, uint64_t data);  // this prototype is duplicated in uw_value_base.h
+void _uw_hash_uint64(UwHashContext* ctx, uint64_t data);  // this prototype is duplicated in uw_base.h
 UwType_Hash _uw_hash_finish(UwHashContext* ctx);
 
 #ifdef __cplusplus

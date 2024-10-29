@@ -1,7 +1,7 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "include/uw_value.h"
+#include "include/uw_c.h"
 #include "src/uw_null_internal.h"  // for _uw_create_null
 #include "src/uw_list_internal.h"
 

@@ -4,12 +4,12 @@
  * Include file for pure C.
  */
 
-#include <uw_value_base.h>
+#include <uw_base.h>
 #include <uw_list.h>
 #include <uw_map.h>
 #include <uw_string.h>
 #include <uw_ctype.h>
-#include <uw_value_tg.h>
+#include <uw_tg.h>
 
 // automatically cleaned value
 #define UwValue [[ gnu::cleanup(uw_delete) ]] UwValuePtr
