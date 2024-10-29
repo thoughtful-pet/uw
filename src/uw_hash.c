@@ -1,5 +1,5 @@
 /*
- * AMW hash based on https://github.com/Nicoshev/rapidhash
+ * UW hash based on https://github.com/Nicoshev/rapidhash
  *
  * Rapidhash has the following advantages to be adopted:
  *   - Clean maintainable code.
@@ -7,14 +7,15 @@
  *
  * Implementation differences:
  *   - Tail is padded with zeroes and the code is simplified.
- *   - Although data length is known for all AMW values, it is excluded
- *     from hash calculations to make AMW code simpler and less error prone.
+ *   - Although data length is known for all UW values, it is excluded
+ *     from hash calculations to make UW code simpler and less error prone.
  *     But it can be uncommented for testing against the original implementation.
  */
 
-#include "uw_value_base.h"
+#include "include/uw_value_base.h"
 
-#include "rapidhash.h"
+#include "src/rapidhash.h"
+#include "src/uw_hash_internal.h"
 
 //#define TRACE(...)  printf(__VA_ARGS__)
 #define TRACE(...)

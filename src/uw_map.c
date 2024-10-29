@@ -1,22 +1,178 @@
+#include <stdarg.h>
 #include <string.h>
 
-#include "uw_value.h"
+#include "include/uw_value.h"
+#include "src/uw_null_internal.h"  // for _uw_create_null
+#include "src/uw_map_internal.h"
 
-// capacity must be power of two, it doubles when map needs to grow
-#define UWMAP_INITIAL_CAPACITY  8  // must be power of two
+UwValuePtr _uw_create_map()
+{
+    UwValuePtr value = _uw_alloc_value();
+    if (value) {
+        value->type_id = UwTypeId_Map;
+        value->refcount = 1;
+        value->map_value = _uw_alloc_map(UWMAP_INITIAL_CAPACITY);
+        if (!value->map_value) {
+            goto error;
+        }
+        value->map_value->kv_pairs = _uw_alloc_list(UWMAP_INITIAL_CAPACITY * 2);
+        if (!value->map_value->kv_pairs) {
+            goto error;
+        }
+    }
+    return value;
 
-// forward declaration
-static void update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value);
+error:
+    _uw_destroy_map(value);
+    return nullptr;
+}
 
-/*
- * optimized methods for acessing hash table
+void _uw_destroy_map(UwValuePtr self)
+{
+    if (self) {
+        if (self->map_value) {
+            _uw_delete_map(self->map_value);
+        }
+        _uw_free_value(self);
+    }
+}
+
+void _uw_hash_map(UwValuePtr self, UwHashContext* ctx)
+{
+    _uw_hash_uint64(ctx, self->type_id);
+    struct _UwList* list = self->map_value->kv_pairs;
+    for (size_t i = 0; i < list->length; i++) {
+        UwValuePtr item = list->items[i];
+        _uw_call_hash(item, ctx);
+    }
+}
+
+static bool update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value);  // forward declaration
+
+UwValuePtr _uw_copy_map(UwValuePtr self)
+{
+    struct _UwMap* map = self->map_value;
+    size_t length = _uw_map_length(map);
+
+    // find nearest power of two for hash table capacity
+    size_t ht_capacity = UWMAP_INITIAL_CAPACITY;
+    while (ht_capacity < length) {
+        ht_capacity <<= 1;
+    }
+
+    length <<= 1;
+
+    UwValuePtr result = _uw_alloc_value();
+    result->type_id = UwTypeId_Map;
+    result->refcount = 1;
+    result->map_value = _uw_alloc_map(ht_capacity);
+    result->map_value->kv_pairs = _uw_alloc_list(length);
+
+    // deep copy
+    for (size_t i = 0; i < length;) {
+        UwValuePtr key = uw_copy(map->kv_pairs->items[i++]);
+        UwValuePtr value = uw_copy(map->kv_pairs->items[i++]);
+        if (key && value) {
+            update_map(result, key, value);
+            uw_delete(&key);
+            uw_delete(&value);
+        } else {
+            uw_delete(&key);
+            uw_delete(&value);
+            goto error;
+        }
+    }
+    return result;
+
+error:
+    _uw_destroy_map(result);
+    return nullptr;
+}
+
+void _uw_dump_map(UwValuePtr self, int indent)
+{
+    _uw_dump_start(self, indent);
+
+    struct _UwMap* map = self->map_value;
+    printf("%zu items, capacity=%zu\n", map->kv_pairs->length >> 1, map->kv_pairs->capacity >> 1);
+
+    indent += 4;
+    for (size_t i = 0; i < map->kv_pairs->length; i++) {
+        _uw_print_indent(indent);
+        printf("Key:\n");
+        _uw_call_dump(map->kv_pairs->items[i], indent);
+        i++;
+        _uw_print_indent(indent);
+        printf("Value:\n");
+        _uw_call_dump(map->kv_pairs->items[i], indent);
+    }
+
+    _uw_print_indent(indent);
+
+    struct _UwHashTable* ht = &map->hash_table;
+    printf("hash table item size %u, items_used=%zu, capacity=%zu (bitmask %llx)\n",
+           ht->item_size, ht->items_used, ht->capacity, (unsigned long long) ht->hash_bitmask);
+
+    for (size_t i = 0; i < ht->capacity; i++ ) {
+        size_t kv_index = ht->get_item(ht, i);
+        _uw_print_indent(indent);
+        printf("%zx: %zu\n", i, kv_index);
+    }
+}
+
+UwValuePtr _uw_map_to_string(UwValuePtr self)
+{
+    // XXX not implemented yet
+    return nullptr;
+}
+
+bool _uw_map_is_true(UwValuePtr self)
+{
+    return _uw_map_length(self->map_value);
+}
+
+bool _uw_map_equal_sametype(UwValuePtr self, UwValuePtr other)
+{
+    return _uw_map_eq(self->map_value, other->map_value);
+}
+
+bool _uw_map_equal(UwValuePtr self, UwValuePtr other)
+{
+    if (other->type_id == UwTypeId_Map) {
+        return _uw_map_eq(self->map_value, other->map_value);
+    } else {
+        return false;
+    }
+}
+
+bool _uw_map_equal_ctype(UwValuePtr self, UwCType ctype, ...)
+{
+    bool result = false;
+    va_list ap;
+    va_start(ap);
+    switch (ctype) {
+        case uwc_value_ptr:
+        case uwc_value: {
+            UwValuePtr other = va_arg(ap, UwValuePtr);
+            result = _uw_map_equal(self, other);
+            break;
+        }
+        default: break;
+    }
+    va_end(ap);
+    return result;
+}
+
+/****************************************************************
+ * methods for acessing hash table
  */
+
 #define HT_ITEM_METHODS(typename) \
-    static size_t get_ht_item_##typename(struct __UwHashTable* ht, size_t index) \
+    static size_t get_ht_item_##typename(struct _UwHashTable* ht, size_t index) \
     { \
         return ((typename*) (ht->items))[index]; \
     } \
-    static void set_ht_item_##typename(struct __UwHashTable* ht, size_t index, size_t value) \
+    static void set_ht_item_##typename(struct _UwHashTable* ht, size_t index, size_t value) \
     { \
         ((typename*) (ht->items))[index] = (typename) value; \
     }
@@ -29,7 +185,7 @@ HT_ITEM_METHODS(uint64_t)
 /*
  * methods for acessing hash table with any item size
  */
-static size_t get_ht_item(struct __UwHashTable* ht, size_t index)
+static size_t get_ht_item(struct _UwHashTable* ht, size_t index)
 {
     uint8_t *item_ptr = &ht->items[index * ht->item_size];
     size_t result = 0;
@@ -40,7 +196,7 @@ static size_t get_ht_item(struct __UwHashTable* ht, size_t index)
     return result;
 }
 
-static void set_ht_item(struct __UwHashTable* ht, size_t index, size_t value)
+static void set_ht_item(struct _UwHashTable* ht, size_t index, size_t value)
 {
     uint8_t *item_ptr = &ht->items[(index + 1) * ht->item_size];
     for (uint8_t i = ht->item_size; i > 0; i--) {
@@ -48,6 +204,10 @@ static void set_ht_item(struct __UwHashTable* ht, size_t index, size_t value)
         value >>= 8;
     }
 }
+
+/****************************************************************
+ * implementation
+ */
 
 static uint8_t get_item_size(size_t capacity)
 /*
@@ -79,7 +239,7 @@ static uint8_t get_item_size(size_t capacity)
  * kv_index = key_index / 2
  */
 
-static _UwMap* allocate_map(size_t capacity)
+struct _UwMap* _uw_alloc_map(size_t capacity)
 /*
  * Create internal map structure for UwValue.map_value
  *
@@ -89,13 +249,13 @@ static _UwMap* allocate_map(size_t capacity)
  */
 {
     size_t item_size = get_item_size(capacity);
-    _UwMap* map = malloc(sizeof(_UwMap) + item_size * capacity);
+    struct _UwMap* map = malloc(sizeof(struct _UwMap) + item_size * capacity);
     if (!map) {
         perror(__func__);
         exit(1);
     }
 
-    _UwHashTable* ht = &map->hash_table;
+    struct _UwHashTable* ht = &map->hash_table;
 
     ht->item_size = item_size;
     ht->hash_bitmask = capacity - 1;
@@ -129,15 +289,6 @@ static _UwMap* allocate_map(size_t capacity)
     return map;
 }
 
-UwValuePtr uw_create_map()
-{
-    UwValuePtr value = _uw_alloc_value();
-    value->type_id = UwTypeId_Map;
-    value->map_value = allocate_map(UWMAP_INITIAL_CAPACITY);
-    value->map_value->kv_pairs = _uw_alloc_list(UWMAP_INITIAL_CAPACITY * 2);
-    return value;
-}
-
 UwValuePtr uw_create_map_va(...)
 {
     va_list ap;
@@ -149,27 +300,27 @@ UwValuePtr uw_create_map_va(...)
 
 UwValuePtr uw_create_map_ap(va_list ap)
 {
-    UwValue map = uw_create_map();
-    uw_map_update_ap(map, ap);
-    return uw_move(map);
+    UwValuePtr map = _uw_create_map();
+    if (map) {
+        if (!uw_map_update_ap(map, ap)) {
+            uw_delete(&map);
+        }
+    }
+    return map;
 }
 
-void _uw_delete_map(_UwMap* map)
+void _uw_delete_map(struct _UwMap* map)
 {
     _uw_delete_list(map->kv_pairs);
-    free(map);
+    _uw_free_map(map);
 }
 
-int _uw_map_cmp(_UwMap* a, _UwMap* b)
+size_t _uw_map_length(struct _UwMap* map)
 {
-    if (a == b) {
-        // compare with self
-        return UW_EQ;
-    }
-    return _uw_list_cmp(a->kv_pairs, b->kv_pairs);
+    return map->kv_pairs->length >> 1;
 }
 
-bool _uw_map_eq(_UwMap* a, _UwMap* b)
+bool _uw_map_eq(struct _UwMap* a, struct _UwMap* b)
 {
     if (a == b) {
         // compare with self
@@ -178,7 +329,7 @@ bool _uw_map_eq(_UwMap* a, _UwMap* b)
     return _uw_list_eq(a->kv_pairs, b->kv_pairs);
 }
 
-static size_t lookup(_UwMap* map, UwValuePtr key, size_t* ht_index, size_t* ht_offset)
+static size_t lookup(struct _UwMap* map, UwValuePtr key, size_t* ht_index, size_t* ht_offset)
 /*
  * Lookup key starting from index = hash(key).
  *
@@ -186,9 +337,11 @@ static size_t lookup(_UwMap* map, UwValuePtr key, size_t* ht_index, size_t* ht_o
  *
  * If `ht_index` is not `nullptr`: write index of hash table item at which lookup has stopped.
  * If `ht_offset` is not `nullptr`: write the difference from final `ht_index` and initial `ht_index` to `ht_offset`;
+ *
+ * XXX leverage equal_ctype method for C type keys and simplify uw_map_get_* and uw_map_has_key_* functions
  */
 {
-    _UwHashTable* hash_table = &map->hash_table;
+    struct _UwHashTable* hash_table = &map->hash_table;
     UwType_Hash index = uw_hash(key) & hash_table->hash_bitmask;
     size_t offset = 0;
 
@@ -212,7 +365,7 @@ static size_t lookup(_UwMap* map, UwValuePtr key, size_t* ht_index, size_t* ht_o
         UwValuePtr k = map->kv_pairs->items[kv_index * 2];
 
         // compare keys
-        if (uw_equal(k, key)) {
+        if (_uw_equal(k, key)) {
             // found key
             if (ht_index) {
                 *ht_index = index;
@@ -230,10 +383,12 @@ static size_t lookup(_UwMap* map, UwValuePtr key, size_t* ht_index, size_t* ht_o
     } while (true);
 }
 
-static void set_hash_table_item(_UwHashTable* hash_table, size_t ht_index, size_t kv_index)
+static size_t set_hash_table_item(struct _UwHashTable* hash_table, size_t ht_index, size_t kv_index)
 /*
  * Assign `kv_index` to `hash_table` at position `ht_index` & hash_bitmask.
  * If the position is already occupied, try next one.
+ *
+ * Return ht_index, possibly updated.
  */
 {
     do {
@@ -242,12 +397,12 @@ static void set_hash_table_item(_UwHashTable* hash_table, size_t ht_index, size_
             ht_index++;
         } else {
             hash_table->set_item(hash_table, ht_index, kv_index);
-            return;
+            return ht_index;
         }
     } while (true);
 }
 
-static inline _UwMap* double_hash_table(_UwMap* map)
+static inline struct _UwMap* double_hash_table(struct _UwMap* map)
 /*
  * Helper functtion for uw_map_update.
  *
@@ -255,11 +410,14 @@ static inline _UwMap* double_hash_table(_UwMap* map)
  * The hash table is embedded into map structure, so re-allocate entire map.
  */
 {
-    _UwMap* new_map = allocate_map(map->hash_table.capacity * 2);
+    struct _UwMap* new_map = _uw_alloc_map(map->hash_table.capacity * 2);
+    if (!new_map) {
+        return nullptr;
+    }
     new_map->kv_pairs = map->kv_pairs;
     new_map->hash_table.items_used = map->hash_table.items_used;
 
-    _UwHashTable* hash_table = &new_map->hash_table;
+    struct _UwHashTable* hash_table = &new_map->hash_table;
 
     // rebuild hash table
     UwValuePtr* key_ptr = new_map->kv_pairs->items;
@@ -274,15 +432,15 @@ static inline _UwMap* double_hash_table(_UwMap* map)
     }
 
     // dispose old map
-    free(map);
+    _uw_free_map(map);
 
     return new_map;
 }
 
-static void update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value)
+static bool update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value)
 {
-    _UwMap* m = map->map_value;
-    _UwHashTable* hash_table = &m->hash_table;
+    struct _UwMap* m = map->map_value;
+    struct _UwHashTable* hash_table = &m->hash_table;
 
     // lookup key in the map
 
@@ -300,7 +458,7 @@ static void update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value)
             uw_delete(v_ptr);
             *v_ptr = uw_makeref(value);
         }
-        return;
+        return true;
     }
 
     // key not found, insert
@@ -311,6 +469,9 @@ static void update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value)
         // too long lookup and too few space left --> resize!
 
         m = double_hash_table(m);
+        if (!m) {
+            return false;
+        }
 
         // update changed stuff
         map->map_value = m;
@@ -319,32 +480,45 @@ static void update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value)
 
     size_t kv_index = _uw_list_length(m->kv_pairs) / 2;
 
-    set_hash_table_item(hash_table, uw_hash(key), kv_index + 1);
+    size_t ht_index = set_hash_table_item(hash_table, uw_hash(key), kv_index + 1);
 
-    _uw_list_append(&m->kv_pairs, key);
-    _uw_list_append(&m->kv_pairs, value);
+    if (!_uw_list_append(&m->kv_pairs, uw_makeref(key))) {
+        goto error;
+    }
+    if (!_uw_list_append(&m->kv_pairs, uw_makeref(value))) {
+        size_t len = m->kv_pairs->length;
+        _uw_list_del(m->kv_pairs, len - 1, len);
+        goto error;
+    }
 
     hash_table->items_used++;
+    return true;
+
+error:
+    // append to list failed, reset hast table item
+    hash_table->set_item(hash_table, ht_index, 0);
+    return false;
 }
 
-void uw_map_update(UwValuePtr map, UwValuePtr key, UwValuePtr value)
+bool uw_map_update(UwValuePtr map, UwValuePtr key, UwValuePtr value)
 {
     uw_assert_map(map);
     uw_assert(key != map);
     uw_assert(value != map);
 
-    update_map(map, key, value);
+    return update_map(map, key, value);
 }
 
-void uw_map_update_va(UwValuePtr map, ...)
+bool uw_map_update_va(UwValuePtr map, ...)
 {
     va_list ap;
     va_start(ap);
-    uw_map_update_ap(map, ap);
+    bool result = uw_map_update_ap(map, ap);
     va_end(ap);
+    return result;
 }
 
-void uw_map_update_ap(UwValuePtr map, va_list ap)
+bool uw_map_update_ap(UwValuePtr map, va_list ap)
 {
     uw_assert_map(map);
 
@@ -357,50 +531,56 @@ void uw_map_update_ap(UwValuePtr map, va_list ap)
             UwValue key = uw_create_from_ctype(ctype, ap);
             ctype = va_arg(ap, int);
             UwValue value = uw_create_from_ctype(ctype, ap);
-            update_map(map, key, value);
+            if (!value) {
+                return false;
+            }
+            if (!update_map(map, key, value)) {
+                return false;
+            }
         }
     }
+    return true;
 }
 
 bool _uw_map_has_key_null(UwValuePtr map, UwType_Null key)
 {
-    UwValue k = _uw_create_null(nullptr);
+    UwValue k = _uw_create_null();
+    uw_assert(k != nullptr);
     return _uw_map_has_key_uw(map, k);
 }
 
 bool _uw_map_has_key_bool(UwValuePtr map, UwType_Bool key)
 {
-    UwValue k = _uw_create_bool(key);
+    UwValue k = _uwc_create_bool(key);
+    uw_assert(k != nullptr);
     return _uw_map_has_key_uw(map, k);
 }
 
 bool _uw_map_has_key_int(UwValuePtr map, UwType_Int key)
 {
-    UwValue k = _uw_create_int(key);
+    UwValue k = _uwc_create_int(key);
+    uw_assert(k != nullptr);
     return _uw_map_has_key_uw(map, k);
 }
 
 bool _uw_map_has_key_float(UwValuePtr map, UwType_Float key)
 {
-    UwValue k = _uw_create_float(key);
-    return _uw_map_has_key_uw(map, k);
-}
-
-bool _uw_map_has_key_u8_wrapper(UwValuePtr map, char* key)
-{
-    UwValue k = _uw_create_string_u8_wrapper(key);
+    UwValue k = _uwc_create_float(key);
+    uw_assert(k != nullptr);
     return _uw_map_has_key_uw(map, k);
 }
 
 bool _uw_map_has_key_u8(UwValuePtr map, char8_t* key)
 {
     UwValue k = _uw_create_string_u8(key);
+    uw_assert(k != nullptr);
     return _uw_map_has_key_uw(map, k);
 }
 
 bool _uw_map_has_key_u32(UwValuePtr map, char32_t* key)
 {
     UwValue k = _uw_create_string_u32(key);
+    uw_assert(k != nullptr);
     return _uw_map_has_key_uw(map, k);
 }
 
@@ -408,8 +588,8 @@ bool _uw_map_has_key_uw(UwValuePtr map, UwValuePtr key)
 {
     uw_assert_map(map);
 
-    _UwMap* m = map->map_value;
-    _UwHashTable* hash_table = &m->hash_table;
+    struct _UwMap* m = map->map_value;
+    struct _UwHashTable* hash_table = &m->hash_table;
 
     // lookup key in the map
 
@@ -418,43 +598,43 @@ bool _uw_map_has_key_uw(UwValuePtr map, UwValuePtr key)
 
 UwValuePtr _uw_map_get_null(UwValuePtr map, UwType_Null key)
 {
-    UwValue k = _uw_create_null(nullptr);
+    UwValue k = _uw_create_null();
+    uw_assert(k != nullptr);
     return _uw_map_get_uw(map, k);
 }
 
 UwValuePtr _uw_map_get_bool(UwValuePtr map, UwType_Bool key)
 {
-    UwValue k = _uw_create_bool(key);
+    UwValue k = _uwc_create_bool(key);
+    uw_assert(k != nullptr);
     return _uw_map_get_uw(map, k);
 }
 
 UwValuePtr _uw_map_get_int(UwValuePtr map, UwType_Int key)
 {
-    UwValue k = _uw_create_int(key);
+    UwValue k = _uwc_create_int(key);
+    uw_assert(k != nullptr);
     return _uw_map_get_uw(map, k);
 }
 
 UwValuePtr _uw_map_get_float(UwValuePtr map, UwType_Float key)
 {
-    UwValue k = _uw_create_float(key);
-    return _uw_map_get_uw(map, k);
-}
-
-UwValuePtr _uw_map_get_u8_wrapper(UwValuePtr map, char* key)
-{
-    UwValue k = _uw_create_string_u8_wrapper(key);
+    UwValue k = _uwc_create_float(key);
+    uw_assert(k != nullptr);
     return _uw_map_get_uw(map, k);
 }
 
 UwValuePtr _uw_map_get_u8(UwValuePtr map, char8_t* key)
 {
     UwValue k = _uw_create_string_u8(key);
+    uw_assert(k != nullptr);
     return _uw_map_get_uw(map, k);
 }
 
 UwValuePtr _uw_map_get_u32(UwValuePtr map, char32_t* key)
 {
     UwValue k = _uw_create_string_u32(key);
+    uw_assert(k != nullptr);
     return _uw_map_get_uw(map, k);
 }
 
@@ -462,8 +642,8 @@ UwValuePtr _uw_map_get_uw(UwValuePtr map, UwValuePtr key)
 {
     uw_assert_map(map);
 
-    _UwMap* m = map->map_value;
-    _UwHashTable* hash_table = &m->hash_table;
+    struct _UwMap* m = map->map_value;
+    struct _UwHashTable* hash_table = &m->hash_table;
 
     // lookup key in the map
 
@@ -482,43 +662,43 @@ UwValuePtr _uw_map_get_uw(UwValuePtr map, UwValuePtr key)
 
 void _uw_map_del_null(UwValuePtr map, UwType_Null key)
 {
-    UwValue k = _uw_create_null(nullptr);
+    UwValue k = _uw_create_null();
+    uw_assert(k != nullptr);
     _uw_map_del_uw(map, k);
 }
 
 void _uw_map_del_bool(UwValuePtr map, UwType_Bool key)
 {
-    UwValue k = _uw_create_bool(key);
+    UwValue k = _uwc_create_bool(key);
+    uw_assert(k != nullptr);
     _uw_map_del_uw(map, k);
 }
 
 void _uw_map_del_int(UwValuePtr map, UwType_Int key)
 {
-    UwValue k = _uw_create_int(key);
+    UwValue k = _uwc_create_int(key);
+    uw_assert(k != nullptr);
     _uw_map_del_uw(map, k);
 }
 
 void _uw_map_del_float(UwValuePtr map, UwType_Float key)
 {
-    UwValue k = _uw_create_float(key);
-    _uw_map_del_uw(map, k);
-}
-
-void _uw_map_del_u8_wrapper(UwValuePtr map, char* key)
-{
-    UwValue k = _uw_create_string_u8_wrapper(key);
+    UwValue k = _uwc_create_float(key);
+    uw_assert(k != nullptr);
     _uw_map_del_uw(map, k);
 }
 
 void _uw_map_del_u8(UwValuePtr map, char8_t* key)
 {
     UwValue k = _uw_create_string_u8(key);
+    uw_assert(k != nullptr);
     _uw_map_del_uw(map, k);
 }
 
 void _uw_map_del_u32(UwValuePtr map, char32_t* key)
 {
     UwValue k = _uw_create_string_u32(key);
+    uw_assert(k != nullptr);
     _uw_map_del_uw(map, k);
 }
 
@@ -526,8 +706,8 @@ void _uw_map_del_uw(UwValuePtr map, UwValuePtr key)
 {
     uw_assert_map(map);
 
-    _UwMap* m = map->map_value;
-    _UwHashTable* hash_table = &m->hash_table;
+    struct _UwMap* m = map->map_value;
+    struct _UwHashTable* hash_table = &m->hash_table;
 
     // lookup key in the map
 
@@ -564,7 +744,7 @@ bool uw_map_item(UwValuePtr map, size_t index, UwValuePtr* key, UwValuePtr* valu
 {
     uw_assert_map(map);
 
-    _UwMap* m = map->map_value;
+    struct _UwMap* m = map->map_value;
 
     index <<= 1;
 
@@ -581,63 +761,3 @@ bool uw_map_item(UwValuePtr map, size_t index, UwValuePtr* key, UwValuePtr* valu
         return false;
     }
 }
-
-UwValuePtr _uw_copy_map(_UwMap* map)
-{
-    size_t length = _uw_list_length(map->kv_pairs) / 2;
-
-    // find nearest power of two for hash table capacity
-    size_t ht_capacity = UWMAP_INITIAL_CAPACITY;
-    while (ht_capacity < length) {
-        ht_capacity <<= 1;
-    }
-
-    length *= 2;
-
-    UwValuePtr new_map = _uw_alloc_value();
-    new_map->type_id = UwTypeId_Map;
-    new_map->map_value = allocate_map(ht_capacity);
-    new_map->map_value->kv_pairs = _uw_alloc_list(length);
-
-    // deep copy
-    for (size_t i = 0; i < length;) {
-        UwValuePtr key = uw_copy(map->kv_pairs->items[i++]);
-        UwValuePtr value = uw_copy(map->kv_pairs->items[i++]);
-        update_map(new_map, key, value);
-        uw_delete(&key);
-        uw_delete(&value);
-    }
-    return new_map;
-}
-
-#ifdef DEBUG
-
-void _uw_dump_map(_UwMap* map, int indent)
-{
-    // continue current line
-    printf("%zu key+values, capacity=%zu\n", map->kv_pairs->length, map->kv_pairs->capacity);
-
-    indent += 4;
-    for (size_t i = 0; i < map->kv_pairs->length; i++) {
-        char label[64];
-        sprintf(label, "Key : ");
-        _uw_dump(map->kv_pairs->items[i], indent, label);
-        i++;
-        sprintf(label, "Value: ");
-        _uw_dump(map->kv_pairs->items[i], indent, label);
-    }
-
-    _uw_print_indent(indent);
-
-    _UwHashTable* ht = &map->hash_table;
-    printf("hash table item size %u, items_used=%zu, capacity=%zu (bitmask %llx)\n",
-           ht->item_size, ht->items_used, ht->capacity, (unsigned long long) ht->hash_bitmask);
-
-    for (size_t i = 0; i < ht->capacity; i++ ) {
-        size_t kv_index = ht->get_item(ht, i);
-        _uw_print_indent(indent);
-        printf("%zx: %zu\n", i, kv_index);
-    }
-}
-
-#endif
