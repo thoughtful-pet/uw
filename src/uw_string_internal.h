@@ -47,10 +47,6 @@ struct _UwString {
             block_count:3;   // number of 64-bit blocks for fast comparison
 };
 
-struct _UwString* _uw_alloc_string(size_t capacity, uint8_t char_size);
-
-#define _uw_free_string(str)  free(str)
-
 /****************************************************************
  * Methods that depend on cap_size field.
  *

@@ -62,13 +62,13 @@ static inline bool _uw_string_eq(struct _UwString* a, struct _UwString* b)
  * Basic interface methods
  */
 
+static struct _UwString* _uw_alloc_string(UwAllocId alloc_id, size_t capacity, uint8_t char_size);  // forward declaration
+
 UwValuePtr _uw_create_string()
 {
-    UwValuePtr value = _uw_alloc_value();
+    UwValuePtr value = _uw_alloc_value(UwTypeId_String);
     if (value) {
-        value->type_id = UwTypeId_String;
-        value->refcount = 1;
-        value->string_value = _uw_alloc_string(0, 1);
+        value->string_value = _uw_alloc_string(value->alloc_id, 0, 1);
         if (!value->string_value) {
             _uw_free_value(value);
             value = nullptr;
@@ -81,7 +81,7 @@ void _uw_destroy_string(UwValuePtr self)
 {
     if (self) {
         if (self->string_value) {
-            _uw_free_string(self->string_value);
+            _uw_allocators[self->alloc_id].free(self->string_value);
         }
         _uw_free_value(self);
     }
@@ -106,11 +106,9 @@ UwValuePtr _uw_copy_string(UwValuePtr self)
     size_t capacity = get_cap_methods(str)->get_length(str);
     uint8_t char_size = strmeth->max_char_size(get_char_ptr(str, 0), capacity);
 
-    UwValuePtr result = _uw_alloc_value();
+    UwValuePtr result = _uw_alloc_value(UwTypeId_String);
     if (result) {
-        result->type_id = UwTypeId_String;
-        result->refcount = 1;
-        result->string_value = _uw_alloc_string(capacity, char_size);
+        result->string_value = _uw_alloc_string(result->alloc_id, capacity, char_size);
         if (!result->string_value) {
             _uw_free_value(result);
             result = nullptr;
@@ -1240,13 +1238,13 @@ static void calc_string_alloc_params(
     *new_memsize = *num_blocks * UWSTRING_BLOCK_SIZE;
 }
 
-static inline struct _UwString* allocate_string(size_t capacity, uint8_t cap_size, uint8_t char_size)
+static inline struct _UwString* allocate_string(UwAllocId alloc_id, size_t capacity, uint8_t cap_size, uint8_t char_size)
 {
     size_t memsize;
     size_t num_blocks;
     calc_string_alloc_params(&capacity, char_size, 0, &cap_size, &memsize, &num_blocks);
 
-    struct _UwString* s = malloc(memsize);
+    struct _UwString* s = _uw_allocators[alloc_id].alloc(memsize);
     if (!s) {
         return nullptr;
     }
@@ -1275,7 +1273,7 @@ static inline struct _UwString* allocate_string(size_t capacity, uint8_t cap_siz
     return s;
 }
 
-struct _UwString* _uw_alloc_string(size_t capacity, uint8_t char_size)
+static struct _UwString* _uw_alloc_string(UwAllocId alloc_id, size_t capacity, uint8_t char_size)
 {
     uw_assert(0 < char_size && char_size <= 4);
 
@@ -1290,7 +1288,7 @@ struct _UwString* _uw_alloc_string(size_t capacity, uint8_t char_size)
         cap_size = calc_cap_size(capacity);
     }
 
-    return allocate_string(capacity, cap_size, char_size);
+    return allocate_string(alloc_id, capacity, cap_size, char_size);
 }
 
 static inline void clean_tail(struct _UwString* str, size_t position, size_t capacity, uint8_t char_size)
@@ -1312,7 +1310,7 @@ static inline void clean_tail(struct _UwString* str, size_t position, size_t cap
     memset(get_char_ptr(str, position), 0, n);
 }
 
-static bool reallocate_string(struct _UwString** str_ref, size_t new_capacity, uint8_t new_char_size)
+static bool reallocate_string(UwAllocId alloc_id, struct _UwString** str_ref, size_t new_capacity, uint8_t new_char_size)
 /*
  * Zero values for `new_*` parameters mean use existing one.
  *
@@ -1344,7 +1342,7 @@ static bool reallocate_string(struct _UwString** str_ref, size_t new_capacity, u
     if (new_char_size == char_size) {
         if (new_cap_size == cap_size) {
             // simply re-allocate existing block
-            new_str = realloc(s, new_memsize);
+            new_str = _uw_allocators[alloc_id].realloc(s, new_memsize);
             if (!new_str) {
                 return false;
             }
@@ -1357,25 +1355,25 @@ static bool reallocate_string(struct _UwString** str_ref, size_t new_capacity, u
             // realloc would also move the data
             // to avoid double move, allocate new string
 
-            new_str = _uw_alloc_string(new_capacity, new_char_size);
+            new_str = _uw_alloc_string(alloc_id, new_capacity, new_char_size);
             if (!new_str) {
                 return false;
             }
             get_cap_methods(new_str)->set_length(new_str, length);
             memcpy(get_char_ptr(new_str, 0), get_char_ptr(s, 0), length * char_size);
-            _uw_free_string(s);
+            _uw_allocators[alloc_id].free(s);
         }
     } else {
         // char_size has changed!
         // allocate new string and copy characters, expanding them
 
-        new_str = _uw_alloc_string(new_capacity, new_char_size);
+        new_str = _uw_alloc_string(alloc_id, new_capacity, new_char_size);
         if (!new_str) {
             return false;
         }
         get_cap_methods(new_str)->set_length(new_str, length);
         get_str_methods(s)->copy_to(get_char_ptr(s, 0), new_str, 0, length);
-        _uw_free_string(s);
+        _uw_allocators[alloc_id].free(s);
     }
 
     *str_ref = new_str;
@@ -1395,7 +1393,7 @@ static struct _UwString* expand(UwValuePtr str, size_t increment, uint8_t new_ch
 
     if (new_capacity > capacity || new_char_size > s->char_size + 1) {
         // need to reallocate
-        if (!reallocate_string(&s, new_capacity, new_char_size)) {
+        if (!reallocate_string(str->alloc_id, &s, new_capacity, new_char_size)) {
             return nullptr;
         }
         str->string_value = s;
@@ -1410,11 +1408,9 @@ static struct _UwString* expand(UwValuePtr str, size_t increment, uint8_t new_ch
 
 UwValuePtr uw_create_empty_string(size_t capacity, uint8_t char_size)
 {
-    UwValuePtr result = _uw_alloc_value();
+    UwValuePtr result = _uw_alloc_value(UwTypeId_String);
     if (result) {
-        result->type_id = UwTypeId_String;
-        result->refcount = 1;
-        result->string_value = _uw_alloc_string(capacity, char_size);
+        result->string_value = _uw_alloc_string(result->alloc_id, capacity, char_size);
     }
     return result;
 }
@@ -2165,7 +2161,7 @@ void _uw_putchar32_utf8(char32_t codepoint)
 
 static struct _UwString* allocate_string2(uint8_t cap_size, uint8_t char_size)
 {
-    return allocate_string(1, cap_size, char_size);
+    return allocate_string(_uw_allocator.id, 1, cap_size, char_size);
 }
 
 bool uw_eq_fast(struct _UwString* a, struct _UwString* b)
@@ -2175,10 +2171,8 @@ bool uw_eq_fast(struct _UwString* a, struct _UwString* b)
 
 UwValuePtr uw_create_empty_string2(uint8_t cap_size, uint8_t char_size)
 {
-    UwValuePtr result = _uw_alloc_value();
+    UwValuePtr result = _uw_alloc_value(UwTypeId_String);
     if (result) {
-        result->type_id = UwTypeId_String;
-        result->refcount = 1;
         result->string_value = allocate_string2(cap_size, char_size);
     }
     return result;

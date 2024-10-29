@@ -5,10 +5,8 @@
 
 UwValuePtr _uw_create_null()
 {
-    UwValuePtr value = _uw_alloc_value();
+    UwValuePtr value = _uw_alloc_value(UwTypeId_Null);
     if (value) {
-        value->type_id = UwTypeId_Null;
-        value->refcount = 1;
         value->null_value = nullptr;
     }
     return value;

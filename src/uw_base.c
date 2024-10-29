@@ -94,6 +94,61 @@ void uw_dump(UwValuePtr value)
 }
 
 /****************************************************************
+ * Allocators.
+ */
+
+static void* malloc_nofail(size_t nbytes)
+{
+    void* block = malloc(nbytes);
+    if (!block) {
+        char msg[64];
+        sprintf(msg, "malloc(%zu)", nbytes);
+        perror(msg);
+        exit(1);
+    }
+    return block;
+}
+
+static void* realloc_nofail(void* block, size_t nbytes)
+{
+    void* new_block = realloc(block, nbytes);
+    if (!new_block) {
+        char msg[64];
+        sprintf(msg, "realloc(%p, %zu)", block, nbytes);
+        perror(msg);
+        exit(1);
+    }
+    return new_block;
+}
+
+UwAllocator _uw_allocators[1 << UW_ALLOCATOR_BITWIDTH] = {
+    {
+        .id      = UW_ALLOCATOR_STD,
+        .alloc   = malloc,
+        .realloc = realloc,
+        .free    = free
+    },
+    {
+        .id      = UW_ALLOCATOR_STD_NOFAIL,
+        .alloc   = malloc_nofail,
+        .realloc = realloc_nofail,
+        .free    = free
+    }
+};
+
+thread_local UwAllocator _uw_allocator = {
+    .id      = UW_ALLOCATOR_STD,
+    .alloc   = malloc,
+    .realloc = realloc,
+    .free    = free
+};
+
+void uw_set_allocator(UwAllocId alloc_id)
+{
+    _uw_allocator = _uw_allocators[alloc_id];
+}
+
+/****************************************************************
  * Global list of types initialized with built-in types.
  */
 

@@ -7,11 +7,9 @@
 
 UwValuePtr _uw_create_list()
 {
-    UwValuePtr value = _uw_alloc_value();
+    UwValuePtr value = _uw_alloc_value(UwTypeId_List);
     if (value) {
-        value->type_id = UwTypeId_List;
-        value->refcount = 1;
-        value->list_value = _uw_alloc_list(UWLIST_INITIAL_CAPACITY);
+        value->list_value = _uw_alloc_list(value->alloc_id, UWLIST_INITIAL_CAPACITY);
         if (!value->list_value) {
             _uw_free_value(value);
             value = nullptr;
@@ -24,7 +22,7 @@ void _uw_destroy_list(UwValuePtr self)
 {
     if (self) {
         if (self->list_value) {
-            _uw_delete_list(self->list_value);
+            _uw_delete_list(self->alloc_id, self->list_value);
         }
         _uw_free_value(self);
     }
@@ -42,11 +40,9 @@ void _uw_hash_list(UwValuePtr self, UwHashContext* ctx)
 
 UwValuePtr _uw_copy_list(UwValuePtr self)
 {
-    UwValuePtr result = _uw_alloc_value();
+    UwValuePtr result = _uw_alloc_value(UwTypeId_List);
     if (result) {
-        result->type_id = UwTypeId_List;
-        result->refcount = 1;
-        result->list_value = _uw_alloc_list((self->list_value->length + UWLIST_CAPACITY_INCREMENT - 1) & ~(UWLIST_CAPACITY_INCREMENT - 1));
+        result->list_value = _uw_alloc_list(result->alloc_id, self->list_value->length);
         if (!result->list_value) {
             goto error;
         }
@@ -126,11 +122,11 @@ bool _uw_list_equal_ctype(UwValuePtr self, UwCType ctype, ...)
     return result;
 }
 
-struct _UwList* _uw_alloc_list(size_t capacity)
+struct _UwList* _uw_alloc_list(UwAllocId alloc_id, size_t capacity)
 {
     capacity = (capacity + UWLIST_CAPACITY_INCREMENT - 1) & ~(UWLIST_CAPACITY_INCREMENT - 1);
 
-    struct _UwList* list = malloc(sizeof(struct _UwList) + capacity * sizeof(UwValuePtr));
+    struct _UwList* list = _uw_allocators[alloc_id].alloc(sizeof(struct _UwList) + capacity * sizeof(UwValuePtr));
     if (!list) {
         perror(__func__);
         exit(1);
@@ -160,12 +156,12 @@ UwValuePtr uw_create_list_ap(va_list ap)
     return list;
 }
 
-void _uw_delete_list(struct _UwList* list)
+void _uw_delete_list(UwAllocId alloc_id, struct _UwList* list)
 {
     for (size_t i = 0; i < list->length; i++) {
         uw_delete(&list->items[i]);
     }
-    _uw_free_list(list);
+    _uw_allocators[alloc_id].free(list);
 }
 
 size_t _uw_list_length(struct _UwList* list)
@@ -206,7 +202,7 @@ bool _uw_list_append_null(UwValuePtr list, UwType_Null item)
     if (!v) {
         return false;
     }
-    return _uw_list_append(&list->list_value, v);
+    return _uw_list_append(list->alloc_id, &list->list_value, v);
 }
 
 bool _uw_list_append_bool(UwValuePtr list, UwType_Bool item)
@@ -216,7 +212,7 @@ bool _uw_list_append_bool(UwValuePtr list, UwType_Bool item)
     if (!v) {
         return false;
     }
-    return _uw_list_append(&list->list_value, v);
+    return _uw_list_append(list->alloc_id, &list->list_value, v);
 }
 
 bool _uw_list_append_int(UwValuePtr list, UwType_Int item)
@@ -226,7 +222,7 @@ bool _uw_list_append_int(UwValuePtr list, UwType_Int item)
     if (!v) {
         return false;
     }
-    return _uw_list_append(&list->list_value, v);
+    return _uw_list_append(list->alloc_id, &list->list_value, v);
 }
 
 bool _uw_list_append_float(UwValuePtr list, UwType_Float item)
@@ -236,7 +232,7 @@ bool _uw_list_append_float(UwValuePtr list, UwType_Float item)
     if (!v) {
         return false;
     }
-    return _uw_list_append(&list->list_value, v);
+    return _uw_list_append(list->alloc_id, &list->list_value, v);
 }
 
 bool _uw_list_append_u8(UwValuePtr list, char8_t* item)
@@ -246,7 +242,7 @@ bool _uw_list_append_u8(UwValuePtr list, char8_t* item)
     if (!v) {
         return false;
     }
-    return _uw_list_append(&list->list_value, v);
+    return _uw_list_append(list->alloc_id, &list->list_value, v);
 }
 
 bool _uw_list_append_u32(UwValuePtr list, char32_t* item)
@@ -256,7 +252,7 @@ bool _uw_list_append_u32(UwValuePtr list, char32_t* item)
     if (!v) {
         return false;
     }
-    return _uw_list_append(&list->list_value, v);
+    return _uw_list_append(list->alloc_id, &list->list_value, v);
 }
 
 bool _uw_list_append_uw(UwValuePtr list, UwValuePtr item)
@@ -267,7 +263,7 @@ bool _uw_list_append_uw(UwValuePtr list, UwValuePtr item)
     // use separate variable for proper cleaning on error
     UwValuePtr item_ref = uw_makeref(item);
 
-    if (_uw_list_append(&list->list_value, item_ref)) {
+    if (_uw_list_append(list->alloc_id, &list->list_value, item_ref)) {
         // item is on the list, return leaving refcount intact
         return true;
     }
@@ -277,7 +273,7 @@ bool _uw_list_append_uw(UwValuePtr list, UwValuePtr item)
 }
 
 
-bool _uw_list_append(struct _UwList** list_ref, UwValuePtr item)
+bool _uw_list_append(UwAllocId alloc_id, struct _UwList** list_ref, UwValuePtr item)
 {
     struct _UwList* list = *list_ref;
 
@@ -286,7 +282,7 @@ bool _uw_list_append(struct _UwList** list_ref, UwValuePtr item)
 
     if (list->length == list->capacity) {
         size_t new_capacity = list->capacity + UWLIST_CAPACITY_INCREMENT;
-        struct _UwList* new_list = realloc(list, sizeof(struct _UwList) + (new_capacity * sizeof(UwValuePtr)));
+        struct _UwList* new_list = _uw_allocators[alloc_id].realloc(list, sizeof(struct _UwList) + (new_capacity * sizeof(UwValuePtr)));
         if (!new_list) {
             return false;
         }
@@ -311,6 +307,7 @@ bool uw_list_append_ap(UwValuePtr list, va_list ap)
 {
     uw_assert_list(list);
 
+    UwAllocId alloc_id = list->alloc_id;
     size_t num_appended = 0;
     for (;;) {
         int ctype = va_arg(ap, int);
@@ -322,7 +319,7 @@ bool uw_list_append_ap(UwValuePtr list, va_list ap)
             if (!item) {
                 goto error;
             }
-            if (!_uw_list_append(&(list)->list_value, item)) {
+            if (!_uw_list_append(alloc_id, &(list)->list_value, item)) {
                 goto error;
             }
             num_appended++;
@@ -413,10 +410,15 @@ UwValuePtr uw_list_slice(UwValuePtr list, size_t start_index, size_t end_index)
     }
     size_t slice_len = end_index - start_index;
 
-    UwValuePtr result = _uw_alloc_value();
-    result->type_id = UwTypeId_List;
-    result->refcount = 1;
-    result->list_value = _uw_alloc_list(slice_len);
+    UwValuePtr result = _uw_alloc_value(UwTypeId_List);
+    if (!result) {
+        return nullptr;
+    }
+    result->list_value = _uw_alloc_list(result->alloc_id, slice_len);
+    if (!result->list_value) {
+        _uw_free_value(result);
+        return nullptr;
+    }
 
     struct _UwList* _list   = list->list_value;
     struct _UwList* _result = result->list_value;

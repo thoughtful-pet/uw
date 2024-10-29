@@ -34,9 +34,20 @@ extern "C" {
 #   define UW_TYPE_BITWIDTH  8
 #endif
 
+#ifndef UW_ALLOCATOR_BITWIDTH
+#   define UW_ALLOCATOR_BITWIDTH  2
+#endif
+
 // remaining bits are used for reference count
-#define UW_REFCOUNT_BITWIDTH  (64 - UW_TYPE_BITWIDTH)
+#define UW_REFCOUNT_BITWIDTH  (64 - UW_TYPE_BITWIDTH - UW_ALLOCATOR_BITWIDTH)
 #define UW_MAX_REFCOUNT       ((1ULL << UW_REFCOUNT_BITWIDTH) - 1)
+
+// type for type id
+typedef unsigned _BitInt(UW_TYPE_BITWIDTH) UwTypeId;
+
+// type for allocator id
+typedef unsigned _BitInt(UW_ALLOCATOR_BITWIDTH) UwAllocId;
+
 // forward declarations
 struct _UwValue;
 struct _UwString;
@@ -51,7 +62,8 @@ typedef double     UwType_Float;
 
 struct _UwValue {
     uint64_t type_id: UW_TYPE_BITWIDTH,
-             refcount: UW_REFCOUNT_BITWIDTH;
+             refcount: UW_REFCOUNT_BITWIDTH,
+             alloc_id: UW_ALLOCATOR_BITWIDTH;
     union {
         UwType_Null  null_value;
         UwType_Bool  bool_value;
@@ -89,11 +101,56 @@ static inline UwValuePtr uw_move(UwValuePtr* v)
 }
 
 /****************************************************************
- * Allocator
+ * Allocators
  */
 
-#define _uw_alloc_value()      malloc(sizeof(struct _UwValue))
-#define _uw_free_value(value)  free(value)
+typedef void* (*UwAlloc)  (size_t nbytes);
+typedef void* (*UwRealloc)(void* block, size_t nbytes);
+typedef void  (*UwFree)   (void* block);
+
+typedef struct {
+    UwAllocId id;
+    UwAlloc   alloc;
+    UwRealloc realloc;
+    UwFree    free;
+} UwAllocator;
+
+#define UW_ALLOCATOR_STD         0  // built-in based on malloc/realloc/free
+#define UW_ALLOCATOR_STD_NOFAIL  1  // built-in based on malloc/realloc/free, exit on OOM
+
+extern UwAllocator _uw_allocators[1 << UW_ALLOCATOR_BITWIDTH];
+/*
+ * Global list of allocators initialized with built-in ones.
+ */
+
+extern thread_local UwAllocator _uw_allocator;
+/*
+ * Current allocator.
+ */
+
+void uw_set_allocator(UwAllocId alloc_id);
+/*
+ * Change current allocator.
+ */
+
+/*
+ * Helper functions
+ */
+
+static inline UwValuePtr _uw_alloc_value(UwTypeId type_id)
+{
+    UwValuePtr value = _uw_allocator.alloc(sizeof(struct _UwValue));
+    if (value) {
+        value->type_id  = type_id;
+        value->refcount = 1;
+    }
+    return value;
+}
+
+static inline void _uw_free_value(UwValuePtr value)
+{
+    _uw_allocators[value->alloc_id].free(value);
+}
 
 /****************************************************************
  * Hash function
@@ -140,9 +197,6 @@ typedef enum {
     uwc_value_ptr = 21,  // UwValuePtr
     uwc_value     = 22   // reserved for autocleaned UwValue
 } UwCType;
-
-// type for type id
-typedef unsigned _BitInt(UW_TYPE_BITWIDTH) UwTypeId;
 
 // predefined types
 #define UwTypeId_Null    0

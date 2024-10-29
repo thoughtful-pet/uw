@@ -10,6 +10,10 @@
 extern "C" {
 #endif
 
+// the following constants must be power of two:
+#define UWLIST_INITIAL_CAPACITY    16
+#define UWLIST_CAPACITY_INCREMENT  16
+
 /****************************************************************
  * Basic interface methods
  */
@@ -36,21 +40,15 @@ struct _UwList {
 };
 
 /****************************************************************
- * Allocator
- */
-
-// the following constants must be power of two:
-#define UWLIST_INITIAL_CAPACITY    16
-#define UWLIST_CAPACITY_INCREMENT  16
-
-struct _UwList* _uw_alloc_list(size_t capacity);
-#define _uw_free_list(list)  free(list)
-
-/****************************************************************
  * Helpers
  */
 
-void _uw_delete_list(struct _UwList* list);
+struct _UwList* _uw_alloc_list(UwAllocId alloc_id, size_t capacity);
+/*
+ * Allocate list.
+ */
+
+void _uw_delete_list(UwAllocId alloc_id, struct _UwList* list);
 /*
  * Call destructor for all items and free the list itself.
  */
@@ -60,7 +58,7 @@ bool _uw_list_eq(struct _UwList* a, struct _UwList* b);
  * Compare for equality.
  */
 
-bool _uw_list_append(struct _UwList** list_ref, UwValuePtr item);
+bool _uw_list_append(UwAllocId alloc_id, struct _UwList** list_ref, UwValuePtr item);
 /*
  * Append an item to the list.
  * This function does not increment item's refcount!

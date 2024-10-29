@@ -5,10 +5,8 @@
 
 UwValuePtr _uw_create_int()
 {
-    UwValuePtr value = _uw_alloc_value();
+    UwValuePtr value = _uw_alloc_value(UwTypeId_Int);
     if (value) {
-        value->type_id = UwTypeId_Int;
-        value->refcount = 1;
         value->int_value = 0;
     }
     return value;

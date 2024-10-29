@@ -5,10 +5,8 @@
 
 UwValuePtr _uw_create_float()
 {
-    UwValuePtr value = _uw_alloc_value();
+    UwValuePtr value = _uw_alloc_value(UwTypeId_Float);
     if (value) {
-        value->type_id = UwTypeId_Float;
-        value->refcount = 1;
         value->float_value = 0.0;
     }
     return value;

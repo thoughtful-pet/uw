@@ -5,10 +5,8 @@
 
 UwValuePtr _uw_create_bool()
 {
-    UwValuePtr value = _uw_alloc_value();
+    UwValuePtr value = _uw_alloc_value(UwTypeId_Bool);
     if (value) {
-        value->type_id = UwTypeId_Bool;
-        value->refcount = 1;
         value->bool_value = false;
     }
     return value;

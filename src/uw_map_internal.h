@@ -10,6 +10,9 @@
 extern "C" {
 #endif
 
+// capacity must be power of two, it doubles when map needs to grow
+#define UWMAP_INITIAL_CAPACITY  8
+
 /****************************************************************
  * Basic interface methods
  */
@@ -48,30 +51,6 @@ struct _UwMap {
     struct _UwList* kv_pairs;        // key-value pairs in the insertion order
     struct _UwHashTable hash_table;
 };
-
-/****************************************************************
- * Allocator
- */
-
-// capacity must be power of two, it doubles when map needs to grow
-#define UWMAP_INITIAL_CAPACITY  8
-
-struct _UwMap* _uw_alloc_map(size_t capacity);
-#define _uw_free_map(map)  free(map)
-
-/****************************************************************
- * Helpers
- */
-
-void _uw_delete_map(struct _UwMap* map);
-/*
- * Call destructor for all items and free the map itself.
- */
-
-bool _uw_map_eq(struct _UwMap* a, struct _UwMap* b);
-/*
- * Compare for equality.
- */
 
 #ifdef __cplusplus
 }
