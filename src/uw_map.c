@@ -70,23 +70,22 @@ UwValuePtr _uw_copy_map(UwValuePtr self)
 
     // deep copy
     for (size_t i = 0; i < length;) {
+        // not using autocleaned variables here
         UwValuePtr key = uw_copy(map->kv_pairs->items[i++]);
         UwValuePtr value = uw_copy(map->kv_pairs->items[i++]);
         if (key && value) {
-            update_map(result, key, value);
-            uw_delete(&key);
-            uw_delete(&value);
-        } else {
-            uw_delete(&key);
-            uw_delete(&value);
-            goto error;
+            if (update_map(result, key, value)) {
+                // key-value are successfully added to the map and should not be destroyed
+                continue;
+            }
         }
+        // uh oh
+        uw_delete(&key);
+        uw_delete(&value);
+        _uw_destroy_map(result);
+        return nullptr;
     }
     return result;
-
-error:
-    _uw_destroy_map(result);
-    return nullptr;
 }
 
 void _uw_dump_map(UwValuePtr self, int indent)
@@ -438,6 +437,9 @@ static inline struct _UwMap* double_hash_table(struct _UwMap* map)
 }
 
 static bool update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value)
+/*
+ * This function does not increment refcount for key and value!
+ */
 {
     struct _UwMap* m = map->map_value;
     struct _UwHashTable* hash_table = &m->hash_table;
@@ -456,7 +458,7 @@ static bool update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value)
         // update only if value is different
         if (*v_ptr != value) {
             uw_delete(v_ptr);
-            *v_ptr = uw_makeref(value);
+            *v_ptr = value;
         }
         return true;
     }
@@ -482,10 +484,10 @@ static bool update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value)
 
     size_t ht_index = set_hash_table_item(hash_table, uw_hash(key), kv_index + 1);
 
-    if (!_uw_list_append(&m->kv_pairs, uw_makeref(key))) {
+    if (!_uw_list_append(&m->kv_pairs, key)) {
         goto error;
     }
-    if (!_uw_list_append(&m->kv_pairs, uw_makeref(value))) {
+    if (!_uw_list_append(&m->kv_pairs, value)) {
         size_t len = m->kv_pairs->length;
         _uw_list_del(m->kv_pairs, len - 1, len);
         goto error;
@@ -506,7 +508,18 @@ bool uw_map_update(UwValuePtr map, UwValuePtr key, UwValuePtr value)
     uw_assert(key != map);
     uw_assert(value != map);
 
-    return update_map(map, key, value);
+    // use separate variables for proper cleaning on error
+    UwValuePtr key_ref   = uw_copy(key);      // copy key for immutability
+    UwValuePtr value_ref = uw_makeref(value);
+
+    if (update_map(map, key_ref, value_ref)) {
+        // key-value references are successfully added to the map
+        return true;
+    }
+    // update failed, decrement refcount
+    uw_delete(&key_ref);
+    uw_delete(&value_ref);
+    return false;
 }
 
 bool uw_map_update_va(UwValuePtr map, ...)
@@ -537,6 +550,9 @@ bool uw_map_update_ap(UwValuePtr map, va_list ap)
             if (!update_map(map, key, value)) {
                 return false;
             }
+            // key-value are added to the map, prevent autocleaning
+            key = nullptr;
+            value = nullptr;
         }
     }
     return true;

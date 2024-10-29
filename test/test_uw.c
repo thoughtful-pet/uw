@@ -1228,8 +1228,8 @@ void test_map()
         UwValue value = uw_create(false);
 
         uw_map_update(map, key, value);
-        TEST(key->refcount == 2);
-        TEST(value->refcount == 2);
+        TEST(key->refcount == 1);    // key is copied, so refcount is intact
+        TEST(value->refcount == 2);  // value is added by reference
         uw_delete(&key);
         uw_delete(&value);
 
@@ -1247,8 +1247,8 @@ void test_map()
             key = uw_create(i);
             value = uw_create(i);
             uw_map_update(map, key, value);
-            TEST(key->refcount == 2);
-            TEST(value->refcount == 2);
+            TEST(key->refcount == 1);    // key is copied, so refcount is intact
+            TEST(value->refcount == 2);  // value is added by reference
             uw_delete(&key);
             uw_delete(&value);
         }

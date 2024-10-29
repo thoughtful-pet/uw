@@ -16,6 +16,8 @@ bool uw_map_update_va(UwValuePtr map, ...);
 bool uw_map_update_ap(UwValuePtr map, va_list ap);
 /*
  * Insert or assign key-value pair using move semantic.
+ *
+ * As long as UW values are mutable, the key is copied.
  */
 
 /*

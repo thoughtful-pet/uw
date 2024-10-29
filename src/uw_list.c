@@ -263,8 +263,19 @@ bool _uw_list_append_uw(UwValuePtr list, UwValuePtr item)
 {
     uw_assert_list(list);
     uw_assert(list != item);
-    return _uw_list_append(&list->list_value, uw_makeref(item));
+
+    // use separate variable for proper cleaning on error
+    UwValuePtr item_ref = uw_makeref(item);
+
+    if (_uw_list_append(&list->list_value, item_ref)) {
+        // item is on the list, return leaving refcount intact
+        return true;
+    }
+    // append failed, decrement refcount
+    uw_delete(&item_ref);
+    return false;
 }
+
 
 bool _uw_list_append(struct _UwList** list_ref, UwValuePtr item)
 {
