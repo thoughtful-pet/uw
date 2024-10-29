@@ -99,6 +99,6 @@
  *   uw_list_append_va(mylist, uw_value_ptr, uw_create(1), uw_value_ptr, uw_create(2), -1);
  *
  *
- * Yes, C is weird. C++ could handle this better bit it's weird in its own way.
+ * Yes, C is weird. C++ could handle this better, but it's weird in its own way.
  */
 
