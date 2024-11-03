@@ -7,7 +7,7 @@
 
 char* _uw_get_type_name_by_id(uint8_t type_id)
 {
-    return _uw_types[type_id].name;
+    return _uw_types[type_id]->name;
 }
 
 char* _uw_get_type_name_from_value(UwValuePtr value)
@@ -18,15 +18,15 @@ char* _uw_get_type_name_from_value(UwValuePtr value)
 static inline bool _uw_call_is_true(UwValuePtr value)
 {
     UwTypeId type_id = value->type_id;
-    UwMethodIsTrue fn = _uw_types[type_id].is_true;
+    UwMethodIsTrue fn = _uw_types[type_id]->is_true;
     uw_assert(fn != nullptr);
-    return _uw_types[type_id].is_true(value);
+    return fn(value);
 }
 
 #define _uw_call_equal_ctype(value, ...)  \
     ({  \
         UwTypeId type_id = (value)->type_id;  \
-        UwMethodEqualCType fn_equal_ctype = _uw_types[type_id].equal_ctype;  \
+        UwMethodEqualCType fn_equal_ctype = _uw_types[type_id]->equal_ctype;  \
         uw_assert(fn_equal_ctype != nullptr);  \
         fn_equal_ctype((value), __VA_ARGS__);  \
     })

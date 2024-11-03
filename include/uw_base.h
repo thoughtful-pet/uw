@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,6 +42,10 @@ extern "C" {
 // remaining bits are used for reference count
 #define UW_REFCOUNT_BITWIDTH  (64 - UW_TYPE_BITWIDTH - UW_ALLOCATOR_BITWIDTH)
 #define UW_MAX_REFCOUNT       ((1ULL << UW_REFCOUNT_BITWIDTH) - 1)
+
+// Crazy idea: Given that UwValuePtr is always aligned,
+// last 3 bits could be used for allocator id.
+// But we'd have to reset these bits each time using UwValuePtr as pointer.
 
 // type for type id
 typedef unsigned _BitInt(UW_TYPE_BITWIDTH) UwTypeId;
@@ -165,10 +170,8 @@ typedef struct _UwHashContext UwHashContext;
 void _uw_hash_uint64(UwHashContext* ctx, uint64_t data);
 
 /****************************************************************
- * Types
+ * C type identifiers
  */
-
-// C type identifiers
 
 // These identifiers are used to provide C type info
 // to such methods as equal_ctype and variadic functions.
@@ -199,7 +202,98 @@ typedef enum {
     uwc_value     = 22   // reserved for autocleaned UwValue
 } UwCType;
 
-// predefined types
+/****************************************************************
+ * Interfaces
+ */
+
+#ifndef UW_INTERFACE_BITWIDTH
+#   define UW_INTERFACE_BITWIDTH  8
+#endif
+
+extern void* _uw_interfaces[1 << UW_INTERFACE_BITWIDTH];
+/*
+ * Global list of interfaces initialized with built-in interfaces.
+ */
+
+int uw_add_interface(void* interface);
+/*
+ * Add interface to the first available position in the global list.
+ * Return interface id or -1 if the list is full.
+ */
+
+// Built-in interfaces
+// TBD, TODO
+#define UwInterfaceId_Logic         0
+    // TBD
+#define UwInterfaceId_Arithmetic    1
+    // TBD
+#define UwInterfaceId_Bitwise       2
+    // TBD
+#define UwInterfaceId_Comparison    3
+    // UwMethodCompare  -- compare_sametype, compare;
+#define UwInterfaceId_RandomAccess  4
+    // UwMethodLength
+    // UwMethodGetItem     (by index for arrays/strings or by key for maps)
+    // UwMethodSetItem     (by index for arrays/strings or by key for maps)
+    // UwMethodDeleteItem  (by index for arrays/strings or by key for maps)
+    // UwMethodPopItem -- necessary here? it's just delete_item(length - 1)
+#define UwInterfaceId_List          5
+    // string supports this interface
+    // UwMethodAppend
+    // UwMethodSlice
+    // UwMethodDeleteRange
+
+/****************************************************************
+ * Types
+ */
+
+// Function types for the basic interface.
+// The basic interface is embedded into UwType structure.
+typedef UwValuePtr (*UwMethodCreate)    ();
+typedef void       (*UwMethodDestroy)   (UwValuePtr self);
+typedef void       (*UwMethodHash)      (UwValuePtr self, UwHashContext* ctx);
+typedef UwValuePtr (*UwMethodCopy)      (UwValuePtr self);
+typedef void       (*UwMethodDump)      (UwValuePtr self, int indent);
+typedef UwValuePtr (*UwMethodToString)  (UwValuePtr self);
+typedef bool       (*UwMethodIsTrue)    (UwValuePtr self);
+typedef bool       (*UwMethodEqual)     (UwValuePtr self, UwValuePtr other);
+typedef bool       (*UwMethodEqualCType)(UwValuePtr self, UwCType ctype, ...);
+
+typedef struct {
+    UwTypeId id;
+    UwTypeId ancestor_id;
+
+    char* name;
+
+    UwMethodCreate     create;
+    UwMethodDestroy    destroy;
+    UwMethodHash       hash;
+    UwMethodCopy       copy;
+    UwMethodDump       dump;
+    UwMethodToString   to_string;
+    UwMethodIsTrue     is_true;
+    UwMethodEqual      equal_sametype;
+    UwMethodEqual      equal;
+    UwMethodEqualCType equal_ctype;
+
+    bool supported_interfaces[UW_INTERFACE_BITWIDTH];
+    // bit fields are compact but static initialization would be a nightmare
+    // _BitInt(UW_INTERFACE_BITWIDTH) is another way but still cumbersome with unknown efficiency
+
+} UwType;
+
+extern UwType* _uw_types[1 << UW_TYPE_BITWIDTH];
+/*
+ * Global list of types initialized with built-in types.
+ */
+
+int uw_add_type(UwType* type);
+/*
+ * Add type to the first available position in the global list.
+ * Return type id or -1 if the list is full..
+ */
+
+// Built-in types
 #define UwTypeId_Null    0
 #define UwTypeId_Bool    1
 #define UwTypeId_Int     2
@@ -225,41 +319,6 @@ typedef enum {
 #define uw_assert_list(value)   uw_assert(uw_is_list  (value))
 #define uw_assert_map(value)    uw_assert(uw_is_map   (value))
 
-// function types for the basic interface
-typedef UwValuePtr (*UwMethodCreate)    ();
-typedef void       (*UwMethodDestroy)   (UwValuePtr self);
-typedef void       (*UwMethodHash)      (UwValuePtr self, UwHashContext* ctx);
-typedef UwValuePtr (*UwMethodCopy)      (UwValuePtr self);
-typedef void       (*UwMethodDump)      (UwValuePtr self, int indent);
-typedef UwValuePtr (*UwMethodToString)  (UwValuePtr self);
-typedef bool       (*UwMethodIsTrue)    (UwValuePtr self);
-typedef bool       (*UwMethodEqual)     (UwValuePtr self, UwValuePtr other);
-typedef bool       (*UwMethodEqualCType)(UwValuePtr self, UwCType ctype, ...);
-
-typedef struct {
-    UwTypeId id;
-    UwTypeId ancestor_id;
-
-    char* name;
-
-    // basic interface
-    UwMethodCreate     create;
-    UwMethodDestroy    destroy;
-    UwMethodHash       hash;
-    UwMethodCopy       copy;
-    UwMethodDump       dump;
-    UwMethodToString   to_string;
-    UwMethodIsTrue     is_true;
-    UwMethodEqual      equal_sametype;
-    UwMethodEqual      equal;
-    UwMethodEqualCType equal_ctype;
-} UwType;
-
-extern UwType _uw_types[1 << UW_TYPE_BITWIDTH];
-/*
- * Global list of types initialized with built-in types.
- */
-
 /****************************************************************
  * Basic functions
  */
@@ -281,7 +340,7 @@ UwType_Hash uw_hash(UwValuePtr value);
 
 static inline UwValuePtr uw_copy(UwValuePtr value)
 {
-    UwMethodCopy fn_copy = _uw_types[value->type_id].copy;
+    UwMethodCopy fn_copy = _uw_types[value->type_id]->copy;
     uw_assert(fn_copy != nullptr);
     return fn_copy(value);
 }
@@ -293,7 +352,7 @@ static inline UwValuePtr uw_copy(UwValuePtr value)
 static inline void _uw_call_destroy(UwValuePtr value)
 {
     UwTypeId type_id = value->type_id;
-    UwMethodDestroy fn_destroy = _uw_types[type_id].destroy;
+    UwMethodDestroy fn_destroy = _uw_types[type_id]->destroy;
     uw_assert(fn_destroy != nullptr);
     fn_destroy(value);
 }
@@ -301,7 +360,7 @@ static inline void _uw_call_destroy(UwValuePtr value)
 static inline void _uw_call_hash(UwValuePtr value, UwHashContext* ctx)
 {
     UwTypeId type_id = value->type_id;
-    UwMethodHash fn_hash = _uw_types[type_id].hash;
+    UwMethodHash fn_hash = _uw_types[type_id]->hash;
     uw_assert(fn_hash != nullptr);
     fn_hash(value, ctx);
 }
@@ -309,7 +368,7 @@ static inline void _uw_call_hash(UwValuePtr value, UwHashContext* ctx)
 static inline void _uw_call_dump(UwValuePtr value, int indent)
 {
     UwTypeId type_id = value->type_id;
-    UwMethodDump fn_dump = _uw_types[type_id].dump;
+    UwMethodDump fn_dump = _uw_types[type_id]->dump;
     uw_assert(fn_dump != nullptr);
     fn_dump(value, indent);
 }
@@ -323,7 +382,7 @@ static inline bool _uw_equal(UwValuePtr a, UwValuePtr b)
         // compare with self
         return true;
     }
-    UwType* t = &_uw_types[a->type_id];
+    UwType* t = _uw_types[a->type_id];
     UwMethodEqual cmp;
     if (a->type_id == b->type_id) {
         cmp = t->equal_sametype;
