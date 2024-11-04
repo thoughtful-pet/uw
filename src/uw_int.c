@@ -3,13 +3,10 @@
 #include "include/uw_base.h"
 #include "src/uw_int_internal.h"
 
-UwValuePtr _uw_create_int()
+bool _uw_init_int(UwValuePtr self)
 {
-    UwValuePtr value = _uw_alloc_value(UwTypeId_Int);
-    if (value) {
-        value->int_value = 0;
-    }
-    return value;
+    self->int_value = 0;
+    return true;
 }
 
 void _uw_hash_int(UwValuePtr self, UwHashContext* ctx)
@@ -20,7 +17,7 @@ void _uw_hash_int(UwValuePtr self, UwHashContext* ctx)
 
 UwValuePtr _uw_copy_int(UwValuePtr self)
 {
-    UwValuePtr value = _uw_create_int();
+    UwValuePtr value = uw_create_int();
     if (value) {
         value->int_value = self->int_value;
     }

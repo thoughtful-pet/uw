@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-UwValuePtr _uw_create_bool        ();
+bool       _uw_init_bool          (UwValuePtr self);
 void       _uw_hash_bool          (UwValuePtr self, UwHashContext* ctx);
 UwValuePtr _uw_copy_bool          (UwValuePtr self);
 void       _uw_dump_bool          (UwValuePtr self, int indent);

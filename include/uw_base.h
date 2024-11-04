@@ -239,8 +239,8 @@ int uw_add_interface(void* interface);
 
 // Function types for the basic interface.
 // The basic interface is embedded into UwType structure.
-typedef UwValuePtr (*UwMethodCreate)    ();
-typedef void       (*UwMethodDestroy)   (UwValuePtr self);
+typedef bool       (*UwMethodInit)      (UwValuePtr self);
+typedef void       (*UwMethodFini)      (UwValuePtr self);
 typedef void       (*UwMethodHash)      (UwValuePtr self, UwHashContext* ctx);
 typedef UwValuePtr (*UwMethodCopy)      (UwValuePtr self);
 typedef void       (*UwMethodDump)      (UwValuePtr self, int indent);
@@ -259,8 +259,8 @@ typedef struct {
     unsigned data_offset;
 
     // basic interface
-    UwMethodCreate     create;
-    UwMethodDestroy    destroy;
+    UwMethodInit       init;
+    UwMethodFini       fini;
     UwMethodHash       hash;
     UwMethodCopy       copy;
     UwMethodDump       dump;
@@ -369,12 +369,24 @@ static inline UwValuePtr uw_copy(UwValuePtr value)
  * Helper functions
  */
 
-static inline void _uw_call_destroy(UwValuePtr value)
+static inline UwValuePtr uw_create_null()
 {
-    UwTypeId type_id = value->type_id;
-    UwMethodDestroy fn_destroy = _uw_types[type_id]->destroy;
-    uw_assert(fn_destroy != nullptr);
-    fn_destroy(value);
+    return _uw_create(UwTypeId_Null);
+}
+
+static inline UwValuePtr uw_create_bool()
+{
+    return _uw_create(UwTypeId_Bool);
+}
+
+static inline UwValuePtr uw_create_int()
+{
+    return _uw_create(UwTypeId_Int);
+}
+
+static inline UwValuePtr uw_create_float()
+{
+    return _uw_create(UwTypeId_Float);
 }
 
 static inline void _uw_call_hash(UwValuePtr value, UwHashContext* ctx)

@@ -3,9 +3,9 @@
 #include "include/uw_base.h"
 #include "src/uw_null_internal.h"
 
-UwValuePtr _uw_create_null()
+bool _uw_init_null(UwValuePtr self)
 {
-    return _uw_alloc_value(UwTypeId_Null);
+    return true;
 }
 
 void _uw_hash_null(UwValuePtr self, UwHashContext* ctx)
@@ -15,7 +15,7 @@ void _uw_hash_null(UwValuePtr self, UwHashContext* ctx)
 
 UwValuePtr _uw_copy_null(UwValuePtr self)
 {
-    return _uw_create_null();
+    return uw_create_null();
 }
 
 void _uw_dump_null(UwValuePtr self, int indent)

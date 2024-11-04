@@ -3,13 +3,10 @@
 #include "include/uw_base.h"
 #include "src/uw_float_internal.h"
 
-UwValuePtr _uw_create_float()
+bool _uw_init_float(UwValuePtr self)
 {
-    UwValuePtr value = _uw_alloc_value(UwTypeId_Float);
-    if (value) {
-        value->float_value = 0.0;
-    }
-    return value;
+    self->float_value = 0.0;
+    return true;
 }
 
 void _uw_hash_float(UwValuePtr self, UwHashContext* ctx)
@@ -27,7 +24,7 @@ void _uw_hash_float(UwValuePtr self, UwHashContext* ctx)
 
 UwValuePtr _uw_copy_float(UwValuePtr self)
 {
-    UwValuePtr value = _uw_create_float();
+    UwValuePtr value = uw_create_float();
     if (value) {
         value->float_value = self->float_value;
     }

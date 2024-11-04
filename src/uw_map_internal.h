@@ -44,8 +44,8 @@ struct _UwMap {
  * Basic interface methods
  */
 
-UwValuePtr _uw_create_map        ();  // this prototype is duplicated in uw_map.h
-void       _uw_destroy_map       (UwValuePtr self);
+bool       _uw_init_map          (UwValuePtr self);
+void       _uw_fini_map          (UwValuePtr self);
 void       _uw_hash_map          (UwValuePtr self, UwHashContext* ctx);
 UwValuePtr _uw_copy_map          (UwValuePtr self);
 void       _uw_dump_map          (UwValuePtr self, int indent);

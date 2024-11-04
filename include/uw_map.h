@@ -6,8 +6,10 @@
 extern "C" {
 #endif
 
-#define uw_create_map() _uw_create_map()
-UwValuePtr _uw_create_map();
+static inline UwValuePtr uw_create_map()
+{
+    return _uw_create(UwTypeId_Map);
+}
 UwValuePtr uw_create_map_va(...);
 UwValuePtr uw_create_map_ap(va_list ap);
 

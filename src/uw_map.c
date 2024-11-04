@@ -2,7 +2,6 @@
 #include <string.h>
 
 #include "include/uw_c.h"
-#include "src/uw_null_internal.h"  // for _uw_create_null
 #include "src/uw_map_internal.h"
 
 static inline size_t get_map_length(struct _UwMap* map)
@@ -134,7 +133,7 @@ static bool init_map(UwAllocId alloc_id, struct _UwMap* map, size_t ht_capacity,
     ht->items_used = 0;
 
     if (init_hash_table(alloc_id, ht, ht_capacity)) {
-        if (_uw_init_list(alloc_id, &map->kv_pairs, list_capacity)) {
+        if (_uw_alloc_list(alloc_id, &map->kv_pairs, list_capacity)) {
             return true;
         }
         _uw_allocators[alloc_id].free(ht->items);
@@ -324,25 +323,17 @@ error:
  * Basic interface methods
  */
 
-UwValuePtr _uw_create_map()
+bool _uw_init_map(UwValuePtr self)
 {
-    UwValuePtr value = _uw_alloc_value(UwTypeId_Map);
-    if (value) {
-        struct _UwMap* map = _uw_get_map_ptr(value);
-        if (!init_map(value->alloc_id, map, UWMAP_INITIAL_CAPACITY, UWMAP_INITIAL_CAPACITY * 2)) {
-            _uw_free_value(value);
-            value = nullptr;
-        }
-    }
-    return value;
+    return init_map(
+        self->alloc_id,
+        _uw_get_map_ptr(self),
+        UWMAP_INITIAL_CAPACITY, UWMAP_INITIAL_CAPACITY * 2);
 }
 
-void _uw_destroy_map(UwValuePtr self)
+void _uw_fini_map(UwValuePtr self)
 {
-    if (self) {
-        delete_map(self->alloc_id, _uw_get_map_ptr(self));
-        _uw_free_value(self);
-    }
+    delete_map(self->alloc_id, _uw_get_map_ptr(self));
 }
 
 void _uw_hash_map(UwValuePtr self, UwHashContext* ctx)
@@ -392,7 +383,7 @@ UwValuePtr _uw_copy_map(UwValuePtr self)
         // uh oh
         uw_delete(&key);
         uw_delete(&value);
-        _uw_destroy_map(result);
+        uw_delete(&result);
         return nullptr;
     }
     return result;
@@ -496,7 +487,7 @@ UwValuePtr uw_create_map_va(...)
 
 UwValuePtr uw_create_map_ap(va_list ap)
 {
-    UwValuePtr map = _uw_create_map();
+    UwValuePtr map = uw_create_map();
     if (map) {
         if (!uw_map_update_ap(map, ap)) {
             uw_delete(&map);
@@ -563,7 +554,7 @@ bool uw_map_update_ap(UwValuePtr map, va_list ap)
 
 bool _uw_map_has_key_null(UwValuePtr map, UwType_Null key)
 {
-    UwValue k = _uw_create_null();
+    UwValue k = uw_create_null();
     uw_assert(k != nullptr);
     return _uw_map_has_key_uw(map, k);
 }
@@ -612,7 +603,7 @@ bool _uw_map_has_key_uw(UwValuePtr self, UwValuePtr key)
 
 UwValuePtr _uw_map_get_null(UwValuePtr map, UwType_Null key)
 {
-    UwValue k = _uw_create_null();
+    UwValue k = uw_create_null();
     uw_assert(k != nullptr);
     return _uw_map_get_uw(map, k);
 }
@@ -672,7 +663,7 @@ UwValuePtr _uw_map_get_uw(UwValuePtr self, UwValuePtr key)
 
 void _uw_map_del_null(UwValuePtr map, UwType_Null key)
 {
-    UwValue k = _uw_create_null();
+    UwValue k = uw_create_null();
     uw_assert(k != nullptr);
     _uw_map_del_uw(map, k);
 }

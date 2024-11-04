@@ -1,34 +1,9 @@
 #include "include/uw_base.h"
 #include "src/uw_class_internal.h"
 
-UwValuePtr _uw_create_class()
+bool _uw_init_class(UwValuePtr self)
 {
-    return _uw_alloc_value(UwTypeId_Class);
-}
-
-void _uw_destroy_class(UwValuePtr self)
-/*
- * Subclass can inherit this basic method,
- * so go down inheritance chain and call destructors of all base classes.
- */
-{
-    if (!self) {
-        return;
-    }
-    UwType* type = _uw_types[self->type_id];
-    uw_assert(type != nullptr);
-
-    while (type->ancestor_id != UwTypeId_Null) {
-        type->destroy(self);
-        type = _uw_types[type->ancestor_id];
-    }
-
-    if (type->id == UwTypeId_Class) {
-        // self destruction
-        _uw_free_value(self);
-    } else {
-        type->destroy(self);
-    }
+    return true;
 }
 
 void _uw_hash_class(UwValuePtr self, UwHashContext* ctx)

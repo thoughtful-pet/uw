@@ -64,29 +64,22 @@ static inline bool _uw_string_eq(struct _UwString* a, struct _UwString* b)
 
 static struct _UwString* _uw_alloc_string(UwAllocId alloc_id, size_t capacity, uint8_t char_size);  // forward declaration
 
-UwValuePtr _uw_create_string()
+bool _uw_init_string(UwValuePtr self)
 {
-    UwValuePtr value = _uw_alloc_value(UwTypeId_String);
-    if (value) {
-        struct _UwString* s = _uw_alloc_string(value->alloc_id, 0, 1);
-        if (s) {
-            *_uw_get_string_pptr(value) = s;
-        } else {
-            _uw_free_value(value);
-            value = nullptr;
-        }
+    struct _UwString* s = _uw_alloc_string(self->alloc_id, 0, 1);
+    if (s) {
+        *_uw_get_string_pptr(self) = s;
+        return true;
+    } else {
+        return false;
     }
-    return value;
 }
 
-void _uw_destroy_string(UwValuePtr self)
+void _uw_fini_string(UwValuePtr self)
 {
-    if (self) {
-        struct _UwString* s = *_uw_get_string_pptr(self);
-        if (s) {
-            _uw_allocators[self->alloc_id].free(s);
-        }
-        _uw_free_value(self);
+    struct _UwString* s = *_uw_get_string_pptr(self);
+    if (s) {
+        _uw_allocators[self->alloc_id].free(s);
     }
 }
 

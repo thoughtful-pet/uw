@@ -3,13 +3,10 @@
 #include "include/uw_base.h"
 #include "src/uw_bool_internal.h"
 
-UwValuePtr _uw_create_bool()
+bool _uw_init_bool(UwValuePtr self)
 {
-    UwValuePtr value = _uw_alloc_value(UwTypeId_Bool);
-    if (value) {
-        value->bool_value = false;
-    }
-    return value;
+    self->bool_value = false;
+    return true;
 }
 
 void _uw_hash_bool(UwValuePtr self, UwHashContext* ctx)
@@ -20,7 +17,7 @@ void _uw_hash_bool(UwValuePtr self, UwHashContext* ctx)
 
 UwValuePtr _uw_copy_bool(UwValuePtr self)
 {
-    UwValuePtr value = _uw_create_bool();
+    UwValuePtr value = uw_create_bool();
     if (value) {
         value->bool_value = self->bool_value;
     }

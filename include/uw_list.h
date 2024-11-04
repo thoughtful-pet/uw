@@ -7,8 +7,10 @@
 extern "C" {
 #endif
 
-#define uw_create_list() _uw_create_list()
-UwValuePtr _uw_create_list();
+static inline UwValuePtr uw_create_list()
+{
+    return _uw_create(UwTypeId_List);
+}
 UwValuePtr uw_create_list_va(...);
 UwValuePtr uw_create_list_ap(va_list ap);
 

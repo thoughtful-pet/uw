@@ -31,8 +31,8 @@ struct _UwList {
  * Basic interface methods
  */
 
-UwValuePtr _uw_create_list        ();  // this prototype is duplicated in uw_list.h
-void       _uw_destroy_list       (UwValuePtr self);
+bool       _uw_init_list          (UwValuePtr self);
+void       _uw_fini_list          (UwValuePtr self);
 void       _uw_hash_list          (UwValuePtr self, UwHashContext* ctx);
 UwValuePtr _uw_copy_list          (UwValuePtr self);
 void       _uw_dump_list          (UwValuePtr self, int indent);
@@ -61,7 +61,7 @@ static inline UwValuePtr* _uw_list_item_ptr(struct _UwList* list, size_t index)
     return &list->items[index];
 }
 
-bool _uw_init_list(UwAllocId alloc_id, struct _UwList* list, size_t capacity);
+bool _uw_alloc_list(UwAllocId alloc_id, struct _UwList* list, size_t capacity);
 /*
  * - allocate list items
  * - set list->length = 0

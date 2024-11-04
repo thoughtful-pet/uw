@@ -2,29 +2,20 @@
 #include <string.h>
 
 #include "include/uw_c.h"
-#include "src/uw_null_internal.h"  // for _uw_create_null
 #include "src/uw_list_internal.h"
 
-UwValuePtr _uw_create_list()
+bool _uw_init_list(UwValuePtr self)
 {
-    UwValuePtr value = _uw_alloc_value(UwTypeId_List);
-    if (value) {
-        struct _UwList* list = _uw_get_list_ptr(value);
-        if (!_uw_init_list(value->alloc_id, list, UWLIST_INITIAL_CAPACITY)) {
-            _uw_free_value(value);
-            value = nullptr;
-        }
-    }
-    return value;
+    return _uw_alloc_list(
+        self->alloc_id,
+        _uw_get_list_ptr(self),
+        UWLIST_INITIAL_CAPACITY
+    );
 }
 
-void _uw_destroy_list(UwValuePtr self)
+void _uw_fini_list(UwValuePtr self)
 {
-    if (self) {
-        struct _UwList* list = _uw_get_list_ptr(self);
-        _uw_delete_list(self->alloc_id, list);
-        _uw_free_value(self);
-    }
+    _uw_delete_list(self->alloc_id, _uw_get_list_ptr(self));
 }
 
 void _uw_hash_list(UwValuePtr self, UwHashContext* ctx)
@@ -43,7 +34,7 @@ UwValuePtr _uw_copy_list(UwValuePtr self)
     UwValuePtr result = _uw_alloc_value(UwTypeId_List);
     if (result) {
         struct _UwList* result_list = _uw_get_list_ptr(result);
-        if (!_uw_init_list(result->alloc_id, result_list, list->length)) {
+        if (!_uw_alloc_list(result->alloc_id, result_list, list->length)) {
             goto error;
         }
         // deep copy
@@ -61,7 +52,7 @@ UwValuePtr _uw_copy_list(UwValuePtr self)
     return result;
 
 error:
-    _uw_destroy_list(result);
+    uw_delete(&result);
     return nullptr;
 }
 
@@ -121,7 +112,7 @@ bool _uw_list_equal_ctype(UwValuePtr self, UwCType ctype, ...)
     return result;
 }
 
-bool _uw_init_list(UwAllocId alloc_id, struct _UwList* list, size_t capacity)
+bool _uw_alloc_list(UwAllocId alloc_id, struct _UwList* list, size_t capacity)
 {
     list->length = 0;
     list->capacity = (capacity + UWLIST_CAPACITY_INCREMENT - 1) & ~(UWLIST_CAPACITY_INCREMENT - 1);
@@ -151,7 +142,7 @@ UwValuePtr uw_create_list_va(...)
 
 UwValuePtr uw_create_list_ap(va_list ap)
 {
-    UwValuePtr list = _uw_create_list();
+    UwValuePtr list = uw_create_list();
     if (list) {
         if (!uw_list_append_ap(list, ap)) {
             uw_delete(&list);
@@ -195,7 +186,7 @@ bool _uw_list_eq(struct _UwList* a, struct _UwList* b)
 bool _uw_list_append_null(UwValuePtr list, UwType_Null item)
 {
     uw_assert_list(list);
-    UwValuePtr v = _uw_create_null();
+    UwValuePtr v = uw_create_null();
     if (!v) {
         return false;
     }
@@ -403,7 +394,7 @@ UwValuePtr uw_list_slice(UwValuePtr self, size_t start_index, size_t end_index)
     }
     if (start_index >= end_index) {
         // return empty list
-        return _uw_create_list();
+        return uw_create_list();
     }
     size_t slice_len = end_index - start_index;
 
@@ -412,7 +403,7 @@ UwValuePtr uw_list_slice(UwValuePtr self, size_t start_index, size_t end_index)
         return nullptr;
     }
     struct _UwList* result_list = _uw_get_list_ptr(result);
-    if (!_uw_init_list(result->alloc_id, result_list, slice_len)) {
+    if (!_uw_alloc_list(result->alloc_id, result_list, slice_len)) {
         _uw_free_value(result);
         return nullptr;
     }

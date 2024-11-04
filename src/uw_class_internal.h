@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-UwValuePtr _uw_create_class        ();
+bool       _uw_init_class          (UwValuePtr self);
 void       _uw_hash_class          (UwValuePtr self, UwHashContext* ctx);
 UwValuePtr _uw_copy_class          (UwValuePtr self);
 void       _uw_dump_class          (UwValuePtr self, int indent);

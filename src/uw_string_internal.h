@@ -33,8 +33,8 @@ struct _UwString {
  * Basic interface methods
  */
 
-UwValuePtr _uw_create_string        ();
-void       _uw_destroy_string       (UwValuePtr self);
+bool       _uw_init_string          (UwValuePtr self);
+void       _uw_fini_string          (UwValuePtr self);
 void       _uw_hash_string          (UwValuePtr self, UwHashContext* ctx);
 UwValuePtr _uw_copy_string          (UwValuePtr self);
 void       _uw_dump_string          (UwValuePtr self, int indent);

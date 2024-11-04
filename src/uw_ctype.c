@@ -12,7 +12,7 @@
 UwValuePtr uw_create_from_ctype(UwCType ctype, va_list args)
 {
     switch (ctype) {
-        case uwc_nullptr:   va_arg(args, void*); return _uw_create_null();  // XXX something I don't get about nullptr_t in va_arg
+        case uwc_nullptr:   va_arg(args, void*); return uw_create_null();  // XXX something I don't get about nullptr_t in va_arg
 
         case uwc_bool:      return _uwc_create_bool ((bool) va_arg(args, int /*bool*/));
 
@@ -49,26 +49,32 @@ UwValuePtr uw_create_from_ctype(UwCType ctype, va_list args)
 
 UwValuePtr _uwc_create_null(nullptr_t dummy)
 {
-    return _uw_create_null();
+    return uw_create_null();
 }
 
 UwValuePtr _uwc_create_bool(UwType_Bool initializer)
 {
-    UwValuePtr value = _uw_create_bool();
-    value->bool_value = initializer;
+    UwValuePtr value = uw_create_bool();
+    if (value) {
+        value->bool_value = initializer;
+    }
     return value;
 }
 
 UwValuePtr _uwc_create_int(UwType_Int initializer)
 {
-    UwValuePtr value = _uw_create_int();
-    value->int_value = initializer;
+    UwValuePtr value = uw_create_int();
+    if (value) {
+        value->int_value = initializer;
+    }
     return value;
 }
 
 UwValuePtr _uwc_create_float(UwType_Float initializer)
 {
-    UwValuePtr value = _uw_create_float();
-    value->float_value = initializer;
+    UwValuePtr value = uw_create_float();
+    if (value) {
+        value->float_value = initializer;
+    }
     return value;
 }
