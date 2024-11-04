@@ -5,11 +5,7 @@
 
 UwValuePtr _uw_create_null()
 {
-    UwValuePtr value = _uw_alloc_value(UwTypeId_Null);
-    if (value) {
-        value->null_value = nullptr;
-    }
-    return value;
+    return _uw_alloc_value(UwTypeId_Null);
 }
 
 void _uw_hash_null(UwValuePtr self, UwHashContext* ctx)

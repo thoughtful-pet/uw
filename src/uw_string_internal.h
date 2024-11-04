@@ -14,6 +14,21 @@ extern "C" {
 #define _likely_(x)    __builtin_expect(!!(x), 1)
 #define _unlikely_(x)  __builtin_expect(!!(x), 0)
 
+// internal string structure
+
+struct _UwString {
+    uint8_t cap_size:3,      // length and capacity size in bytes minus one
+            char_size:2,     // character size in bytes minus one
+            block_count:3;   // number of 64-bit blocks for fast comparison
+};
+
+#define _uw_get_string_pptr(value)  \
+    (  \
+        (struct _UwString**) (  \
+            ((uint8_t*) (value)) + sizeof(_UwValueBase) \
+        )  \
+    )
+
 /****************************************************************
  * Basic interface methods
  */
@@ -40,12 +55,6 @@ bool       _uw_string_equal_ctype   (UwValuePtr self, UwCType ctype, ...);
  */
 
 #define UWSTRING_BLOCK_SIZE    8
-
-struct _UwString {
-    uint8_t cap_size:3,      // length and capacity size in bytes minus one
-            char_size:2,     // character size in bytes minus one
-            block_count:3;   // number of 64-bit blocks for fast comparison
-};
 
 /****************************************************************
  * Methods that depend on cap_size field.
@@ -126,6 +135,15 @@ static inline StrMethods* get_str_methods(struct _UwString* str)
 {
     return &_uws_str_methods[str->char_size];
 }
+
+static inline uint8_t _uw_string_char_size(struct _UwString* s)
+{
+    return s->char_size + 1;
+}
+
+#ifdef DEBUG
+    bool uw_eq_fast(struct _UwString* a, struct _UwString* b);
+#endif
 
 #ifdef __cplusplus
 }

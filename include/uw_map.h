@@ -53,13 +53,10 @@ void _uw_map_del_u8   (UwValuePtr map, char8_t*     key);
 void _uw_map_del_u32  (UwValuePtr map, char32_t*    key);
 void _uw_map_del_uw   (UwValuePtr map, UwValuePtr   key);
 
-size_t _uw_map_length(struct _UwMap* map);
-
-static inline size_t uw_map_length(UwValuePtr map)
-{
-    uw_assert_map(map);
-    return _uw_map_length(map->map_value);
-}
+size_t uw_map_length(UwValuePtr map);
+/*
+ * Return the number of items in `map`.
+ */
 
 bool uw_map_item(UwValuePtr map, size_t index, UwValuePtr* key, UwValuePtr* value);
 /*

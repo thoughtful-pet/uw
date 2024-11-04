@@ -14,6 +14,19 @@ extern "C" {
 #define UWLIST_INITIAL_CAPACITY    16
 #define UWLIST_CAPACITY_INCREMENT  16
 
+struct _UwList {
+    size_t length;
+    size_t capacity;
+    UwValuePtr* items;
+};
+
+#define _uw_get_list_ptr(value)  \
+    (  \
+        (struct _UwList*) (  \
+            ((uint8_t*) (value)) + sizeof(_UwValueBase) \
+        )  \
+    )
+
 /****************************************************************
  * Basic interface methods
  */
@@ -30,27 +43,36 @@ bool       _uw_list_equal         (UwValuePtr self, UwValuePtr other);
 bool       _uw_list_equal_ctype   (UwValuePtr self, UwCType ctype, ...);
 
 /****************************************************************
- * The list is a variable-length structure
- */
-
-struct _UwList {
-    size_t length;
-    size_t capacity;
-    struct _UwValue* items[];
-};
-
-/****************************************************************
  * Helpers
  */
 
-struct _UwList* _uw_alloc_list(UwAllocId alloc_id, size_t capacity);
+static inline size_t _uw_list_length(struct _UwList* list)
+{
+    return list->length;
+}
+
+static inline UwValuePtr _uw_list_item(struct _UwList* list, size_t index)
+{
+    return list->items[index];
+}
+
+static inline UwValuePtr* _uw_list_item_ptr(struct _UwList* list, size_t index)
+{
+    return &list->items[index];
+}
+
+bool _uw_init_list(UwAllocId alloc_id, struct _UwList* list, size_t capacity);
 /*
- * Allocate list.
+ * - allocate list items
+ * - set list->length = 0
+ * - set list->capacity = rounded capacity
+ *
+ * Return true if list->items is not nullptr.
  */
 
 void _uw_delete_list(UwAllocId alloc_id, struct _UwList* list);
 /*
- * Call destructor for all items and free the list itself.
+ * Call destructor for all items and free the list items.
  */
 
 bool _uw_list_eq(struct _UwList* a, struct _UwList* b);
@@ -58,7 +80,7 @@ bool _uw_list_eq(struct _UwList* a, struct _UwList* b);
  * Compare for equality.
  */
 
-bool _uw_list_append(UwAllocId alloc_id, struct _UwList** list_ref, UwValuePtr item);
+bool _uw_list_append(UwAllocId alloc_id, struct _UwList* list, UwValuePtr item);
 /*
  * Append an item to the list.
  * This function does not increment item's refcount!

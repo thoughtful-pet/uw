@@ -12,6 +12,18 @@
  * Basic functions
  */
 
+UwValuePtr _uw_alloc_value(UwTypeId type_id)
+{
+    UwType* t = _uw_types[type_id];
+    UwValuePtr value = _uw_allocator.alloc(t->data_offset + t->data_size);
+    if (value) {
+        value->type_id  = type_id;
+        value->refcount = 1;
+        value->alloc_id = _uw_allocator.id;
+    }
+    return value;
+}
+
 UwValuePtr _uw_create(UwTypeId type_id)
 {
     UwMethodCreate fn = _uw_types[type_id]->create;
@@ -69,7 +81,7 @@ void _uw_dump_start(UwValuePtr value, int indent)
     if (type_name == nullptr) {
         printf(" BAD TYPE %d", value->type_id);
     } else {
-        printf(" %s (%d)", type_name,value->type_id);
+        printf(" %s (type id: %d)", type_name,value->type_id);
     }
     printf(" refcount=%zu; ", value->refcount);
 }
@@ -175,6 +187,8 @@ static UwType null_type = {
     .id               = UwTypeId_Null,
     .ancestor_id      = UwTypeId_Null,  // no ancestor; Null can't be an ancestor for any type
     .name             = "Null",
+    .data_size        = 0,
+    .data_offset      = sizeof(_UwValueBase),
     .create           = _uw_create_null,
     .destroy          = _uw_destroy_integral,
     .hash             = _uw_hash_null,
@@ -193,6 +207,8 @@ static UwType bool_type = {
     .id               = UwTypeId_Bool,
     .ancestor_id      = UwTypeId_Null,  // no ancestor
     .name             = "Bool",
+    .data_size        = sizeof(UwType_Bool),
+    .data_offset      = sizeof(_UwValueBase),
     .create           = _uw_create_bool,
     .destroy          = _uw_destroy_integral,
     .hash             = _uw_hash_bool,
@@ -213,6 +229,8 @@ static UwType int_type = {
     .id               = UwTypeId_Int,
     .ancestor_id      = UwTypeId_Null,  // no ancestor
     .name             = "Int",
+    .data_size        = sizeof(UwType_Int),
+    .data_offset      = sizeof(_UwValueBase),
     .create           = _uw_create_int,
     .destroy          = _uw_destroy_integral,
     .hash             = _uw_hash_int,
@@ -236,6 +254,8 @@ static UwType float_type = {
     .id               = UwTypeId_Float,
     .ancestor_id      = UwTypeId_Null,  // no ancestor
     .name             = "Float",
+    .data_size        = sizeof(UwType_Float),
+    .data_offset      = sizeof(_UwValueBase),
     .create           = _uw_create_float,
     .destroy          = _uw_destroy_integral,
     .hash             = _uw_hash_float,
@@ -258,6 +278,8 @@ static UwType string_type = {
     .id               = UwTypeId_String,
     .ancestor_id      = UwTypeId_Null,  // no ancestor
     .name             = "String",
+    .data_size        = sizeof(struct _UwString*),
+    .data_offset      = sizeof(_UwValueBase),
     .create           = _uw_create_string,
     .destroy          = _uw_destroy_string,
     .hash             = _uw_hash_string,
@@ -278,6 +300,8 @@ static UwType list_type = {
     .id               = UwTypeId_List,
     .ancestor_id      = UwTypeId_Null,  // no ancestor
     .name             = "List",
+    .data_size        = sizeof(struct _UwList),
+    .data_offset      = sizeof(_UwValueBase),
     .create           = _uw_create_list,
     .destroy          = _uw_destroy_list,
     .hash             = _uw_hash_list,
@@ -299,6 +323,8 @@ static UwType map_type = {
     .id               = UwTypeId_Map,
     .ancestor_id      = UwTypeId_Null,  // no ancestor
     .name             = "Map",
+    .data_size        = sizeof(struct _UwMap),
+    .data_offset      = sizeof(_UwValueBase),
     .create           = _uw_create_map,
     .destroy          = _uw_destroy_map,
     .hash             = _uw_hash_map,
@@ -336,4 +362,23 @@ int uw_add_type(UwType* type)
         }
     }
     return -1;
+}
+
+int uw_subclass(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_size)
+{
+    UwType* ancestor = _uw_types[ancestor_id];
+    uw_assert(ancestor != nullptr);
+
+    *type = *ancestor;  // copy type structure
+
+    type->ancestor_id = ancestor_id;
+    type->name = name;
+    type->data_size = data_size;
+    type->data_offset = ancestor->data_offset + ancestor->data_size;
+
+    int type_id = uw_add_type(type);
+    if (type_id != -1) {
+        type->id = (UwTypeId) type_id;
+    }
+    return type_id;
 }

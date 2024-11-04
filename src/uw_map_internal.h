@@ -13,6 +13,33 @@ extern "C" {
 // capacity must be power of two, it doubles when map needs to grow
 #define UWMAP_INITIAL_CAPACITY  8
 
+struct _UwHashTable;
+
+typedef size_t (*_UwHtGet)(struct _UwHashTable* ht, size_t index);
+typedef void   (*_UwHtSet)(struct _UwHashTable* ht, size_t index, size_t value);
+
+struct _UwHashTable {
+    uint8_t item_size;   // in bytes
+    UwType_Hash hash_bitmask;  // calculated from item_size
+    size_t items_used;
+    size_t capacity;
+    _UwHtGet get_item;  // getter function for specific item size
+    _UwHtSet set_item;  // setter function for specific item size
+    uint8_t* items;     // items have variable size
+};
+
+struct _UwMap {
+    struct _UwList kv_pairs;        // key-value pairs in the insertion order
+    struct _UwHashTable hash_table;
+};
+
+#define _uw_get_map_ptr(value)  \
+    (  \
+        (struct _UwMap*) (  \
+            ((uint8_t*) (value)) + sizeof(_UwValueBase) \
+        )  \
+    )
+
 /****************************************************************
  * Basic interface methods
  */
@@ -27,30 +54,6 @@ bool       _uw_map_is_true       (UwValuePtr self);
 bool       _uw_map_equal_sametype(UwValuePtr self, UwValuePtr other);
 bool       _uw_map_equal         (UwValuePtr self, UwValuePtr other);
 bool       _uw_map_equal_ctype   (UwValuePtr self, UwCType ctype, ...);
-
-/****************************************************************
- * Hash table and _UwMap structures
- */
-
-struct _UwHashTable;
-
-typedef size_t (*_UwHtGet)(struct _UwHashTable* ht, size_t index);
-typedef void   (*_UwHtSet)(struct _UwHashTable* ht, size_t index, size_t value);
-
-struct _UwHashTable {
-    uint8_t item_size;   // in bytes
-    UwType_Hash hash_bitmask;  // calculated from item_size
-    size_t items_used;
-    size_t capacity;
-    _UwHtGet get_item;  // getter function for specific item size
-    _UwHtSet set_item;  // setter function for specific item size
-    uint8_t items[];    // items have variable size
-};
-
-struct _UwMap {
-    struct _UwList* kv_pairs;        // key-value pairs in the insertion order
-    struct _UwHashTable hash_table;
-};
 
 #ifdef __cplusplus
 }

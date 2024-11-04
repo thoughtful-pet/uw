@@ -53,30 +53,25 @@ typedef unsigned _BitInt(UW_TYPE_BITWIDTH) UwTypeId;
 // type for allocator id
 typedef unsigned _BitInt(UW_ALLOCATOR_BITWIDTH) UwAllocId;
 
-// forward declarations
-struct _UwValue;
-struct _UwString;
-struct _UwList;
-struct _UwMap;
-
 // Integral types
 typedef nullptr_t  UwType_Null;
 typedef bool       UwType_Bool;
 typedef int64_t    UwType_Int;
 typedef double     UwType_Float;
 
+typedef uint64_t _UwValueBase;
+
 struct _UwValue {
-    uint64_t type_id: UW_TYPE_BITWIDTH,
-             refcount: UW_REFCOUNT_BITWIDTH,
-             alloc_id: UW_ALLOCATOR_BITWIDTH;
+    _UwValueBase type_id: UW_TYPE_BITWIDTH,
+                 refcount: UW_REFCOUNT_BITWIDTH,
+                 alloc_id: UW_ALLOCATOR_BITWIDTH;
+    // this is a variable part defined only for convenience of integral types,
+    // actual size of this structure can be as small as _UwValueBase,
+    // e.g. null values do not include this:
     union {
-        UwType_Null  null_value;
         UwType_Bool  bool_value;
         UwType_Int   int_value;
         UwType_Float float_value;
-        struct _UwString* string_value;
-        struct _UwList*   list_value;
-        struct _UwMap*    map_value;
     };
 };
 
@@ -142,16 +137,11 @@ void uw_set_allocator(UwAllocId alloc_id);
  * Helper functions
  */
 
-static inline UwValuePtr _uw_alloc_value(UwTypeId type_id)
-{
-    UwValuePtr value = _uw_allocator.alloc(sizeof(struct _UwValue));
-    if (value) {
-        value->type_id  = type_id;
-        value->refcount = 1;
-        value->alloc_id = _uw_allocator.id;
-    }
-    return value;
-}
+UwValuePtr _uw_alloc_value(UwTypeId type_id);
+/*
+ * Allocate storage for value using current allocator.
+ * The storage is not initialized and may contain garbage.
+ */
 
 static inline void _uw_free_value(UwValuePtr value)
 {
@@ -265,6 +255,10 @@ typedef struct {
 
     char* name;
 
+    unsigned data_size;
+    unsigned data_offset;
+
+    // basic interface
     UwMethodCreate     create;
     UwMethodDestroy    destroy;
     UwMethodHash       hash;
@@ -276,6 +270,7 @@ typedef struct {
     UwMethodEqual      equal;
     UwMethodEqualCType equal_ctype;
 
+    // extra interfaces
     bool supported_interfaces[UW_INTERFACE_BITWIDTH];
     // bit fields are compact but static initialization would be a nightmare
     // _BitInt(UW_INTERFACE_BITWIDTH) is another way but still cumbersome with unknown efficiency
@@ -290,7 +285,23 @@ extern UwType* _uw_types[1 << UW_TYPE_BITWIDTH];
 int uw_add_type(UwType* type);
 /*
  * Add type to the first available position in the global list.
- * Return type id or -1 if the list is full..
+ *
+ * All fields of `type` must be initialized.
+ *
+ * Return type id or -1 if the list is full.
+ */
+
+int uw_subclass(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_size);
+/*
+ * `type` and `name` should point to a static storage.
+ *
+ * Initialize `type` with ancestor's type, calculate data_offset, set data_size
+ * and other essential fields, and then add `type` to the global list using `uw_add_type`.
+ *
+ * The caller should alter basic methods and set supported interfaces after
+ * calling this function.
+ *
+ * Return subclassed type id or -1 if the list is full.
  */
 
 // Built-in types
@@ -301,8 +312,10 @@ int uw_add_type(UwType* type);
 #define UwTypeId_String  4
 #define UwTypeId_List    5
 #define UwTypeId_Map     6
+#define UwTypeId_Class   7
 
 // type checking
+// XXX with inheritance, go down the chain
 #define uw_is_null(value)    ((value) && ((value)->type_id == UwTypeId_Null))
 #define uw_is_bool(value)    ((value) && ((value)->type_id == UwTypeId_Bool))
 #define uw_is_int(value)     ((value) && ((value)->type_id == UwTypeId_Int))
@@ -344,6 +357,13 @@ static inline UwValuePtr uw_copy(UwValuePtr value)
     uw_assert(fn_copy != nullptr);
     return fn_copy(value);
 }
+
+#define _uw_get_data_ptr(value, type_name_ptr)  \
+    (  \
+        (type_name_ptr) (  \
+            ((uint8_t*) (value)) + _uw_types[(value)->type_id]->data_offset \
+        )  \
+    )
 
 /****************************************************************
  * Helper functions

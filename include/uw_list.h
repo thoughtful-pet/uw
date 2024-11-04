@@ -12,13 +12,7 @@ UwValuePtr _uw_create_list();
 UwValuePtr uw_create_list_va(...);
 UwValuePtr uw_create_list_ap(va_list ap);
 
-size_t _uw_list_length(struct _UwList* list);
-
-static inline size_t uw_list_length(UwValuePtr list)
-{
-    uw_assert_list(list);
-    return _uw_list_length(list->list_value);
-}
+size_t uw_list_length(UwValuePtr list);
 
 bool _uw_list_append_null (UwValuePtr list, UwType_Null  item);
 bool _uw_list_append_bool (UwValuePtr list, UwType_Bool  item);

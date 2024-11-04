@@ -15,16 +15,10 @@ UwValuePtr _uw_create_string_u32(char32_t*  initializer);
 
 UwValuePtr uw_create_empty_string(size_t capacity, uint8_t char_size);
 
+uint8_t uw_string_char_size(UwValuePtr s);
+
 // check if `index` is within string length
 #define uw_string_index_valid(str, index) ((index) < uw_strlen(str))
-
-uint8_t _uw_string_char_size(struct _UwString* s);
-
-static inline uint8_t uw_string_char_size(UwValuePtr s)
-{
-    uw_assert_string(s);
-    return _uw_string_char_size(s->string_value);
-}
 
 bool _uw_equal_cstr(UwValuePtr a, char* b);
 bool _uw_equal_u8  (UwValuePtr a, char8_t* b);
@@ -225,7 +219,6 @@ uint8_t u32_char_size(char32_t* str, size_t max_len);
  */
 
 #ifdef DEBUG
-    bool uw_eq_fast(struct _UwString* a, struct _UwString* b);
     UwValuePtr uw_create_empty_string2(uint8_t cap_size, uint8_t char_size);
 #endif
 

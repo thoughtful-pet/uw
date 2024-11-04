@@ -68,8 +68,10 @@ UwValuePtr _uw_create_string()
 {
     UwValuePtr value = _uw_alloc_value(UwTypeId_String);
     if (value) {
-        value->string_value = _uw_alloc_string(value->alloc_id, 0, 1);
-        if (!value->string_value) {
+        struct _UwString* s = _uw_alloc_string(value->alloc_id, 0, 1);
+        if (s) {
+            *_uw_get_string_pptr(value) = s;
+        } else {
             _uw_free_value(value);
             value = nullptr;
         }
@@ -80,8 +82,9 @@ UwValuePtr _uw_create_string()
 void _uw_destroy_string(UwValuePtr self)
 {
     if (self) {
-        if (self->string_value) {
-            _uw_allocators[self->alloc_id].free(self->string_value);
+        struct _UwString* s = *_uw_get_string_pptr(self);
+        if (s) {
+            _uw_allocators[self->alloc_id].free(s);
         }
         _uw_free_value(self);
     }
@@ -91,7 +94,7 @@ void _uw_hash_string(UwValuePtr self, UwHashContext* ctx)
 {
     _uw_hash_uint64(ctx, self->type_id);
 
-    struct _UwString* str = self->string_value;
+    struct _UwString* str = *_uw_get_string_pptr(self);
     size_t length = get_cap_methods(str)->get_length(str);
     if (length) {
         get_str_methods(str)->hash(get_char_ptr(str, 0), length, ctx);
@@ -100,7 +103,7 @@ void _uw_hash_string(UwValuePtr self, UwHashContext* ctx)
 
 UwValuePtr _uw_copy_string(UwValuePtr self)
 {
-    struct _UwString* str = self->string_value;
+    struct _UwString* str = *_uw_get_string_pptr(self);
     StrMethods* strmeth = get_str_methods(str);
 
     size_t capacity = get_cap_methods(str)->get_length(str);
@@ -108,15 +111,15 @@ UwValuePtr _uw_copy_string(UwValuePtr self)
 
     UwValuePtr result = _uw_alloc_value(UwTypeId_String);
     if (result) {
-        result->string_value = _uw_alloc_string(result->alloc_id, capacity, char_size);
-        if (!result->string_value) {
+        struct _UwString* result_str = _uw_alloc_string(result->alloc_id, capacity, char_size);
+        if (!result_str) {
             _uw_free_value(result);
             result = nullptr;
         } else {
+            *_uw_get_string_pptr(result) = result_str;
             if (capacity) {
-                struct _UwString* rs = result->string_value;
-                strmeth->copy_to(get_char_ptr(str, 0), rs, 0, capacity);
-                get_cap_methods(rs)->set_length(rs, capacity);
+                strmeth->copy_to(get_char_ptr(str, 0), result_str, 0, capacity);
+                get_cap_methods(result_str)->set_length(result_str, capacity);
             }
         }
     }
@@ -127,7 +130,7 @@ void _uw_dump_string(UwValuePtr self, int indent)
 {
     _uw_dump_start(self, indent);
 
-    struct _UwString* str = self->string_value;
+    struct _UwString* str = *_uw_get_string_pptr(self);
     CapMethods* capmeth = get_cap_methods(str);
     size_t length = capmeth->get_length(str);
 
@@ -179,20 +182,20 @@ void _uw_dump_string(UwValuePtr self, int indent)
 
 bool _uw_string_is_true(UwValuePtr self)
 {
-    struct _UwString* str = self->string_value;
+    struct _UwString* str = *_uw_get_string_pptr(self);
     CapMethods* capmeth = get_cap_methods(str);
     return capmeth->get_length(str);
 }
 
 bool _uw_string_equal_sametype(UwValuePtr self, UwValuePtr other)
 {
-    return _uw_string_eq(self->string_value, other->string_value);
+    return _uw_string_eq(*_uw_get_string_pptr(self), *_uw_get_string_pptr(other));
 }
 
 bool _uw_string_equal(UwValuePtr self, UwValuePtr other)
 {
     if (other->type_id == UwTypeId_String) {
-        return _uw_string_eq(self->string_value, other->string_value);
+        return _uw_string_eq(*_uw_get_string_pptr(self), *_uw_get_string_pptr(other));
     } else {
         return false;
     }
@@ -220,16 +223,6 @@ bool _uw_string_equal_ctype(UwValuePtr self, UwCType ctype, ...)
 /****************************************************************
  * misc. helper functions
  */
-
-static inline uint8_t get_char_size(struct _UwString* s)
-{
-    return s->char_size + 1;
-}
-
-uint8_t _uw_string_char_size(struct _UwString* s)
-{
-    return get_char_size(s);
-}
 
 static inline uint8_t update_char_width(uint8_t width, char32_t c)
 {
@@ -1382,7 +1375,7 @@ static bool reallocate_string(UwAllocId alloc_id, struct _UwString** str_ref, si
 
 static struct _UwString* expand(UwValuePtr str, size_t increment, uint8_t new_char_size)
 {
-    struct _UwString* s = str->string_value;
+    struct _UwString* s = *_uw_get_string_pptr(str);
 
     CapMethods* capmeth = get_cap_methods(s);
     StrMethods* strmeth = get_str_methods(s);
@@ -1396,7 +1389,7 @@ static struct _UwString* expand(UwValuePtr str, size_t increment, uint8_t new_ch
         if (!reallocate_string(str->alloc_id, &s, new_capacity, new_char_size)) {
             return nullptr;
         }
-        str->string_value = s;
+        *_uw_get_string_pptr(str) = s;
     }
     return s;
 }
@@ -1410,7 +1403,13 @@ UwValuePtr uw_create_empty_string(size_t capacity, uint8_t char_size)
 {
     UwValuePtr result = _uw_alloc_value(UwTypeId_String);
     if (result) {
-        result->string_value = _uw_alloc_string(result->alloc_id, capacity, char_size);
+        struct _UwString* s = _uw_alloc_string(result->alloc_id, capacity, char_size);
+        if (s) {
+            *_uw_get_string_pptr(result) = s;
+        } else {
+            _uw_free_value(result);
+            result = nullptr;
+        }
     }
     return result;
 }
@@ -1427,7 +1426,7 @@ UwValuePtr _uw_create_string_c(char* initializer)
 
     UwValuePtr result = uw_create_empty_string(capacity, 1);
     if (result) {
-        struct _UwString* s = result->string_value;
+        struct _UwString* s = *_uw_get_string_pptr(result);
         if (initializer) {
             get_str_methods(s)->copy_from_cstr(get_char_ptr(s, 0), initializer, capacity);
             get_cap_methods(s)->set_length(s, capacity);
@@ -1449,7 +1448,7 @@ UwValuePtr _uw_create_string_u8(char8_t* initializer)
 
     UwValuePtr result = uw_create_empty_string(capacity, char_size);
     if (result) {
-        struct _UwString* s = result->string_value;
+        struct _UwString* s = *_uw_get_string_pptr(result);
         if (initializer) {
             get_str_methods(s)->copy_from_utf8(get_char_ptr(s, 0), initializer, capacity);
             get_cap_methods(s)->set_length(s, capacity);
@@ -1471,7 +1470,7 @@ UwValuePtr _uw_create_string_u32(char32_t* initializer)
 
     UwValuePtr result = uw_create_empty_string(capacity, char_size);
     if (result) {
-        struct _UwString* s = result->string_value;
+        struct _UwString* s = *_uw_get_string_pptr(result);
         if (initializer) {
             get_str_methods(s)->copy_from_utf32(get_char_ptr(s, 0), initializer, capacity);
             get_cap_methods(s)->set_length(s, capacity);
@@ -1484,17 +1483,23 @@ UwValuePtr _uw_create_string_u32(char32_t* initializer)
  * String functions
  */
 
+uint8_t uw_string_char_size(UwValuePtr s)
+{
+    uw_assert_string(s);
+    return _uw_string_char_size(*_uw_get_string_pptr(s));
+}
+
 size_t uw_strlen(UwValuePtr str)
 {
     uw_assert_string(str);
-    struct _UwString* s = str->string_value;
+    struct _UwString* s = *_uw_get_string_pptr(str);
     return get_cap_methods(s)->get_length(s);
 }
 
 #define STRING_EQ_IMPL(suffix, type_name_b)  \
 {  \
     uw_assert_string(a);  \
-    struct _UwString* astr = a->string_value;  \
+    struct _UwString* astr = *_uw_get_string_pptr(a);  \
     \
     size_t a_length = get_cap_methods(astr)->get_length(astr);  \
     return get_str_methods(astr)->equal_##suffix(get_char_ptr(astr, 0), (type_name_b*) b, a_length);  \
@@ -1507,7 +1512,7 @@ bool _uw_equal_u32 (UwValuePtr a, char32_t* b) STRING_EQ_IMPL(u32,  char32_t)
 #define SUBSTRING_EQ_IMPL(suffix, type_name_b)  \
 {  \
     uw_assert_string(a);  \
-    struct _UwString* astr = a->string_value;  \
+    struct _UwString* astr = *_uw_get_string_pptr(a);  \
     \
     size_t a_length = get_cap_methods(astr)->get_length(astr);  \
     \
@@ -1531,7 +1536,7 @@ bool _uw_substring_eq_u32(UwValuePtr a, size_t start_pos, size_t end_pos, char32
 bool _uw_substring_eq_uw(UwValuePtr a, size_t start_pos, size_t end_pos, UwValuePtr b)
 {
     uw_assert_string(a);
-    struct _UwString* astr = a->string_value;
+    struct _UwString* astr = *_uw_get_string_pptr(a);
 
     size_t a_length = get_cap_methods(astr)->get_length(astr);
 
@@ -1543,7 +1548,7 @@ bool _uw_substring_eq_uw(UwValuePtr a, size_t start_pos, size_t end_pos, UwValue
     }
 
     uw_assert_string(b);
-    struct _UwString* bstr = b->string_value;
+    struct _UwString* bstr = *_uw_get_string_pptr(b);
 
     if (end_pos == start_pos && get_cap_methods(bstr)->get_length(bstr) == 0) {
         return true;
@@ -1556,7 +1561,7 @@ CStringPtr uw_string_to_cstring(UwValuePtr str)
 {
     uw_assert_string(str);
 
-    struct _UwString* s = str->string_value;
+    struct _UwString* s = *_uw_get_string_pptr(str);
     size_t length = get_cap_methods(s)->get_length(s);
 
     CStringPtr result = malloc(length + 1);
@@ -1571,7 +1576,7 @@ void uw_string_copy_buf(UwValuePtr str, char* buffer)
 {
     uw_assert_string(str);
 
-    struct _UwString* s = str->string_value;
+    struct _UwString* s = *_uw_get_string_pptr(str);
     size_t length = get_cap_methods(s)->get_length(s);
     get_str_methods(s)->copy_to_cstr(get_char_ptr(s, 0), buffer, length);
 }
@@ -1591,15 +1596,15 @@ void uw_string_swap(UwValuePtr a, UwValuePtr b)
         return;
     }
 
-    struct _UwString* tmp = a->string_value;
-    a->string_value = b->string_value;
-    b->string_value = tmp;
+    struct _UwString* tmp = *_uw_get_string_pptr(a);
+    *_uw_get_string_pptr(a) = *_uw_get_string_pptr(b);
+    *_uw_get_string_pptr(b) = tmp;
 }
 
 bool _uw_string_append_char(UwValuePtr dest, char c)
 {
     uw_assert_string(dest);
-    struct _UwString* d = dest->string_value;
+    struct _UwString* d = *_uw_get_string_pptr(dest);
 
     size_t dest_len = get_cap_methods(d)->get_length(d);
 
@@ -1616,7 +1621,7 @@ bool _uw_string_append_char(UwValuePtr dest, char c)
 bool _uw_string_append_c32(UwValuePtr dest, char32_t c)
 {
     uw_assert_string(dest);
-    struct _UwString* d = dest->string_value;
+    struct _UwString* d = *_uw_get_string_pptr(dest);
 
     size_t dest_len = get_cap_methods(d)->get_length(d);
 
@@ -1633,7 +1638,7 @@ bool _uw_string_append_c32(UwValuePtr dest, char32_t c)
 static bool append_cstr(UwValuePtr dest, char* src, size_t src_len)
 {
     uw_assert_string(dest);
-    struct _UwString* d = dest->string_value;
+    struct _UwString* d = *_uw_get_string_pptr(dest);
     size_t dest_len = get_cap_methods(d)->get_length(d);
 
     d = expand(dest, src_len, 1);
@@ -1669,7 +1674,7 @@ bool uw_string_append_substring_cstr(UwValuePtr dest, char* src, size_t src_star
 static bool append_u8(UwValuePtr dest, char8_t* src, size_t src_len)
 {
     uw_assert_string(dest);
-    struct _UwString* d = dest->string_value;
+    struct _UwString* d = *_uw_get_string_pptr(dest);
 
     size_t dest_len = get_cap_methods(d)->get_length(d);
 
@@ -1715,7 +1720,7 @@ bool _uw_string_append_substring_u8(UwValuePtr dest, char8_t* src, size_t src_st
 static bool append_u32(UwValuePtr dest, char32_t* src, size_t src_len)
 {
     uw_assert_string(dest);
-    struct _UwString* d = dest->string_value;
+    struct _UwString* d = *_uw_get_string_pptr(dest);
 
     size_t dest_len = get_cap_methods(d)->get_length(d);
 
@@ -1762,7 +1767,7 @@ bool _uw_string_append_substring_u32(UwValuePtr dest, char32_t*  src, size_t src
 static bool append_uw(UwValuePtr dest, struct _UwString* src, size_t src_start_pos, size_t src_len)
 {
     uw_assert_string(dest);
-    struct _UwString* d = dest->string_value;
+    struct _UwString* d = *_uw_get_string_pptr(dest);
     size_t dest_len = get_cap_methods(d)->get_length(d);
 
     StrMethods* src_strmeth = get_str_methods(src);
@@ -1785,7 +1790,7 @@ static bool append_uw(UwValuePtr dest, struct _UwString* src, size_t src_start_p
 bool _uw_string_append_uw(UwValuePtr dest, UwValuePtr src)
 {
     uw_assert_string(src);
-    struct _UwString* s = src->string_value;
+    struct _UwString* s = *_uw_get_string_pptr(src);
 
     size_t src_len = get_cap_methods(s)->get_length(s);
     return append_uw(dest, s, 0, src_len);
@@ -1794,7 +1799,7 @@ bool _uw_string_append_uw(UwValuePtr dest, UwValuePtr src)
 bool _uw_string_append_substring_uw(UwValuePtr dest, UwValuePtr src, size_t src_start_pos, size_t src_end_pos)
 {
     uw_assert_string(src);
-    struct _UwString* s = src->string_value;
+    struct _UwString* s = *_uw_get_string_pptr(src);
 
     size_t src_len = get_cap_methods(s)->get_length(s);
     if (src_end_pos > src_len) {
@@ -1812,7 +1817,7 @@ bool uw_string_append_utf8(UwValuePtr dest, char8_t* buffer, size_t size, size_t
 {
     uw_assert(size != 0);
     uw_assert_string(dest);
-    struct _UwString* d = dest->string_value;
+    struct _UwString* d = *_uw_get_string_pptr(dest);
     size_t dest_len = get_cap_methods(d)->get_length(d);
 
     uint8_t src_char_size;
@@ -1837,7 +1842,7 @@ bool _uw_string_insert_many_c32(UwValuePtr str, size_t position, char32_t value,
         return true;
     }
     uw_assert_string(str);
-    struct _UwString* s = str->string_value;
+    struct _UwString* s = *_uw_get_string_pptr(str);
     size_t len = get_cap_methods(s)->get_length(s);
 
     if (position > len) {
@@ -1866,7 +1871,7 @@ bool _uw_string_insert_many_c32(UwValuePtr str, size_t position, char32_t value,
 UwValuePtr uw_string_get_substring(UwValuePtr str, size_t start_pos, size_t end_pos)
 {
     uw_assert_string(str);
-    struct _UwString* s = str->string_value;
+    struct _UwString* s = *_uw_get_string_pptr(str);
 
     CapMethods* capmeth = get_cap_methods(s);
     StrMethods* strmeth = get_str_methods(s);
@@ -1885,7 +1890,7 @@ UwValuePtr uw_string_get_substring(UwValuePtr str, size_t start_pos, size_t end_
 
     UwValuePtr result = uw_create_empty_string(length, char_size);
     if (result) {
-        struct _UwString* dest = result->string_value;
+        struct _UwString* dest = *_uw_get_string_pptr(result);
 
         get_cap_methods(dest)->set_length(dest, length);
         strmeth->copy_to(src, dest, 0, length);
@@ -1896,7 +1901,7 @@ UwValuePtr uw_string_get_substring(UwValuePtr str, size_t start_pos, size_t end_
 char32_t uw_string_at(UwValuePtr str, size_t position)
 {
     uw_assert_string(str);
-    struct _UwString* s = str->string_value;
+    struct _UwString* s = *_uw_get_string_pptr(str);
     size_t length = get_cap_methods(s)->get_length(s);
     if (position < length) {
         return get_str_methods(s)->get_char(get_char_ptr(s, position));
@@ -1908,7 +1913,7 @@ char32_t uw_string_at(UwValuePtr str, size_t position)
 void uw_string_erase(UwValuePtr str, size_t start_pos, size_t end_pos)
 {
     uw_assert_string(str);
-    struct _UwString* s = str->string_value;
+    struct _UwString* s = *_uw_get_string_pptr(str);
     CapMethods* capmeth = get_cap_methods(s);
     size_t length = capmeth->get_length(s);
     uint8_t char_size = s->char_size + 1;
@@ -1932,7 +1937,7 @@ void uw_string_erase(UwValuePtr str, size_t start_pos, size_t end_pos)
 void uw_string_truncate(UwValuePtr str, size_t position)
 {
     uw_assert_string(str);
-    struct _UwString* s = str->string_value;
+    struct _UwString* s = *_uw_get_string_pptr(str);
     CapMethods* capmeth = get_cap_methods(s);
 
     if (position < capmeth->get_length(s)) {
@@ -1945,7 +1950,7 @@ void uw_string_truncate(UwValuePtr str, size_t position)
 void uw_string_ltrim(UwValuePtr str)
 {
     uw_assert_string(str);
-    struct _UwString* s = str->string_value;
+    struct _UwString* s = *_uw_get_string_pptr(str);
     StrMethods* strmeth = get_str_methods(s);
     size_t len = get_cap_methods(s)->get_length(s);
     uint8_t char_size = s->char_size + 1;
@@ -1966,7 +1971,7 @@ void uw_string_ltrim(UwValuePtr str)
 void uw_string_rtrim(UwValuePtr str)
 {
     uw_assert_string(str);
-    struct _UwString* s = str->string_value;
+    struct _UwString* s = *_uw_get_string_pptr(str);
     StrMethods* strmeth = get_str_methods(s);
     size_t n = get_cap_methods(s)->get_length(s);
     uint8_t char_size = s->char_size + 1;
@@ -1993,7 +1998,7 @@ UwValuePtr _uw_string_split_c32(UwValuePtr str, char32_t splitter)
 {
     uw_assert_string(str);
 
-    struct _UwString* s = str->string_value;
+    struct _UwString* s = *_uw_get_string_pptr(str);
     StrMethods* strmeth = get_str_methods(s);
 
     size_t len = get_cap_methods(s)->get_length(s);
@@ -2019,7 +2024,7 @@ UwValuePtr _uw_string_split_c32(UwValuePtr str, char32_t splitter)
                 return nullptr;
             }
             if (substr_len) {
-                struct _UwString* subs = substr->string_value;
+                struct _UwString* subs = *_uw_get_string_pptr(substr);
                 strmeth->copy_to(start, subs, 0, substr_len);
                 get_cap_methods(subs)->set_length(subs, substr_len);
             }
@@ -2042,7 +2047,7 @@ UwValuePtr _uw_string_split_c32(UwValuePtr str, char32_t splitter)
             return nullptr;
         }
         if (substr_len) {
-            struct _UwString* subs = substr->string_value;
+            struct _UwString* subs = *_uw_get_string_pptr(substr);
             strmeth->copy_to(start, subs, 0, substr_len);
             get_cap_methods(subs)->set_length(subs, substr_len);
         }
@@ -2173,7 +2178,7 @@ UwValuePtr uw_create_empty_string2(uint8_t cap_size, uint8_t char_size)
 {
     UwValuePtr result = _uw_alloc_value(UwTypeId_String);
     if (result) {
-        result->string_value = allocate_string2(cap_size, char_size);
+        *_uw_get_string_pptr(result) = allocate_string2(cap_size, char_size);
     }
     return result;
 }
