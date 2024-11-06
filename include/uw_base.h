@@ -200,16 +200,31 @@ typedef enum {
 #   define UW_INTERFACE_BITWIDTH  8
 #endif
 
-extern void* _uw_interfaces[1 << UW_INTERFACE_BITWIDTH];
+extern bool _uw_registered_interfaces[1 << UW_INTERFACE_BITWIDTH];
 /*
- * Global list of interfaces initialized with built-in interfaces.
+ * Global list of registered interfaces.
+ * Its purpose is simply track assigned ids.
+ *
+ * Not using bit array because static initialization
+ * of such array is a nightmare in C.
  */
 
-int uw_add_interface(void* interface);
+int uw_register_interface();
 /*
  * Add interface to the first available position in the global list.
  * Return interface id or -1 if the list is full.
  */
+
+/*
+ * The following macro leverages naming scheme where
+ * interface structure is named UwInterface_<interface_name>
+ * and id is named UwInterfaceId_<interface_name>
+ */
+#define uw_get_interface(value, interface_name)  \
+    (  \
+        (UwInterface_##interface_name *) \
+            _uw_types[(value)->type_id]->interfaces[UwInterfaceId_##interface_name]  \
+    )
 
 // Built-in interfaces
 // TBD, TODO
@@ -232,6 +247,12 @@ int uw_add_interface(void* interface);
     // UwMethodAppend
     // UwMethodSlice
     // UwMethodDeleteRange
+
+#define UwInterfaceId_File          6
+#define UwInterfaceId_FileReader    7
+#define UwInterfaceId_FileWriter    8
+
+#define UwInterfaceId_LineReader    9
 
 /****************************************************************
  * Types
@@ -271,11 +292,44 @@ typedef struct {
     UwMethodEqualCType equal_ctype;
 
     // extra interfaces
-    bool supported_interfaces[UW_INTERFACE_BITWIDTH];
-    // bit fields are compact but static initialization would be a nightmare
-    // _BitInt(UW_INTERFACE_BITWIDTH) is another way but still cumbersome with unknown efficiency
+    void* interfaces[1 << UW_INTERFACE_BITWIDTH];
 
 } UwType;
+
+// Built-in types
+#define UwTypeId_Null       0
+#define UwTypeId_Bool       1
+#define UwTypeId_Int        2
+#define UwTypeId_Float      3
+#define UwTypeId_String     4
+#define UwTypeId_List       5
+#define UwTypeId_Map        6
+#define UwTypeId_Class      7
+#define UwTypeId_File       8
+#define UwTypeId_StringIO   9
+
+// type checking
+#define uw_is_null(value)      uw_is_subclass((value), UwTypeId_Null)
+#define uw_is_bool(value)      uw_is_subclass((value), UwTypeId_Bool)
+#define uw_is_int(value)       uw_is_subclass((value), UwTypeId_Int)
+#define uw_is_float(value)     uw_is_subclass((value), UwTypeId_Float)
+#define uw_is_string(value)    uw_is_subclass((value), UwTypeId_String)
+#define uw_is_list(value)      uw_is_subclass((value), UwTypeId_List)
+#define uw_is_map(value)       uw_is_subclass((value), UwTypeId_Map)
+#define uw_is_class(value)     uw_is_subclass((value), UwTypeId_Class)
+#define uw_is_file(value)      uw_is_subclass((value), UwTypeId_File)
+#define uw_is_stringio(value)  uw_is_subclass((value), UwTypeId_StringIO)
+
+#define uw_assert_null(value)      uw_assert(uw_is_null    (value))
+#define uw_assert_bool(value)      uw_assert(uw_is_bool    (value))
+#define uw_assert_int(value)       uw_assert(uw_is_int     (value))
+#define uw_assert_float(value)     uw_assert(uw_is_float   (value))
+#define uw_assert_string(value)    uw_assert(uw_is_string  (value))
+#define uw_assert_list(value)      uw_assert(uw_is_list    (value))
+#define uw_assert_map(value)       uw_assert(uw_is_map     (value))
+#define uw_assert_class(value)     uw_assert(uw_is_class   (value))
+#define uw_assert_file(value)      uw_assert(uw_is_file    (value))
+#define uw_assert_stringio(value)  uw_assert(uw_is_stringio(value))
 
 extern UwType* _uw_types[1 << UW_TYPE_BITWIDTH];
 /*
@@ -304,33 +358,22 @@ int uw_subclass(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_si
  * Return subclassed type id or -1 if the list is full.
  */
 
-// Built-in types
-#define UwTypeId_Null    0
-#define UwTypeId_Bool    1
-#define UwTypeId_Int     2
-#define UwTypeId_Float   3
-#define UwTypeId_String  4
-#define UwTypeId_List    5
-#define UwTypeId_Map     6
-#define UwTypeId_Class   7
-
-// type checking
-// XXX with inheritance, go down the chain
-#define uw_is_null(value)    ((value) && ((value)->type_id == UwTypeId_Null))
-#define uw_is_bool(value)    ((value) && ((value)->type_id == UwTypeId_Bool))
-#define uw_is_int(value)     ((value) && ((value)->type_id == UwTypeId_Int))
-#define uw_is_float(value)   ((value) && ((value)->type_id == UwTypeId_Float))
-#define uw_is_string(value)  ((value) && ((value)->type_id == UwTypeId_String))
-#define uw_is_list(value)    ((value) && ((value)->type_id == UwTypeId_List))
-#define uw_is_map(value)     ((value) && ((value)->type_id == UwTypeId_Map))
-
-#define uw_assert_null(value)   uw_assert(uw_is_null  (value))
-#define uw_assert_bool(value)   uw_assert(uw_is_bool  (value))
-#define uw_assert_int(value)    uw_assert(uw_is_int   (value))
-#define uw_assert_float(value)  uw_assert(uw_is_float (value))
-#define uw_assert_string(value) uw_assert(uw_is_string(value))
-#define uw_assert_list(value)   uw_assert(uw_is_list  (value))
-#define uw_assert_map(value)    uw_assert(uw_is_map   (value))
+static inline bool uw_is_subclass(UwValuePtr value, UwTypeId type_id)
+{
+    if (!value) {
+        return false;
+    }
+    UwTypeId t = value->type_id;
+    for (;;) {
+        if (t == type_id) {
+            return true;
+        }
+        t = _uw_types[t]->ancestor_id;
+        if (t == UwTypeId_Null) {
+            return false;
+        }
+    }
+}
 
 /****************************************************************
  * Basic functions
@@ -413,6 +456,9 @@ static inline bool _uw_equal(UwValuePtr a, UwValuePtr b)
     if (a == b) {
         // compare with self
         return true;
+    }
+    if (a == nullptr || b == nullptr) {
+        return false;
     }
     UwType* t = _uw_types[a->type_id];
     UwMethodEqual cmp;

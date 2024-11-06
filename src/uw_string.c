@@ -187,10 +187,17 @@ bool _uw_string_equal_sametype(UwValuePtr self, UwValuePtr other)
 
 bool _uw_string_equal(UwValuePtr self, UwValuePtr other)
 {
-    if (other->type_id == UwTypeId_String) {
-        return _uw_string_eq(*_uw_get_string_pptr(self), *_uw_get_string_pptr(other));
-    } else {
-        return false;
+    UwTypeId t = other->type_id;
+    for (;;) {
+        if (t == UwTypeId_String) {
+            return _uw_string_eq(*_uw_get_string_pptr(self), *_uw_get_string_pptr(other));
+        } else {
+            // check base class
+            t = _uw_types[t]->ancestor_id;
+            if (t == UwTypeId_Null) {
+                return false;
+            }
+        }
     }
 }
 
@@ -1814,6 +1821,7 @@ bool uw_string_append_utf8(UwValuePtr dest, char8_t* buffer, size_t size, size_t
     size_t dest_len = get_cap_methods(d)->get_length(d);
 
     uint8_t src_char_size;
+    *bytes_processed = size;
     size_t src_len = utf8_strlen2_buf(buffer, bytes_processed, &src_char_size);
 
     if (src_len) {
@@ -1821,11 +1829,9 @@ bool uw_string_append_utf8(UwValuePtr dest, char8_t* buffer, size_t size, size_t
         if (!d) {
             return false;
         }
-
         get_cap_methods(d)->set_length(d, src_len + dest_len);
         get_str_methods(d)->copy_from_utf8(get_char_ptr(d, dest_len), buffer, src_len);
     }
-
     return true;
 }
 
@@ -1938,6 +1944,26 @@ void uw_string_truncate(UwValuePtr str, size_t position)
         // clean tail for fast comparison to work
         clean_tail(s, position, capmeth->get_capacity(s), s->char_size + 1);
     }
+}
+
+ssize_t uw_strscan(UwValuePtr str, char32_t chr, size_t start_pos)
+{
+    uw_assert_string(str);
+    struct _UwString* s = *_uw_get_string_pptr(str);
+    CapMethods* capmeth = get_cap_methods(s);
+    StrMethods* strmeth = get_str_methods(s);
+
+    size_t length = capmeth->get_length(s);
+    uint8_t* ptr = get_char_ptr(s, start_pos);
+
+    for (size_t i = start_pos; i < length; i++) {
+        char32_t codepoint = strmeth->get_char(ptr);
+        if (codepoint == chr) {
+            return i;
+        }
+        ptr += s->char_size + 1;
+    }
+    return -1;
 }
 
 void uw_string_ltrim(UwValuePtr str)

@@ -17,6 +17,7 @@ extern "C" {
 // internal string structure
 
 struct _UwString {
+    // variable length structure
     uint8_t cap_size:3,      // length and capacity size in bytes minus one
             char_size:2,     // character size in bytes minus one
             block_count:3;   // number of 64-bit blocks for fast comparison

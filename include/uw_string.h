@@ -78,6 +78,13 @@ void uw_string_truncate(UwValuePtr str, size_t position);
  * Truncate string at given `position`.
  */
 
+ssize_t uw_strscan(UwValuePtr str, char32_t chr, size_t start_pos);
+/*
+ * Find `chr` in `str` starting from `start_pos`.
+ *
+ * Return position of character or -1.
+ */
+
 void uw_string_ltrim(UwValuePtr str);
 void uw_string_rtrim(UwValuePtr str);
 void uw_string_trim(UwValuePtr str);

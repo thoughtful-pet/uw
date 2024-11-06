@@ -48,11 +48,20 @@ bool _uw_bool_equal_sametype(UwValuePtr self, UwValuePtr other)
 
 bool _uw_bool_equal(UwValuePtr self, UwValuePtr other)
 {
-    switch (other->type_id) {
-        case UwTypeId_Bool:  return self->bool_value == other->bool_value;
-        case UwTypeId_Int:   return self->bool_value == (UwType_Bool) other->int_value;
-        case UwTypeId_Float: return self->bool_value == (UwType_Bool) other->float_value;
-        default:             return false;
+    UwTypeId t = other->type_id;
+    for (;;) {
+        switch (t) {
+            case UwTypeId_Bool:  return self->bool_value == other->bool_value;
+            case UwTypeId_Int:   return self->bool_value == (UwType_Bool) other->int_value;
+            case UwTypeId_Float: return self->bool_value == (UwType_Bool) other->float_value;
+            default: {
+                // check base class
+                t = _uw_types[t]->ancestor_id;
+                if (t == UwTypeId_Null) {
+                    return false;
+                }
+            }
+        }
     }
 }
 

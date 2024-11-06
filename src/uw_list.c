@@ -87,10 +87,17 @@ bool _uw_list_equal_sametype(UwValuePtr self, UwValuePtr other)
 
 bool _uw_list_equal(UwValuePtr self, UwValuePtr other)
 {
-    if (other->type_id == UwTypeId_List) {
-        return _uw_list_eq(_uw_get_list_ptr(self), _uw_get_list_ptr(other));
-    } else {
-        return false;
+    UwTypeId t = other->type_id;
+    for (;;) {
+        if (t == UwTypeId_List) {
+            return _uw_list_eq(_uw_get_list_ptr(self), _uw_get_list_ptr(other));
+        } else {
+            // check base class
+            t = _uw_types[t]->ancestor_id;
+            if (t == UwTypeId_Null) {
+                return false;
+            }
+        }
     }
 }
 

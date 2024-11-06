@@ -320,6 +320,17 @@ UwValuePtr _uw_map_get_u8_wrapper(UwValuePtr map, char* key);
 
 void _uw_map_del_u8_wrapper(UwValuePtr map, char* key);
 
+/****************************************************************
+ * StringIO functions
+ */
+
+#define uw_create_string_io(str) _Generic((str), \
+             char*: _uw_create_string_io_u8_wrapper,  \
+          char8_t*: _uw_create_string_io_u8,          \
+         char32_t*: _uw_create_string_io_u32,         \
+        UwValuePtr: _uw_create_string_io_uw           \
+    )((str))
+
 #ifdef __cplusplus
 }
 #endif

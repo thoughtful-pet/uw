@@ -1,4 +1,6 @@
 #include "include/uw_base.h"
+#include "include/uw_file.h"
+#include "include/uw_string_io.h"
 #include "src/uw_null_internal.h"
 #include "src/uw_bool_internal.h"
 #include "src/uw_class_internal.h"
@@ -6,8 +8,10 @@
 #include "src/uw_int_internal.h"
 #include "src/uw_float_internal.h"
 #include "src/uw_string_internal.h"
+#include "src/uw_string_io_internal.h"
 #include "src/uw_list_internal.h"
 #include "src/uw_map_internal.h"
+#include "src/uw_file_internal.h"
 
 /****************************************************************
  * Basic functions
@@ -30,7 +34,7 @@ static bool call_init(UwValuePtr value, UwTypeId type_id)
  * Helper function for _uw_create.
  */
 {
-    UwType* type = _uw_types[value->type_id];
+    UwType* type = _uw_types[type_id];
     uw_assert(type != nullptr);
 
     if (type->ancestor_id != UwTypeId_Null) {
@@ -143,6 +147,11 @@ void _uw_print_indent(int indent)
 
 void _uw_dump(UwValuePtr value, int indent)
 {
+    if (value == nullptr) {
+        _uw_print_indent(indent);
+        printf("nullptr\n");
+        return;
+    }
     UwMethodDump fn_dump = _uw_types[value->type_id]->dump;
     uw_assert(fn_dump != nullptr);
     return fn_dump(value, 0);
@@ -212,15 +221,24 @@ void uw_set_allocator(UwAllocId alloc_id)
  * Global list of interfaces initialized with built-in interfaces.
  */
 
-void* _uw_interfaces[1 << UW_INTERFACE_BITWIDTH] = {
-    // TODO
+bool _uw_registered_interfaces[1 << UW_INTERFACE_BITWIDTH] = {
+    [UwInterfaceId_Logic]        = true,
+    [UwInterfaceId_Arithmetic]   = true,
+    [UwInterfaceId_Bitwise]      = true,
+    [UwInterfaceId_Comparison]   = true,
+    [UwInterfaceId_RandomAccess] = true,
+    [UwInterfaceId_List]         = true,
+    [UwInterfaceId_File]         = true,
+    [UwInterfaceId_FileReader]   = true,
+    [UwInterfaceId_FileWriter]   = true,
+    [UwInterfaceId_LineReader]   = true
 };
 
-int uw_add_interface(void* interface)
+int uw_register_interface()
 {
     for (int i = 0; i < (1 << UW_INTERFACE_BITWIDTH); i++) {
-        if (_uw_interfaces[i] == nullptr) {
-            _uw_interfaces[i] = interface;
+        if (!_uw_registered_interfaces[i]) {
+            _uw_registered_interfaces[i] = true;
             return i;
         }
     }
@@ -248,7 +266,7 @@ static UwType null_type = {
     .equal          = _uw_null_equal,
     .equal_ctype    = _uw_null_equal_ctype,
 
-    .supported_interfaces = {}
+    .interfaces = {}
 };
 
 static UwType bool_type = {
@@ -268,8 +286,8 @@ static UwType bool_type = {
     .equal          = _uw_bool_equal,
     .equal_ctype    = _uw_bool_equal_ctype,
 
-    .supported_interfaces = {
-        // [UwInterfaceId_Logic] = true
+    .interfaces = {
+        // [UwInterfaceId_Logic] = &bool_type_logic_interface
     }
 };
 
@@ -290,11 +308,11 @@ static UwType int_type = {
     .equal          = _uw_int_equal,
     .equal_ctype    = _uw_int_equal_ctype,
 
-    .supported_interfaces = {
-        // [UwInterfaceId_Logic]      = true,
-        // [UwInterfaceId_Arithmetic] = true,
-        // [UwInterfaceId_Bitwise]    = true,
-        // [UwInterfaceId_Comparison] = true
+    .interfaces = {
+        // [UwInterfaceId_Logic]      = &int_type_logic_interface,
+        // [UwInterfaceId_Arithmetic] = &int_type_arithmetic_interface,
+        // [UwInterfaceId_Bitwise]    = &int_type_bitwise_interface,
+        // [UwInterfaceId_Comparison] = &int_type_comparison_interface
     }
 };
 
@@ -315,10 +333,10 @@ static UwType float_type = {
     .equal          = _uw_float_equal,
     .equal_ctype    = _uw_float_equal_ctype,
 
-    .supported_interfaces = {
-        // [UwInterfaceId_Logic]      = true,
-        // [UwInterfaceId_Arithmetic] = true,
-        // [UwInterfaceId_Comparison] = true
+    .interfaces = {
+        // [UwInterfaceId_Logic]      = &float_type_logic_interface,
+        // [UwInterfaceId_Arithmetic] = &float_type_arithmetic_interface,
+        // [UwInterfaceId_Comparison] = &float_type_comparison_interface
     }
 };
 
@@ -339,8 +357,8 @@ static UwType string_type = {
     .equal          = _uw_string_equal,
     .equal_ctype    = _uw_string_equal_ctype,
 
-    .supported_interfaces = {
-        // [UwInterfaceId_RandomAccess] = true
+    .interfaces = {
+        // [UwInterfaceId_RandomAccess] = &string_type_random_access_interface
     }
 };
 
@@ -361,9 +379,9 @@ static UwType list_type = {
     .equal          = _uw_list_equal,
     .equal_ctype    = _uw_list_equal_ctype,
 
-    .supported_interfaces = {
-        // [UwInterfaceId_RandomAccess] = true,
-        // [UwInterfaceId_List]         = true
+    .interfaces = {
+        // [UwInterfaceId_RandomAccess] = &list_type_random_access_interface,
+        // [UwInterfaceId_List]         = &list_type_list_interface
     }
 };
 
@@ -384,8 +402,8 @@ static UwType map_type = {
     .equal          = _uw_map_equal,
     .equal_ctype    = _uw_map_equal_ctype,
 
-    .supported_interfaces = {
-        // [UwInterfaceId_RandomAccess] = true
+    .interfaces = {
+        // [UwInterfaceId_RandomAccess] = &map_type_random_access_interface
     }
 };
 
@@ -406,7 +424,87 @@ static UwType class_type = {
     .equal          = _uw_class_equal,
     .equal_ctype    = _uw_class_equal_ctype,
 
-    .supported_interfaces = {}
+    .interfaces = {}
+};
+
+static UwInterface_File file_type_file_interface = {
+    .open     = _uw_file_open,
+    .close    = _uw_file_close,
+    .set_fd   = _uw_file_set_fd,
+    .set_name = _uw_file_set_name
+};
+
+static UwInterface_FileReader file_type_file_reader_interface = {
+    .read = _uw_file_read
+};
+
+static UwInterface_FileWriter file_type_file_writer_interface = {
+    .write = _uw_file_write
+};
+
+static UwInterface_LineReader file_type_line_reader_interface = {
+    .start             = _uw_file_start_read_lines,
+    .read_line         = _uw_file_read_line,
+    .read_line_inplace = _uw_file_read_line_inplace,
+    .unread_line       = _uw_file_unread_line,
+    .stop              = _uw_file_stop_read_lines
+};
+
+static UwType file_type = {
+    .id             = UwTypeId_File,
+    .ancestor_id    = UwTypeId_Null,  // no ancestor
+    .name           = "File",
+    .data_size      = sizeof(struct _UwFile),
+    .data_offset    = sizeof(_UwValueBase),
+    .init           = _uw_init_file,
+    .fini           = _uw_fini_file,
+    .hash           = _uw_hash_file,
+    .copy           = _uw_copy_file,
+    .dump           = _uw_dump_file,
+    .to_string      = _uw_file_to_string,
+    .is_true        = _uw_file_is_true,
+    .equal_sametype = _uw_file_equal_sametype,
+    .equal          = _uw_file_equal,
+    .equal_ctype    = _uw_file_equal_ctype,
+
+    .interfaces = {
+        [UwInterfaceId_File]       = &file_type_file_interface,
+        [UwInterfaceId_FileReader] = &file_type_file_reader_interface,
+        [UwInterfaceId_FileWriter] = &file_type_file_writer_interface,
+        [UwInterfaceId_LineReader] = &file_type_line_reader_interface
+    }
+};
+
+static UwInterface_LineReader stringio_type_line_reader_interface = {
+    .start             = _uw_stringio_start_read_lines,
+    .read_line         = _uw_stringio_read_line,
+    .read_line_inplace = _uw_stringio_read_line_inplace,
+    .unread_line       = _uw_stringio_unread_line,
+    .stop              = _uw_stringio_stop_read_lines
+};
+
+static UwType stringio_type = {
+    .id             = UwTypeId_StringIO,
+    .ancestor_id    = UwTypeId_String,  // it's a subclass!
+    .name           = "StringIO",
+    .data_size      = sizeof(struct _UwStringIO),
+    .data_offset    = sizeof(_UwValueBase) + sizeof(struct _UwString*),
+    .init           = _uw_init_stringio,
+    .fini           = _uw_fini_stringio,
+    .hash           = _uw_hash_string,
+    .copy           = _uw_copy_stringio,
+    .dump           = _uw_dump_string,
+    .to_string      = _uw_copy_string,  // yes, simply make a copy of string
+    .is_true        = _uw_string_is_true,
+    .equal_sametype = _uw_string_equal_sametype,
+    .equal          = _uw_string_equal,
+    .equal_ctype    = _uw_string_equal_ctype,
+
+    // in a subclass all interfaces of base classes must be in place:
+    .interfaces = {
+        // [UwInterfaceId_RandomAccess] = &string_type_random_access_interface
+        [UwInterfaceId_LineReader] = &stringio_type_line_reader_interface
+    }
 };
 
 UwType* _uw_types[1 << UW_TYPE_BITWIDTH] = {
@@ -418,7 +516,9 @@ UwType* _uw_types[1 << UW_TYPE_BITWIDTH] = {
     [UwTypeId_String] = &string_type,
     [UwTypeId_List]   = &list_type,
     [UwTypeId_Map]    = &map_type,
-    [UwTypeId_Class]  = &class_type
+    [UwTypeId_Class]  = &class_type,
+    [UwTypeId_File]     = &file_type,
+    [UwTypeId_StringIO] = &stringio_type
 };
 
 

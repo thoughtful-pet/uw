@@ -9,6 +9,8 @@
 #include <uw_map.h>
 #include <uw_string.h>
 #include <uw_ctype.h>
+#include <uw_file.h>
+#include <uw_string_io.h>
 #include <uw_tg.h>
 
 // automatically cleaned value

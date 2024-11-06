@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include "include/uw_c.h"
 #include "src/uw_string_internal.h"
@@ -1278,12 +1279,63 @@ void test_map()
     }
 }
 
+void test_file()
+{
+    char8_t a[] = u8"###################################################################################################\n";
+    char8_t b[] = u8"##############################################################################################\n";
+    char8_t c[] = u8"สบาย\n";
+    char8_t* expected_result = a;
+
+    char8_t data_filename[] = u8"./test/data/utf8-crossing-buffer-boundary";
+
+    UwValue file = uw_file_open(data_filename, O_RDONLY, 0);
+    TEST(uw_start_read_lines(file));
+    UwValue line = uw_create("");
+    while (uw_read_line_inplace(file, line)) {
+        if (!uw_equal(line, expected_result)) {
+            if (expected_result == a) {
+                expected_result = b;
+                TEST(uw_equal(line, expected_result));
+                expected_result = c;
+            }
+            else {
+                TEST(uw_equal(line, expected_result));
+            }
+        }
+    }
+}
+
+void test_string_io()
+{
+    UwValue sio = uw_create_string_io("one\ntwo\nthree");
+    UwValue line = uw_read_line(sio);
+    TEST(line != nullptr);
+    TEST(uw_equal(line, "one\n"));
+    TEST(uw_read_line_inplace(sio, line));
+    TEST(uw_equal(line, "two\n"));
+    TEST(uw_unread_line(sio, line));
+    // re-create line to avoid modification of unread one
+    uw_delete(&line);
+    line = uw_create("");
+    TEST(uw_read_line_inplace(sio, line));
+    TEST(uw_equal(line, "two\n"));
+    uw_read_line_inplace(sio, line);
+    TEST(uw_equal(line, "three"));
+    TEST(!uw_read_line_inplace(sio, line));
+    TEST(uw_read_line(sio) == nullptr);
+
+    TEST(uw_start_read_lines(sio));
+    TEST(uw_equal(uw_read_line(sio), "one\n"));
+}
+
 int main(int argc, char* argv[])
 {
     test_integral_types();
     test_string();
     test_list();
     test_map();
+    test_file();
+    test_string_io();
 
     if (num_fail == 0) {
         printf("%d test%s OK\n", num_tests, (num_tests == 1)? "" : "s");
