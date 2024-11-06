@@ -1587,20 +1587,6 @@ void uw_delete_cstring(CStringPtr* str)
     *str = nullptr;
 }
 
-void uw_string_swap(UwValuePtr a, UwValuePtr b)
-{
-    uw_assert_string(a);
-    uw_assert_string(b);
-
-    if (a == b) {
-        return;
-    }
-
-    struct _UwString* tmp = *_uw_get_string_pptr(a);
-    *_uw_get_string_pptr(a) = *_uw_get_string_pptr(b);
-    *_uw_get_string_pptr(b) = tmp;
-}
-
 bool _uw_string_append_char(UwValuePtr dest, char c)
 {
     uw_assert_string(dest);

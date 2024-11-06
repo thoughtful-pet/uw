@@ -42,11 +42,6 @@ void uw_string_copy_buf(UwValuePtr str, char* buffer);
  * XXX decode multibyte ???
  */
 
-void uw_string_swap(UwValuePtr a, UwValuePtr b);
-/*
- * Swap internal structures.
- */
-
 UwValuePtr uw_string_get_substring(UwValuePtr str, size_t start_pos, size_t end_pos);
 /*
  * Get substring from `start_pos` to `end_pos`.
