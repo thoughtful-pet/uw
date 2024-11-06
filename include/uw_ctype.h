@@ -31,9 +31,9 @@ UwValuePtr uw_create_from_ctype(UwCType ctype, va_list args);
 typedef char* CStringPtr;
 
 // somewhat ugly macro to define a local variable initialized with a copy of uw string:
-#define UW_CSTRING_LOCAL(variable, str) \
-    char variable[uw_strlen(str) + 1]; \
-    uw_string_copy_buf((str), variable)
+#define UW_CSTRING_LOCAL(variable_name, uw_str) \
+    char variable_name[uw_strlen(uw_str) + 1]; \
+    uw_string_copy_buf((uw_str), variable_name)
 
 void uw_delete_cstring(CStringPtr* str);
 
