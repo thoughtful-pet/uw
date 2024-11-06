@@ -8,9 +8,18 @@
  * Although generics is a great thing,
  * they make preprocessor output looks extremely ugly.
  *
- * Generics behave strangely with char* and char8_t*.
- * Clang 16 uses char* version called with either string constant
- * as initializer, but complains if char8_t* choice is not defined.
+ * Note that string literals are weird:
+ *
+ * char8_t* str = u8"สวัสดี";  --> incompatible pointers
+ *
+ * but the following is okay:
+ *
+ * char8_t str[] = u8"สวัสดี";
+ *
+ * So, when u8 literal is passed to generic, it's a char*, not char8_t*.
+ *
+ * Generics are also weird: Clang 16 (at least) complains if char8_t*
+ * choice is not defined despite of the above.
  *
  * As a workaround, using *_u8_wrapper(char*) functions which treat
  * char* as char8_t* and call *_u8 version.
