@@ -401,10 +401,10 @@ static inline UwValuePtr uw_copy(UwValuePtr value)
     return fn_copy(value);
 }
 
-#define _uw_get_data_ptr(value, type_name_ptr)  \
+#define _uw_get_data_ptr(value, type_id, type_name_ptr)  \
     (  \
         (type_name_ptr) (  \
-            ((uint8_t*) (value)) + _uw_types[(value)->type_id]->data_offset \
+            ((uint8_t*) (value)) + _uw_types[type_id]->data_offset \
         )  \
     )
 

@@ -7,7 +7,7 @@
 
 bool _uw_init_stringio(UwValuePtr self)
 {
-    struct _UwStringIO* sio = _uw_get_data_ptr(self, struct _UwStringIO*);
+    struct _UwStringIO* sio = _uw_get_data_ptr(self, UwTypeId_StringIO, struct _UwStringIO*);
     sio->line_position = 0;
     sio->pushback = nullptr;
     return true;
@@ -15,7 +15,7 @@ bool _uw_init_stringio(UwValuePtr self)
 
 void _uw_fini_stringio(UwValuePtr self)
 {
-    struct _UwStringIO* sio = _uw_get_data_ptr(self, struct _UwStringIO*);
+    struct _UwStringIO* sio = _uw_get_data_ptr(self, UwTypeId_StringIO, struct _UwStringIO*);
     sio->line_position = 0;
     uw_delete(&sio->pushback);
 }
@@ -32,7 +32,7 @@ UwValuePtr _uw_copy_stringio(UwValuePtr self)
 
 bool _uw_stringio_start_read_lines(UwValuePtr self)
 {
-    struct _UwStringIO* sio = _uw_get_data_ptr(self, struct _UwStringIO*);
+    struct _UwStringIO* sio = _uw_get_data_ptr(self, UwTypeId_StringIO, struct _UwStringIO*);
     sio->line_position = 0;
     uw_delete(&sio->pushback);
     return true;
@@ -52,7 +52,7 @@ UwValuePtr _uw_stringio_read_line(UwValuePtr self)
 
 bool _uw_stringio_read_line_inplace(UwValuePtr self, UwValuePtr line)
 {
-    struct _UwStringIO* sio = _uw_get_data_ptr(self, struct _UwStringIO*);
+    struct _UwStringIO* sio = _uw_get_data_ptr(self, UwTypeId_StringIO, struct _UwStringIO*);
 
     uw_string_truncate(line, 0);
 
@@ -79,7 +79,7 @@ bool _uw_stringio_read_line_inplace(UwValuePtr self, UwValuePtr line)
 
 bool _uw_stringio_unread_line(UwValuePtr self, UwValuePtr line)
 {
-    struct _UwStringIO* sio = _uw_get_data_ptr(self, struct _UwStringIO*);
+    struct _UwStringIO* sio = _uw_get_data_ptr(self, UwTypeId_StringIO, struct _UwStringIO*);
 
     if (sio->pushback) {
         return false;
@@ -90,7 +90,7 @@ bool _uw_stringio_unread_line(UwValuePtr self, UwValuePtr line)
 
 void _uw_stringio_stop_read_lines(UwValuePtr self)
 {
-    struct _UwStringIO* sio = _uw_get_data_ptr(self, struct _UwStringIO*);
+    struct _UwStringIO* sio = _uw_get_data_ptr(self, UwTypeId_StringIO, struct _UwStringIO*);
     uw_delete(&sio->pushback);
 }
 
