@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 // the following constants must be power of two:
-#define UWLIST_INITIAL_CAPACITY    16
+#define UWLIST_INITIAL_CAPACITY    4
 #define UWLIST_CAPACITY_INCREMENT  16
 
 struct _UwList {
