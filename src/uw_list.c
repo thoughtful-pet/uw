@@ -310,7 +310,7 @@ bool uw_list_append_ap(UwValuePtr list, va_list ap)
             if (!item) {
                 goto error;
             }
-            if (!_uw_list_append(alloc_id, _uw_get_list_ptr(list), item)) {
+            if (!_uw_list_append(alloc_id, _uw_get_list_ptr(list), uw_makeref(item))) {
                 goto error;
             }
             num_appended++;
