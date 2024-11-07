@@ -166,11 +166,6 @@ size_t uw_list_length(UwValuePtr list)
 
 bool _uw_list_eq(struct _UwList* a, struct _UwList* b)
 {
-    if (a == b) {
-        // compare with self
-        return true;
-    }
-
     size_t n = a->length;
     if (b->length != n) {
         // lists have different lengths

@@ -433,10 +433,6 @@ bool _uw_map_is_true(UwValuePtr self)
 
 static inline bool map_eq(struct _UwMap* a, struct _UwMap* b)
 {
-    if (a == b) {
-        // compare with self
-        return true;
-    }
     return _uw_list_eq(&a->kv_pairs, &b->kv_pairs);
 }
 

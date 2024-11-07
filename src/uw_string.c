@@ -36,11 +36,6 @@ static inline bool _uw_eq_fast(struct _UwString* a, struct _UwString* b)
 
 static inline bool _uw_string_eq(struct _UwString* a, struct _UwString* b)
 {
-    if (a == b) {
-        // compare with self
-        return true;
-    }
-
     // fast comparison
     if (_uw_eq_fast(a, b)) {
         return true;
