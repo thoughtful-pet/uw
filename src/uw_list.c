@@ -122,7 +122,11 @@ bool _uw_list_equal_ctype(UwValuePtr self, UwCType ctype, ...)
 bool _uw_alloc_list(UwAllocId alloc_id, struct _UwList* list, size_t capacity)
 {
     list->length = 0;
-    list->capacity = (capacity + UWLIST_CAPACITY_INCREMENT - 1) & ~(UWLIST_CAPACITY_INCREMENT - 1);
+    if (capacity <= UWLIST_INITIAL_CAPACITY) {
+        list->capacity = (capacity + UWLIST_INITIAL_CAPACITY - 1) & ~(UWLIST_INITIAL_CAPACITY - 1);
+    } else {
+        list->capacity = (capacity + UWLIST_CAPACITY_INCREMENT - 1) & ~(UWLIST_CAPACITY_INCREMENT - 1);
+    }
     list->items = _uw_allocators[alloc_id].alloc(list->capacity * sizeof(UwValuePtr));
     return list->items != nullptr;
 }
