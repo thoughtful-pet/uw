@@ -80,9 +80,14 @@ ssize_t uw_strscan(UwValuePtr str, char32_t chr, size_t start_pos);
  * Return position of character or -1.
  */
 
+
 void uw_string_ltrim(UwValuePtr str);
 void uw_string_rtrim(UwValuePtr str);
 void uw_string_trim(UwValuePtr str);
+
+void uw_string_lower(UwValuePtr str);
+void uw_string_upper(UwValuePtr str);
+
 
 /*
  * Append functions
@@ -198,6 +203,9 @@ uint8_t u32_char_size(char32_t* str, size_t max_len);
 /*
  * Find the maximal size of character in `str`, up to `max_len` or null terminator.
  */
+
+#define uw_char_lower(c)  u_tolower(c)
+#define uw_char_upper(c)  u_toupper(c)
 
 /****************************************************************
  * Character classification functions

@@ -1994,6 +1994,38 @@ void uw_string_trim(UwValuePtr str)
     uw_string_ltrim(str);
 }
 
+void uw_string_lower(UwValuePtr str)
+{
+    uw_assert_string(str);
+    struct _UwString* s = *_uw_get_string_pptr(str);
+    StrMethods* strmeth = get_str_methods(s);
+    size_t n = get_cap_methods(s)->get_length(s);
+    uint8_t char_size = s->char_size + 1;
+
+    char8_t* ptr = get_char_ptr(s, 0);
+    while (n) {
+        strmeth->put_char(ptr, uw_char_lower(strmeth->get_char(ptr)));
+        ptr += char_size;
+        n--;
+    }
+}
+
+void uw_string_upper(UwValuePtr str)
+{
+    uw_assert_string(str);
+    struct _UwString* s = *_uw_get_string_pptr(str);
+    StrMethods* strmeth = get_str_methods(s);
+    size_t n = get_cap_methods(s)->get_length(s);
+    uint8_t char_size = s->char_size + 1;
+
+    char8_t* ptr = get_char_ptr(s, 0);
+    while (n) {
+        strmeth->put_char(ptr, uw_char_upper(strmeth->get_char(ptr)));
+        ptr += char_size;
+        n--;
+    }
+}
+
 UwValuePtr _uw_string_split_c32(UwValuePtr str, char32_t splitter)
 {
     uw_assert_string(str);
