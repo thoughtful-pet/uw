@@ -774,10 +774,10 @@ void test_string()
         // test comparison
         UwValue v2 = uw_create("hello everybody");
         TEST(uw_equal(v, v2));
-        TEST(_uw_equal_cstr(v, "hello everybody"));
-        TEST(_uw_equal_cstr(v2, "hello everybody"));
-        TEST(!_uw_equal_cstr(v, "hello Everybody"));
-        TEST(!_uw_equal_cstr(v2, "hello Everybody"));
+        TEST(uw_equal_cstr(v, "hello everybody"));
+        TEST(uw_equal_cstr(v2, "hello everybody"));
+        TEST(!uw_equal_cstr(v, "hello Everybody"));
+        TEST(!uw_equal_cstr(v2, "hello Everybody"));
         TEST(uw_equal(v, "hello everybody"));
         TEST(uw_equal(v2, "hello everybody"));
         TEST(!uw_equal(v, "hello Everybody"));

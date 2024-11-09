@@ -9,9 +9,9 @@
 extern "C" {
 #endif
 
-UwValuePtr _uw_create_string_c  (char*      initializer);
-UwValuePtr _uw_create_string_u8 (char8_t*   initializer);
-UwValuePtr _uw_create_string_u32(char32_t*  initializer);
+UwValuePtr  uw_create_string_cstr(char*      initializer);
+UwValuePtr _uw_create_string_u8  (char8_t*   initializer);
+UwValuePtr _uw_create_string_u32 (char32_t*  initializer);
 
 UwValuePtr uw_create_empty_string(size_t capacity, uint8_t char_size);
 
@@ -20,7 +20,7 @@ uint8_t uw_string_char_size(UwValuePtr s);
 // check if `index` is within string length
 #define uw_string_index_valid(str, index) ((index) < uw_strlen(str))
 
-bool _uw_equal_cstr(UwValuePtr a, char* b);
+bool  uw_equal_cstr(UwValuePtr a, char* b);
 bool _uw_equal_u8  (UwValuePtr a, char8_t* b);
 bool _uw_equal_u32 (UwValuePtr a, char32_t* b);
 

@@ -44,16 +44,10 @@ bool       _uw_file_equal_ctype   (UwValuePtr self, UwCType ctype, ...);
  * File interface methods
  */
 
-// Rationale for using char8_t* for file names:
-// 1. if it was UwValuePtr, we'd have to copy it for immutability
-// 2. in C it's mainly in UTF-8 encoding, creating UwValue from it
-//    and passing to methods would involve unnecessary duplicate copying
-// Maybe this will be changed in future, but for now it's a better approach.
-
-bool _uw_file_open    (UwValuePtr self, char8_t* name, int flags, mode_t mode);
+bool _uw_file_open    (UwValuePtr self, UwValuePtr file_name, int flags, mode_t mode);
 void _uw_file_close   (UwValuePtr self);
 bool _uw_file_set_fd  (UwValuePtr self, int fd);
-bool _uw_file_set_name(UwValuePtr self, char8_t* name);
+bool _uw_file_set_name(UwValuePtr self, UwValuePtr file_name);
 
 /****************************************************************
  * FileReader interface methods

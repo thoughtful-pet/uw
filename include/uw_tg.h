@@ -136,8 +136,8 @@ bool _uw_equal_uw        (UwValuePtr a, UwValuePtr         b);
  */
 
 #define uw_create_string(initializer) _Generic((initializer), \
-             char*: _uw_create_string_c,   \
-        UwValuePtr: _uw_create_string_uw   \
+             char*:  uw_create_string_cstr, \
+        UwValuePtr: _uw_create_string_uw    \
     )(initializer)
 
 UwValuePtr _uw_create_string_uw (UwValuePtr str);
@@ -339,6 +339,17 @@ void _uw_map_del_u8_wrapper(UwValuePtr map, char* key);
          char32_t*: _uw_create_string_io_u32,         \
         UwValuePtr: _uw_create_string_io_uw           \
     )((str))
+
+/****************************************************************
+ * File functions
+ */
+
+#define uw_file_open(file_name, flags, mode) _Generic((file_name), \
+             char*: _uw_file_open_u8_wrapper,  \
+          char8_t*: _uw_file_open_u8,          \
+         char32_t*: _uw_file_open_u32,         \
+        UwValuePtr: _uw_file_open_uw           \
+    )((file_name), (flags), (mode))
 
 #ifdef __cplusplus
 }

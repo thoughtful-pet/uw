@@ -105,7 +105,7 @@ bool _uw_file_equal_ctype(UwValuePtr self, UwCType ctype, ...)
  * File interface methods
  */
 
-bool _uw_file_open(UwValuePtr self, char8_t* name, int flags, mode_t mode)
+bool _uw_file_open(UwValuePtr self, UwValuePtr file_name, int flags, mode_t mode)
 {
     struct _UwFile* f = _uw_get_data_ptr(self, UwTypeId_File, struct _UwFile*);
 
@@ -115,27 +115,20 @@ bool _uw_file_open(UwValuePtr self, char8_t* name, int flags, mode_t mode)
         return false;
     }
 
-    // prepare filename
-    UwValuePtr file_name = uw_create(name);
-    if (!file_name) {
-        return false;
-    }
-
     // open file
+    UW_CSTRING_LOCAL(filename_cstr, file_name);
     do {
-        f->fd = open((char*) name, flags, mode);
+        f->fd = open(filename_cstr, flags, mode);
     } while (f->fd == -1 && errno == EINTR);
 
     if (f->fd == -1) {
         f->error = errno;
-        uw_delete(&file_name);
         return false;
     }
 
     // set file name
     uw_delete(&f->name);
-    f->name = file_name;
-    file_name = nullptr;
+    f->name = uw_copy(file_name);
 
     f->is_external_fd = false;
 
@@ -173,7 +166,7 @@ bool _uw_file_set_fd(UwValuePtr self, int fd)
     return true;
 }
 
-bool _uw_file_set_name(UwValuePtr self, char8_t* name)
+bool _uw_file_set_name(UwValuePtr self, UwValuePtr file_name)
 {
     struct _UwFile* f = _uw_get_data_ptr(self, UwTypeId_File, struct _UwFile*);
 
@@ -182,16 +175,9 @@ bool _uw_file_set_name(UwValuePtr self, char8_t* name)
         return false;
     }
 
-    // prepare filename
-    UwValuePtr file_name = uw_create(name);
-    if (!file_name) {
-        return false;
-    }
-
     // set file name
     uw_delete(&f->name);
-    f->name = file_name;
-    file_name = nullptr;
+    f->name = uw_copy(file_name);
 
     return true;
 }
@@ -394,19 +380,42 @@ void _uw_file_stop_read_lines(UwValuePtr self)
  * Shorthand functions
  */
 
-UwValuePtr uw_file_open(char8_t* name, int flags, mode_t mode)
+UwValuePtr uw_file_open_cstr(char* file_name, int flags, mode_t mode)
 {
-    UwValuePtr file = uw_create_file();
+    UwValue fname = uw_create_string_cstr(file_name);
+    return _uw_file_open_uw(fname, flags, mode);
+}
+
+UwValuePtr _uw_file_open_u8_wrapper(char* file_name, int flags, mode_t mode)
+{
+    UwValue fname = _uw_create_string_u8_wrapper(file_name);
+    return _uw_file_open_uw(fname, flags, mode);
+}
+
+UwValuePtr _uw_file_open_u8(char8_t* file_name, int flags, mode_t mode)
+{
+    UwValue fname = _uw_create_string_u8(file_name);
+    return _uw_file_open_uw(fname, flags, mode);
+}
+
+UwValuePtr _uw_file_open_u32(char32_t* file_name, int flags, mode_t mode)
+{
+    UwValue fname = _uw_create_string_u32(file_name);
+    return _uw_file_open_uw(fname, flags, mode);
+}
+
+UwValuePtr _uw_file_open_uw(UwValuePtr file_name, int flags, mode_t mode)
+{
+    UwValue file = uw_create_file();
     if (!file) {
         return nullptr;
     }
     UwInterface_File* iface = uw_get_interface(file, File);
     if (iface) {
-        if (iface->open(file, name, flags, mode)) {
-            return file;
+        if (iface->open(file, file_name, flags, mode)) {
+            return uw_move(&file);
         }
     }
-    uw_delete(&file);
     return nullptr;
 }
 
@@ -427,13 +436,13 @@ bool uw_file_set_fd(UwValuePtr file, int fd)
     return iface->set_fd(file, fd);
 }
 
-bool uw_file_set_name(UwValuePtr file, char8_t* name)
+bool uw_file_set_name(UwValuePtr file, UwValuePtr file_name)
 {
     UwInterface_File* iface = uw_get_interface(file, File);
     if (!iface) {
         return false;
     }
-    return iface->set_name(file, name);
+    return iface->set_name(file, file_name);
 }
 
 ssize_t uw_file_read(UwValuePtr file, void* buffer, size_t buffer_size)

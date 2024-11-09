@@ -34,9 +34,9 @@ UwValuePtr uw_create_from_ctype(UwCType ctype, va_list args)
         case uwc_float:     return _uwc_create_float(va_arg(args, double /*float*/));
         case uwc_double:    return _uwc_create_float(va_arg(args, double));
 
-        case uwc_charptr:   return _uw_create_string_c  (va_arg(args, char*));
-        case uwc_char8ptr:  return _uw_create_string_u8 (va_arg(args, char8_t*));
-        case uwc_char32ptr: return _uw_create_string_u32(va_arg(args, char32_t*));
+        case uwc_charptr:   return  uw_create_string_cstr(va_arg(args, char*));
+        case uwc_char8ptr:  return _uw_create_string_u8  (va_arg(args, char8_t*));
+        case uwc_char32ptr: return _uw_create_string_u32 (va_arg(args, char32_t*));
 
         case uwc_value_ptr: return va_arg(args, UwValuePtr);
         case uwc_value_makeref: { UwValuePtr v = va_arg(args, UwValuePtr); return uw_makeref(v); }

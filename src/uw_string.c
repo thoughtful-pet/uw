@@ -202,7 +202,7 @@ bool _uw_string_equal_ctype(UwValuePtr self, UwCType ctype, ...)
     va_list ap;
     va_start(ap);
     switch (ctype) {
-        case uwc_charptr:   result = _uw_equal_cstr(self, va_arg(ap, char*)); break;
+        case uwc_charptr:   result =  uw_equal_cstr(self, va_arg(ap, char*)); break;
         case uwc_char8ptr:  result = _uw_equal_u8  (self, va_arg(ap, char8_t*)); break;
         case uwc_char32ptr: result = _uw_equal_u32 (self, va_arg(ap, char32_t*)); break;
 
@@ -1413,7 +1413,7 @@ UwValuePtr uw_create_empty_string(size_t capacity, uint8_t char_size)
     return result;
 }
 
-UwValuePtr _uw_create_string_c(char* initializer)
+UwValuePtr uw_create_string_cstr(char* initializer)
 {
     size_t capacity = 0;
 
@@ -1504,7 +1504,7 @@ size_t uw_strlen(UwValuePtr str)
     return get_str_methods(astr)->equal_##suffix(get_char_ptr(astr, 0), (type_name_b*) b, a_length);  \
 }
 
-bool _uw_equal_cstr(UwValuePtr a, char* b)     STRING_EQ_IMPL(cstr, char)
+bool  uw_equal_cstr(UwValuePtr a, char* b)     STRING_EQ_IMPL(cstr, char)
 bool _uw_equal_u8  (UwValuePtr a, char8_t* b)  STRING_EQ_IMPL(u8,   char8_t)
 bool _uw_equal_u32 (UwValuePtr a, char32_t* b) STRING_EQ_IMPL(u32,  char32_t)
 
