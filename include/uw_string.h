@@ -173,6 +173,12 @@ char* uw_char32_to_utf8(char32_t codepoint, char* buffer);
  * Return pointer to the next position in buffer.
  */
 
+void* uw_string_data_ptr(UwValuePtr str);
+/*
+ * Return pointer to internal string data.
+ * The function is intended for file I/O operations.
+ */
+
 void _uw_putchar32_utf8(char32_t codepoint);
 
 size_t utf8_strlen(char8_t* str);

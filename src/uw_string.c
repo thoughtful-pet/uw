@@ -2242,6 +2242,13 @@ void _uw_putchar32_utf8(char32_t codepoint)
     }
 }
 
+void* uw_string_data_ptr(UwValuePtr str)
+{
+    uw_assert_string(str);
+    struct _UwString* s = *_uw_get_string_pptr(str);
+    return (void*) get_char_ptr(s, 0);
+}
+
 #ifdef DEBUG
 
 static struct _UwString* allocate_string2(uint8_t cap_size, uint8_t char_size)
