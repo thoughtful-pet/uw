@@ -39,7 +39,7 @@ UwValuePtr uw_create_from_ctype(UwCType ctype, va_list args)
         case uwc_char32ptr: return _uw_create_string_u32(va_arg(args, char32_t*));
 
         case uwc_value_ptr: return va_arg(args, UwValuePtr);
-        case uwc_value:     { UwValuePtr v = va_arg(args, UwValuePtr); return uw_makeref(v); }
+        case uwc_value_makeref: { UwValuePtr v = va_arg(args, UwValuePtr); return uw_makeref(v); }
         default:
             // panic
             fprintf(stderr, "%s: bad C type identifier %d\n", __func__, ctype);

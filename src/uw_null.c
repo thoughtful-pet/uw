@@ -53,7 +53,7 @@ bool _uw_null_equal_ctype(UwValuePtr self, UwCType ctype, ...)
     switch (ctype) {
         case uwc_nullptr:   result = true; break;
         case uwc_value_ptr:
-        case uwc_value: {
+        case uwc_value_makeref: {
             UwValuePtr other = va_arg(ap, UwValuePtr);
             result = uw_is_null(other);
             break;

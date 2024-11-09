@@ -93,7 +93,7 @@ bool _uw_bool_equal_ctype(UwValuePtr self, UwCType ctype, ...)
         case uwc_double:    result = self->bool_value == (UwType_Bool) va_arg(ap, double); break;
 
         case uwc_value_ptr:
-        case uwc_value:     { UwValuePtr other = va_arg(ap, UwValuePtr); result = _uw_bool_equal(self, other); break; }
+        case uwc_value_makeref: { UwValuePtr other = va_arg(ap, UwValuePtr); result = _uw_bool_equal(self, other); break; }
 
         default: break;
     }

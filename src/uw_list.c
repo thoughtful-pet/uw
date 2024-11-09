@@ -108,7 +108,7 @@ bool _uw_list_equal_ctype(UwValuePtr self, UwCType ctype, ...)
     va_start(ap);
     switch (ctype) {
         case uwc_value_ptr:
-        case uwc_value: {
+        case uwc_value_makeref: {
             UwValuePtr other = va_arg(ap, UwValuePtr);
             result = _uw_list_equal(self, other);
             break;

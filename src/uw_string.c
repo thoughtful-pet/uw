@@ -207,7 +207,11 @@ bool _uw_string_equal_ctype(UwValuePtr self, UwCType ctype, ...)
         case uwc_char32ptr: result = _uw_equal_u32 (self, va_arg(ap, char32_t*)); break;
 
         case uwc_value_ptr:
-        case uwc_value:     { UwValuePtr other = va_arg(ap, UwValuePtr); result = _uw_string_equal(self, other); break; }
+        case uwc_value_makeref: {
+            UwValuePtr other = va_arg(ap, UwValuePtr);
+            result = _uw_string_equal(self, other);
+            break;
+        }
 
         default: break;
     }

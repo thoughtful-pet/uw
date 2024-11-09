@@ -188,8 +188,8 @@ typedef enum {
     uwc_charptr   = 18,  // char*
     uwc_char8ptr  = 19,  // char8_t*
     uwc_char32ptr = 20,  // char32_t*
-    uwc_value_ptr = 21,  // UwValuePtr
-    uwc_value     = 22   // reserved for autocleaned UwValue
+    uwc_value_ptr = 21,  // UwValuePtr without incrementing refcount
+    uwc_value_makeref = 22   // increment refcount, used to pass autocleaned UwValue
 } UwCType;
 
 /****************************************************************
