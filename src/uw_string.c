@@ -2174,6 +2174,34 @@ UwValuePtr _uw_string_join_uw(UwValuePtr separator, UwValuePtr list)
     return uw_move(&result);
 }
 
+size_t uw_strlen_in_utf8(UwValuePtr str)
+{
+    uw_assert_string(str);
+    struct _UwString* s = *_uw_get_string_pptr(str);
+    uint8_t char_size = s->char_size + 1;
+
+    StrMethods* strmeth = get_str_methods(s);
+    char8_t* ptr = get_char_ptr(s, 0);
+
+    size_t length = 0;
+    size_t n = get_cap_methods(s)->get_length(s);
+    while (n) {
+        char32_t c = strmeth->get_char(ptr);
+        if (c < 0x80) {
+            length++;
+        } else if (c < 0b1'00000'000000) {
+            length += 2;
+        } else if (c < 0b1'0000'000000'000000) {
+            length += 3;
+        } else {
+            length += 4;
+        }
+        ptr += char_size;
+        n--;
+    }
+    return length;
+}
+
 char* uw_char32_to_utf8(char32_t codepoint, char* buffer)
 {
     /*

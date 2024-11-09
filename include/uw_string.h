@@ -162,6 +162,11 @@ UwValuePtr _uw_string_join_uw (UwValuePtr separator, UwValuePtr list);
  * Miiscellaneous helper functions.
  */
 
+size_t uw_strlen_in_utf8(UwValuePtr str);
+/*
+ * Return length of str as if was encoded in UTF-8.
+ */
+
 char* uw_char32_to_utf8(char32_t codepoint, char* buffer);
 /*
  * Write up to 4 characters to buffer.

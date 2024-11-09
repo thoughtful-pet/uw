@@ -32,7 +32,7 @@ typedef char* CStringPtr;
 
 // somewhat ugly macro to define a local variable initialized with a copy of uw string:
 #define UW_CSTRING_LOCAL(variable_name, uw_str) \
-    char variable_name[uw_strlen(uw_str) + 1]; \
+    char variable_name[uw_strlen_in_utf8(uw_str) + 1]; \
     uw_string_copy_buf((uw_str), variable_name)
 
 void uw_delete_cstring(CStringPtr* str);
