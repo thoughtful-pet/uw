@@ -1816,6 +1816,28 @@ bool uw_string_append_utf8(UwValuePtr dest, char8_t* buffer, size_t size, size_t
     return true;
 }
 
+bool uw_string_append_buffer(UwValuePtr dest, uint8_t* buffer, size_t size)
+{
+    uw_assert(size != 0);
+    uw_assert_string(dest);
+    struct _UwString* d = *_uw_get_string_pptr(dest);
+    uw_assert(d->char_size == 0);
+    size_t dest_len = get_cap_methods(d)->get_length(d);
+
+    d = expand(dest, size, 1);
+    if (!d) {
+        return false;
+    }
+
+    get_cap_methods(d)->set_length(d, dest_len + size);
+
+    uint8_t* ptr = get_char_ptr(d, dest_len);
+    while (size--) {
+        get_str_methods(d)->put_char(ptr++, *buffer++);
+    }
+    return true;
+}
+
 bool _uw_string_insert_many_c32(UwValuePtr str, size_t position, char32_t value, size_t n)
 {
     if (n == 0) {

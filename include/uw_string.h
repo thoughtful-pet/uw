@@ -93,7 +93,7 @@ void uw_string_upper(UwValuePtr str);
  * Append functions
  */
 bool _uw_string_append_char(UwValuePtr dest, char       c);
-bool _uw_string_append_cstr(UwValuePtr dest, char*      src);
+bool  uw_string_append_cstr(UwValuePtr dest, char*      src);
 bool _uw_string_append_c32 (UwValuePtr dest, char32_t   c);
 bool _uw_string_append_u8  (UwValuePtr dest, char8_t*   src);
 bool _uw_string_append_u32 (UwValuePtr dest, char32_t*  src);
@@ -104,6 +104,14 @@ bool uw_string_append_utf8(UwValuePtr dest, char8_t* buffer, size_t size, size_t
  * Append UTF-8-encoded characters from `buffer`.
  * Write the number of bytes processed to `bytes_processed`, which can be less
  * than `size` if buffer ends with incomplete UTF-8 sequence.
+ *
+ * Return false if out of memory.
+ */
+
+bool uw_string_append_buffer(UwValuePtr dest, uint8_t* buffer, size_t size);
+/*
+ * Append bytes from `buffer`.
+ * `dest` char size must be 1.
  *
  * Return false if out of memory.
  */
@@ -119,7 +127,7 @@ bool _uw_string_insert_many_c32(UwValuePtr str, size_t position, char32_t value,
  *
  * Append `src` substring starting from `src_start_pos` to `src_end_pos`.
  */
-bool _uw_string_append_substring_cstr(UwValuePtr dest, char*      src, size_t src_start_pos, size_t src_end_pos);
+bool  uw_string_append_substring_cstr(UwValuePtr dest, char*      src, size_t src_start_pos, size_t src_end_pos);
 bool _uw_string_append_substring_u8  (UwValuePtr dest, char8_t*   src, size_t src_start_pos, size_t src_end_pos);
 bool _uw_string_append_substring_u32 (UwValuePtr dest, char32_t*  src, size_t src_start_pos, size_t src_end_pos);
 bool _uw_string_append_substring_uw  (UwValuePtr dest, UwValuePtr src, size_t src_start_pos, size_t src_end_pos);
