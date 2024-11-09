@@ -39,7 +39,7 @@ void uw_string_copy_buf(UwValuePtr str, char* buffer);
 /*
  * Copy string to buffer, appending terminating 0.
  * Use carefully. The caller is responsible to allocate the buffer.
- * XXX decode multibyte ???
+ * Encode multibyte chars to UTF-8.
  */
 
 UwValuePtr uw_string_get_substring(UwValuePtr str, size_t start_pos, size_t end_pos);
@@ -47,7 +47,7 @@ UwValuePtr uw_string_get_substring(UwValuePtr str, size_t start_pos, size_t end_
  * Get substring from `start_pos` to `end_pos`.
  */
 
-bool _uw_substring_eq_cstr(UwValuePtr a, size_t start_pos, size_t end_pos, char*      b);
+bool  uw_substring_eq_cstr(UwValuePtr a, size_t start_pos, size_t end_pos, char*      b);
 bool _uw_substring_eq_u8  (UwValuePtr a, size_t start_pos, size_t end_pos, char8_t*   b);
 bool _uw_substring_eq_u32 (UwValuePtr a, size_t start_pos, size_t end_pos, char32_t*  b);
 bool _uw_substring_eq_uw  (UwValuePtr a, size_t start_pos, size_t end_pos, UwValuePtr b);
@@ -140,12 +140,12 @@ UwValuePtr uw_string_split(UwValuePtr str);  // split by spaces
 
 UwValuePtr _uw_string_split_c32(UwValuePtr str, char32_t splitter);
 
-UwValuePtr _uw_string_split_any_cstr(UwValuePtr str, char*      splitters);
+UwValuePtr  uw_string_split_any_cstr(UwValuePtr str, char*      splitters);
 UwValuePtr _uw_string_split_any_u8  (UwValuePtr str, char8_t*   splitters);
 UwValuePtr _uw_string_split_any_u32 (UwValuePtr str, char32_t*  splitters);
 UwValuePtr _uw_string_split_any_uw  (UwValuePtr str, UwValuePtr splitters);
 
-UwValuePtr _uw_string_split_strict_cstr(UwValuePtr str, char*      splitter);
+UwValuePtr  uw_string_split_strict_cstr(UwValuePtr str, char*      splitter);
 UwValuePtr _uw_string_split_strict_u8  (UwValuePtr str, char8_t*   splitter);
 UwValuePtr _uw_string_split_strict_u32 (UwValuePtr str, char32_t*  splitter);
 UwValuePtr _uw_string_split_strict_uw  (UwValuePtr str, UwValuePtr splitter);
@@ -160,6 +160,12 @@ UwValuePtr _uw_string_join_uw (UwValuePtr separator, UwValuePtr list);
 
 /*
  * Miiscellaneous helper functions.
+ */
+
+char* uw_char32_to_utf8(char32_t codepoint, char* buffer);
+/*
+ * Write up to 4 characters to buffer.
+ * Return pointer to the next position in buffer.
  */
 
 void _uw_putchar32_utf8(char32_t codepoint);

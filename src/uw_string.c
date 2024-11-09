@@ -1000,7 +1000,7 @@ STR_COPY_TO_IMPL(uint32_t)
 
 // copy to C-string
 
-static void _cp_to_cstr_uint8_t(uint8_t* self_ptr, char* dest, size_t length)
+static void _cp_to_u8_uint8_t(uint8_t* self_ptr, char* dest, size_t length)
 {
     memcpy(dest, self_ptr, length);
     *(dest + length) = 0;
@@ -1008,35 +1008,26 @@ static void _cp_to_cstr_uint8_t(uint8_t* self_ptr, char* dest, size_t length)
 
 // integral types:
 
-#define CSTR_REPLACEMENT_CHAR  '.'  // as in hex dumps
-
-#define STR_COPY_TO_CSTR_IMPL(type_name_self)  \
-    static void _cp_to_cstr_##type_name_self(uint8_t* self_ptr, char* dest, size_t length)  \
+#define STR_COPY_TO_U8_IMPL(type_name_self)  \
+    static void _cp_to_u8_##type_name_self(uint8_t* self_ptr, char* dest, size_t length)  \
     {  \
         type_name_self* src_ptr = (type_name_self*) self_ptr;  \
         while (_likely_(length--)) {  \
-            type_name_self c = *src_ptr++;  \
-            if (_unlikely_(c >= 256)) {  \
-                c = CSTR_REPLACEMENT_CHAR;  \
-            }  \
-            *dest++ = (char) c;  \
+            dest = uw_char32_to_utf8(*src_ptr++, dest); \
         }  \
         *dest = 0;  \
     }
 
-STR_COPY_TO_CSTR_IMPL(uint16_t)
-STR_COPY_TO_CSTR_IMPL(uint32_t)
+STR_COPY_TO_U8_IMPL(uint16_t)
+STR_COPY_TO_U8_IMPL(uint32_t)
 
 // uint24_t
 
-static void _cp_to_cstr_uint24_t(uint8_t* self_ptr, char* dest, size_t length)
+static void _cp_to_u8_uint24_t(uint8_t* self_ptr, char* dest, size_t length)
 {
     while (_likely_(length--)) {
         char32_t c = get_char_uint24_t((uint24_t**) &self_ptr);
-        if (_unlikely_(c >= 256)) {
-            c = CSTR_REPLACEMENT_CHAR;
-        }
-        *dest++ = (char) c;
+        dest = uw_char32_to_utf8(c, dest);
     }
     *dest = 0;
 }
@@ -1126,22 +1117,22 @@ static size_t _cp_from_u8_uint24_t(uint8_t* self_ptr, uint8_t* src_ptr, size_t l
 StrMethods _uws_str_methods[4] = {
     { _get_char_uint8_t,      _put_char_uint8_t,    _hash_uint8_t,             _max_char_size_uint8_t,
       _eq_uint8_t,            _eq_uint8_t_char,     _eq_uint8_t_char8_t,       _eq_uint8_t_char32_t,
-      _cp_to_uint8_t,         _cp_to_cstr_uint8_t,
+      _cp_to_uint8_t,         _cp_to_u8_uint8_t,
       _cp_from_char_uint8_t,  _cp_from_u8_uint8_t,  _cp_from_char32_t_uint8_t
     },
     { _get_char_uint16_t,     _put_char_uint16_t,   _hash_uint16_t,            _max_char_size_uint16_t,
       _eq_uint16_t,           _eq_uint16_t_char,    _eq_uint16_t_char8_t,      _eq_uint16_t_char32_t,
-      _cp_to_uint16_t,        _cp_to_cstr_uint16_t,
+      _cp_to_uint16_t,        _cp_to_u8_uint16_t,
       _cp_from_char_uint16_t, _cp_from_u8_uint16_t, _cp_from_char32_t_uint16_t
     },
     { _get_char_uint24_t,     _put_char_uint24_t,   _hash_uint24_t,            _max_char_size_uint24_t,
       _eq_uint24_t,           _eq_uint24_t_char,    _eq_uint24_t_char8_t,      _eq_uint24_t_char32_t,
-      _cp_to_uint24_t,        _cp_to_cstr_uint24_t,
+      _cp_to_uint24_t,        _cp_to_u8_uint24_t,
       _cp_from_char_uint24_t, _cp_from_u8_uint24_t, _cp_from_char32_t_uint24_t
     },
     { _get_char_uint32_t,     _put_char_uint32_t,   _hash_uint32_t,            _max_char_size_uint32_t,
       _eq_uint32_t,           _eq_uint32_t_char,    _eq_uint32_t_char8_t,      _eq_uint32_t_char32_t,
-      _cp_to_uint32_t,        _cp_to_cstr_uint32_t,
+      _cp_to_uint32_t,        _cp_to_u8_uint32_t,
       _cp_from_char_uint32_t, _cp_from_u8_uint32_t, _cp_from_char32_t_uint32_t
     }
 };
@@ -1528,7 +1519,7 @@ bool _uw_equal_u32 (UwValuePtr a, char32_t* b) STRING_EQ_IMPL(u32,  char32_t)
     return get_str_methods(astr)->equal_##suffix(get_char_ptr(astr, start_pos), b, end_pos - start_pos);  \
 }
 
-bool _uw_substring_eq_cstr(UwValuePtr a, size_t start_pos, size_t end_pos, char*    b) SUBSTRING_EQ_IMPL(cstr, char)
+bool  uw_substring_eq_cstr(UwValuePtr a, size_t start_pos, size_t end_pos, char*    b) SUBSTRING_EQ_IMPL(cstr, char)
 bool _uw_substring_eq_u8 (UwValuePtr a, size_t start_pos, size_t end_pos, char8_t*  b) SUBSTRING_EQ_IMPL(u8,   char8_t)
 bool _uw_substring_eq_u32(UwValuePtr a, size_t start_pos, size_t end_pos, char32_t* b) SUBSTRING_EQ_IMPL(u32,  char32_t)
 
@@ -1567,7 +1558,7 @@ CStringPtr uw_string_to_cstring(UwValuePtr str)
     if (!result) {
         return nullptr;
     }
-    get_str_methods(s)->copy_to_cstr(get_char_ptr(s, 0), result, length);
+    get_str_methods(s)->copy_to_u8(get_char_ptr(s, 0), result, length);
     return result;
 }
 
@@ -1577,7 +1568,7 @@ void uw_string_copy_buf(UwValuePtr str, char* buffer)
 
     struct _UwString* s = *_uw_get_string_pptr(str);
     size_t length = get_cap_methods(s)->get_length(s);
-    get_str_methods(s)->copy_to_cstr(get_char_ptr(s, 0), buffer, length);
+    get_str_methods(s)->copy_to_u8(get_char_ptr(s, 0), buffer, length);
 }
 
 void uw_delete_cstring(CStringPtr* str)
@@ -2183,7 +2174,7 @@ UwValuePtr _uw_string_join_uw(UwValuePtr separator, UwValuePtr list)
     return uw_move(&result);
 }
 
-void _uw_putchar32_utf8(char32_t codepoint)
+char* uw_char32_to_utf8(char32_t codepoint, char* buffer)
 {
     /*
      * U+0000 - U+007F      0xxxxxxx
@@ -2191,33 +2182,36 @@ void _uw_putchar32_utf8(char32_t codepoint)
      * U+0800 - U+FFFF      1110xxxx  10xxxxxx  10xxxxxx
      * U+010000 - U+10FFFF  11110xxx  10xxxxxx  10xxxxxx  10xxxxxx
      */
-    if (codepoint > 0x10FFFF) {
-        putchar('.');
-        return;
-    }
-    if (codepoint < 32) {
-        putchar('.');
-        return;
-    }
     if (codepoint < 0x80) {
-        putchar((char) codepoint);
-        return;
+        *buffer++ = (char) codepoint;
+        return buffer;
     }
     if (codepoint < 0b1'00000'000000) {
-        putchar((char) 0xC0 | (codepoint >> 6));
-        putchar((char) 0x80 | (codepoint & 0x3F));
-        return;
+        *buffer++ = (char) (0xC0 | (codepoint >> 6));
+        *buffer++ = (char) (0x80 | (codepoint & 0x3F));
+        return buffer;
     }
     if (codepoint < 0b1'0000'000000'000000) {
-        putchar((char) 0xE0 | (codepoint >> 12));
-        putchar((char) 0x80 | ((codepoint >> 6) & 0x3F));
-        putchar((char) 0x80 | (codepoint & 0x3F));
-        return;
+        *buffer++ = (char) (0xE0 | (codepoint >> 12));
+        *buffer++ = (char) (0x80 | ((codepoint >> 6) & 0x3F));
+        *buffer++ = (char) (0x80 | (codepoint & 0x3F));
+        return buffer;
     }
-    putchar((char) 0xF0 | (codepoint >> 18));
-    putchar((char) 0x80 | ((codepoint >> 12) & 0x3F));
-    putchar((char) 0x80 | ((codepoint >> 6) & 0x3F));
-    putchar((char) 0x80 | (codepoint & 0x3F));
+    *buffer++ = (char) (0xF0 | ((codepoint >> 18) & 0x07));
+    *buffer++ = (char) (0x80 | ((codepoint >> 12) & 0x3F));
+    *buffer++ = (char) (0x80 | ((codepoint >> 6) & 0x3F));
+    *buffer++ = (char) (0x80 | (codepoint & 0x3F));
+    return buffer;
+}
+
+void _uw_putchar32_utf8(char32_t codepoint)
+{
+    char buffer[5];
+    char* start = buffer;
+    char* end = uw_char32_to_utf8(codepoint, buffer);
+    while (start < end) {
+        putchar(*start++);
+    }
 }
 
 #ifdef DEBUG

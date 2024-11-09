@@ -799,10 +799,10 @@ void test_string()
         TEST(strcmp(cv3, "hello everybody") == 0);
 
         // test substring
-        TEST(_uw_substring_eq_cstr(v, 4, 7, "o e"));
-        TEST(!_uw_substring_eq_cstr(v, 4, 7, ""));
-        TEST(_uw_substring_eq_cstr(v, 0, 4, "hell"));
-        TEST(_uw_substring_eq_cstr(v, 11, 100, "body"));
+        TEST(uw_substring_eq_cstr(v, 4, 7, "o e"));
+        TEST(!uw_substring_eq_cstr(v, 4, 7, ""));
+        TEST(uw_substring_eq_cstr(v, 0, 4, "hell"));
+        TEST(uw_substring_eq_cstr(v, 11, 100, "body"));
         TEST(uw_substring_eq(v, 4, 7, "o e"));
         TEST(!uw_substring_eq(v, 4, 7, ""));
         TEST(uw_substring_eq(v, 0, 4, "hell"));

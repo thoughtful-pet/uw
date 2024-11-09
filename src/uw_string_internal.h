@@ -109,7 +109,7 @@ typedef bool     (*EqualCStr)(uint8_t* self_ptr, char* other, size_t length);
 typedef bool     (*EqualUtf8)(uint8_t* self_ptr, char8_t* other, size_t length);
 typedef bool     (*EqualUtf32)(uint8_t* self_ptr, char32_t* other, size_t length);
 typedef void     (*CopyTo)(uint8_t* self_ptr, struct _UwString* dest, size_t dest_start_pos, size_t length);
-typedef void     (*CopyToCStr)(uint8_t* self_ptr, char* dest_ptr, size_t length);
+typedef void     (*CopyToUtf8)(uint8_t* self_ptr, char* dest_ptr, size_t length);
 typedef size_t   (*CopyFromCStr)(uint8_t* self_ptr, char* src_ptr, size_t length);
 typedef size_t   (*CopyFromUtf8)(uint8_t* self_ptr, char8_t* src_ptr, size_t length);
 typedef size_t   (*CopyFromUtf32)(uint8_t* self_ptr, char32_t* src_ptr, size_t length);
@@ -124,7 +124,7 @@ typedef struct {
     EqualUtf8     equal_u8;
     EqualUtf32    equal_u32;
     CopyTo        copy_to;
-    CopyToCStr    copy_to_cstr;
+    CopyToUtf8    copy_to_u8;
     CopyFromCStr  copy_from_cstr;
     CopyFromUtf8  copy_from_utf8;
     CopyFromUtf32 copy_from_utf32;
