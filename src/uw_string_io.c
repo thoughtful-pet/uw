@@ -7,9 +7,6 @@
 
 bool _uw_init_stringio(UwValuePtr self)
 {
-    struct _UwStringIO* sio = _uw_get_data_ptr(self, UwTypeId_StringIO, struct _UwStringIO*);
-    sio->line_position = 0;
-    sio->pushback = nullptr;
     return true;
 }
 

@@ -5,7 +5,6 @@
 
 bool _uw_init_int(UwValuePtr self)
 {
-    self->int_value = 0;
     return true;
 }
 

@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "include/uw_base.h"
 #include "include/uw_file.h"
 #include "include/uw_string_io.h"
@@ -20,8 +22,10 @@
 UwValuePtr _uw_alloc_value(UwTypeId type_id)
 {
     UwType* t = _uw_types[type_id];
-    UwValuePtr value = _uw_allocator.alloc(t->data_offset + t->data_size);
+    size_t memsize = t->data_offset + t->data_size;
+    UwValuePtr value = _uw_allocator.alloc(memsize);
     if (value) {
+        memset(value, 0, memsize);
         value->type_id  = type_id;
         value->refcount = 1;
         value->alloc_id = _uw_allocator.id;

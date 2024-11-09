@@ -13,17 +13,10 @@ bool _uw_init_file(UwValuePtr self)
 {
     struct _UwFile* f = _uw_get_data_ptr(self, UwTypeId_File, struct _UwFile*);
     f->fd = -1;
-    f->is_external_fd = false;
-    f->error = 0;
     f->name = uw_create_null();
     if (!f->name) {
         return false;
     }
-
-    // init line reader
-    f->buffer = nullptr;
-    f->pushback = nullptr;
-
     return true;
 }
 

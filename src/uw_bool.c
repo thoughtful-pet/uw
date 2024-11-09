@@ -5,7 +5,6 @@
 
 bool _uw_init_bool(UwValuePtr self)
 {
-    self->bool_value = false;
     return true;
 }
 
