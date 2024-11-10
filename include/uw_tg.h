@@ -155,6 +155,7 @@ bool _uw_string_append_u8_wrapper(UwValuePtr dest, char* src);
 
 #define uw_string_append_char(dest, chr) _Generic((chr), \
                   char: _uw_string_append_char, \
+         unsigned char: _uw_string_append_char, \
               char32_t: _uw_string_append_c32,  \
                    int: _uw_string_append_c32   \
     )((dest), (chr))
