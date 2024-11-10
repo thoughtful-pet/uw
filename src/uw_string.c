@@ -131,7 +131,6 @@ void _uw_dump_string(UwValuePtr self, int indent)
     // dump up to 8 blocks
     _uw_print_indent(indent);
     size_t n = 0;
-    size_t i = 0;
     uint8_t* bptr = (uint8_t*) str;
     while (n++ <= str->block_count) {
         for (int i = 0; i < UWSTRING_BLOCK_SIZE; i++) {
@@ -488,7 +487,7 @@ uint8_t utf8_char_size(char8_t* str, size_t max_len)
 char8_t* utf8_skip(char8_t* str, size_t n)
 {
     while(n--) {
-        char32_t c = read_utf8_char(&str);
+        read_utf8_char(&str);
         if (_unlikely_(*str == 0)) {
             break;
         }
@@ -517,7 +516,7 @@ char8_t* utf8_skip(char8_t* str, size_t n)
     }  \
     static void _set_length_##typename(struct _UwString* str, size_t n)  \
     {  \
-        return set_length_##typename(str, n);  \
+        set_length_##typename(str, n);  \
     }  \
     static inline size_t get_capacity_##typename(struct _UwString* str)  \
     {  \
@@ -535,7 +534,7 @@ char8_t* utf8_skip(char8_t* str, size_t n)
     }  \
     static void _set_capacity_##typename(struct _UwString* str, size_t n)  \
     {  \
-        return set_capacity_##typename(str, n);  \
+        set_capacity_##typename(str, n);  \
     }
 
 CAP_METHODS_IMPL(uint8_t)
@@ -834,7 +833,7 @@ STR_EQ_IMPL(uint32_t)
             if (_unlikely_(c == 0)) {  \
                 return false;  \
             }  \
-            if (_unlikely_(*this_ptr++ != c)) {  \
+            if (_unlikely_(((type_name_other) (*this_ptr++)) != c)) {  \
                 return false;  \
             }  \
         }  \
@@ -854,11 +853,11 @@ STR_EQ_CU32_IMPL(uint32_t, char32_t)
     static bool _eq_uint24_t_##type_name_other(uint8_t* self_ptr, type_name_other* other, size_t length)  \
     {  \
         while (_likely_(length--)) {  \
-            char c = *other++;  \
+            type_name_other c = *other++;  \
             if (_unlikely_(c == 0)) {  \
                 return false;  \
             }  \
-            if (_unlikely_(get_char_uint24_t((uint24_t**) &self_ptr) != c)) {  \
+            if (_unlikely_(((type_name_other) get_char_uint24_t((uint24_t**) &self_ptr)) != c)) {  \
                 return false;  \
             }  \
         }  \
@@ -1368,7 +1367,6 @@ static struct _UwString* expand(UwValuePtr str, size_t increment, uint8_t new_ch
     struct _UwString* s = *_uw_get_string_pptr(str);
 
     CapMethods* capmeth = get_cap_methods(s);
-    StrMethods* strmeth = get_str_methods(s);
 
     size_t length = capmeth->get_length(s);
     size_t capacity = capmeth->get_capacity(s);
@@ -1726,7 +1724,6 @@ bool _uw_string_append_u32(UwValuePtr dest, char32_t* src)
 
 bool _uw_string_append_substring_u32(UwValuePtr dest, char32_t*  src, size_t src_start_pos, size_t src_end_pos)
 {
-    uint8_t src_char_size;
     size_t src_len = u32_strlen(src);  // have to find src_len for bounds checking
     if (src_end_pos > src_len) {
         src_end_pos = src_len;

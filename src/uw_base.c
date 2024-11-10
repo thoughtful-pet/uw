@@ -158,7 +158,7 @@ void _uw_dump(UwValuePtr value, int indent)
     }
     UwMethodDump fn_dump = _uw_types[value->type_id]->dump;
     uw_assert(fn_dump != nullptr);
-    return fn_dump(value, 0);
+    fn_dump(value, 0);
 }
 
 void uw_dump(UwValuePtr value)

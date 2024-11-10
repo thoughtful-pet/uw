@@ -15,7 +15,7 @@ void _uw_hash_float(UwValuePtr self, UwHashContext* ctx)
 
     uint64_t v = 0;
     uint8_t* p = (uint8_t*) &self->float_value;
-    for (int i = 0; i < sizeof(UwType_Float); i++) {
+    for (size_t i = 0; i < sizeof(UwType_Float); i++) {
         v <<= 8;
         v += *p++;
     }

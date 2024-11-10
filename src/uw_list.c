@@ -320,9 +320,13 @@ bool uw_list_append_ap(UwValuePtr list, va_list ap)
 
 error:
     while (num_appended--) {
-        {
-            UwValue v = uw_list_pop(list);
-        }
+        // when -Wall enabled, compiler complains, but nothing is wrong here
+        // {
+        //     UwValue v = uw_list_pop(list);
+        // }
+        // anyway, have to call destructor manually
+        UwValuePtr v = uw_list_pop(list);
+        uw_delete(&v);
     }
     return false;
 }
@@ -337,7 +341,7 @@ UwValuePtr uw_list_item(UwValuePtr self, ssize_t index)
         index = list->length + index;
         uw_assert(index >= 0);
     } else {
-        uw_assert(index < list->length);
+        uw_assert(((size_t) index) < list->length);
     }
     return  uw_makeref(list->items[index]);
 }

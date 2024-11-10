@@ -4,6 +4,8 @@ set(CMAKE_C_COMPILER clang-16)
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+add_compile_options(-Wall -Wextra -pedantic -Werror -Wno-gnu -Wno-unused-parameter -Wno-format-pedantic)
+
 find_package(ICU COMPONENTS uc REQUIRED)
 
 add_library(uw STATIC

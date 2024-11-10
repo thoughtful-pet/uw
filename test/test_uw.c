@@ -47,7 +47,7 @@ void test_integral_types()
     // Int values
     UwValue int_0 = uw_create(0);
     UwValue int_1 = uw_create(1);
-    UwValue int_1_1 = uw_create(1);
+    //UwValue int_1_1 = uw_create(1);
     UwValue int_neg1 = uw_create(-1);
     TEST(uw_is_int(int_0));
     TEST(uw_is_int(int_1));
@@ -1178,7 +1178,7 @@ void test_list()
             TEST(item->refcount == 2);
         }
 
-        TEST(uw_list_length(list) == i + 1);
+        TEST(uw_list_length(list) == (size_t)(i + 1));
 
         {
             UwValue v = uw_list_item(list, i);
@@ -1275,6 +1275,7 @@ void test_map()
             uwc_charptr,  "finally",     uwc_value_ptr, uw_create_map_va(uwc_charptr, "ok", uwc_charptr, "done", -1),
             -1
         );
+        (void) map;
 //        uw_dump(map);
     }
 }

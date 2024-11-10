@@ -72,21 +72,21 @@ bool _uw_int_equal_ctype(UwValuePtr self, UwCType ctype, ...)
     switch (ctype) {
         case uwc_bool:      { bool a = va_arg(ap, int /*bool*/), b = self->int_value; result = a == b; break; }
 
-        case uwc_char:      result = self->int_value ==           (char) va_arg(ap,          int); break;
-        case uwc_uchar:     result = self->int_value ==  (unsigned char) va_arg(ap, unsigned int); break;
-        case uwc_short:     result = self->int_value ==          (short) va_arg(ap,          int); break;
-        case uwc_ushort:    result = self->int_value == (unsigned short) va_arg(ap, unsigned int); break;
+        case uwc_char:      result = self->int_value == (UwType_Int)           (char) va_arg(ap,          int); break;
+        case uwc_uchar:     result = self->int_value == (UwType_Int)  (unsigned char) va_arg(ap, unsigned int); break;
+        case uwc_short:     result = self->int_value == (UwType_Int)          (short) va_arg(ap,          int); break;
+        case uwc_ushort:    result = self->int_value == (UwType_Int) (unsigned short) va_arg(ap, unsigned int); break;
 
-        case uwc_int:       result = self->int_value == va_arg(ap,                int); break;
-        case uwc_uint:      result = self->int_value == va_arg(ap,       unsigned int); break;
-        case uwc_long:      result = self->int_value == va_arg(ap,               long); break;
-        case uwc_ulong:     result = self->int_value == va_arg(ap,      unsigned long); break;
-        case uwc_longlong:  result = self->int_value == va_arg(ap,          long long); break;
-        case uwc_ulonglong: result = self->int_value == va_arg(ap, unsigned long long); break;  // XXX can't handle all unsigned range
-        case uwc_int32:     result = self->int_value == va_arg(ap,            int32_t); break;
-        case uwc_uint32:    result = self->int_value == va_arg(ap,           uint32_t); break;
-        case uwc_int64:     result = self->int_value == va_arg(ap,            int64_t); break;
-        case uwc_uint64:    result = self->int_value == va_arg(ap,           uint64_t); break;  // XXX can't handle all unsigned range
+        case uwc_int:       result = self->int_value == (UwType_Int) va_arg(ap,                int); break;
+        case uwc_uint:      result = self->int_value == (UwType_Int) va_arg(ap,       unsigned int); break;
+        case uwc_long:      result = self->int_value == (UwType_Int) va_arg(ap,               long); break;
+        case uwc_ulong:     result = self->int_value == (UwType_Int) va_arg(ap,      unsigned long); break;
+        case uwc_longlong:  result = self->int_value == (UwType_Int) va_arg(ap,          long long); break;
+        case uwc_ulonglong: result = self->int_value == (UwType_Int) va_arg(ap, unsigned long long); break;  // XXX can't handle all unsigned range
+        case uwc_int32:     result = self->int_value == (UwType_Int) va_arg(ap,            int32_t); break;
+        case uwc_uint32:    result = self->int_value == (UwType_Int) va_arg(ap,           uint32_t); break;
+        case uwc_int64:     result = self->int_value == (UwType_Int) va_arg(ap,            int64_t); break;
+        case uwc_uint64:    result = self->int_value == (UwType_Int) va_arg(ap,           uint64_t); break;  // XXX can't handle all unsigned range
 
         case uwc_float:     result = self->int_value == (UwType_Int) va_arg(ap, double /*float*/); break;
         case uwc_double:    result = self->int_value == (UwType_Int) va_arg(ap, double); break;

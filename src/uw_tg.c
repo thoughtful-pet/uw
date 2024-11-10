@@ -15,14 +15,6 @@ char* _uw_get_type_name_from_value(UwValuePtr value)
     return _uw_get_type_name_by_id(value->type_id);
 }
 
-static inline bool _uw_call_is_true(UwValuePtr value)
-{
-    UwTypeId type_id = value->type_id;
-    UwMethodIsTrue fn = _uw_types[type_id]->is_true;
-    uw_assert(fn != nullptr);
-    return fn(value);
-}
-
 #define _uw_call_equal_ctype(value, ...)  \
     ({  \
         UwTypeId type_id = (value)->type_id;  \
