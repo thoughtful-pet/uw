@@ -33,7 +33,7 @@ bool       _uw_init_file          (UwValuePtr self);
 void       _uw_fini_file          (UwValuePtr self);
 void       _uw_hash_file          (UwValuePtr self, UwHashContext* ctx);
 UwValuePtr _uw_copy_file          (UwValuePtr self);
-void       _uw_dump_file          (UwValuePtr self, int indent);
+void       _uw_dump_file          (UwValuePtr self, int indent, struct _UwValueChain* prev_compound);
 UwValuePtr _uw_file_to_string     (UwValuePtr self);
 bool       _uw_file_is_true       (UwValuePtr self);
 bool       _uw_file_equal_sametype(UwValuePtr self, UwValuePtr other);
@@ -44,10 +44,11 @@ bool       _uw_file_equal_ctype   (UwValuePtr self, UwCType ctype, ...);
  * File interface methods
  */
 
-bool _uw_file_open    (UwValuePtr self, UwValuePtr file_name, int flags, mode_t mode);
-void _uw_file_close   (UwValuePtr self);
-bool _uw_file_set_fd  (UwValuePtr self, int fd);
-bool _uw_file_set_name(UwValuePtr self, UwValuePtr file_name);
+bool       _uw_file_open    (UwValuePtr self, UwValuePtr file_name, int flags, mode_t mode);
+void       _uw_file_close   (UwValuePtr self);
+bool       _uw_file_set_fd  (UwValuePtr self, int fd);
+UwValuePtr _uw_file_get_name(UwValuePtr self);
+bool       _uw_file_set_name(UwValuePtr self, UwValuePtr file_name);
 
 /****************************************************************
  * FileReader interface methods

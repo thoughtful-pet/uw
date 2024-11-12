@@ -435,6 +435,7 @@ static UwInterface_File file_type_file_interface = {
     .open     = _uw_file_open,
     .close    = _uw_file_close,
     .set_fd   = _uw_file_set_fd,
+    .get_name = _uw_file_get_name,
     .set_name = _uw_file_set_name
 };
 

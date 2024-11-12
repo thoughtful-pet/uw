@@ -45,7 +45,7 @@ UwValuePtr _uw_copy_file(UwValuePtr self)
     return nullptr;
 }
 
-void _uw_dump_file(UwValuePtr self, int indent)
+void _uw_dump_file(UwValuePtr self, int indent, struct _UwValueChain* prev_compound)
 {
     struct _UwFile* f = _uw_get_data_ptr(self, UwTypeId_File, struct _UwFile*);
 
@@ -157,6 +157,17 @@ bool _uw_file_set_fd(UwValuePtr self, int fd)
     f->fd = fd;
     f->is_external_fd = true;
     return true;
+}
+
+UwValuePtr _uw_file_get_name(UwValuePtr self)
+{
+    struct _UwFile* f = _uw_get_data_ptr(self, UwTypeId_File, struct _UwFile*);
+
+    if (f->name) {
+        return uw_copy(f->name);
+    } else {
+        return nullptr;
+    }
 }
 
 bool _uw_file_set_name(UwValuePtr self, UwValuePtr file_name)
@@ -427,6 +438,15 @@ bool uw_file_set_fd(UwValuePtr file, int fd)
         return false;
     }
     return iface->set_fd(file, fd);
+}
+
+UwValuePtr uw_file_get_name(UwValuePtr file)
+{
+    UwInterface_File* iface = uw_get_interface(file, File);
+    if (!iface) {
+        return nullptr;
+    }
+    return iface->get_name(file);
 }
 
 bool uw_file_set_name(UwValuePtr file, UwValuePtr file_name)
