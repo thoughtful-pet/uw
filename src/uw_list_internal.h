@@ -23,7 +23,7 @@ struct _UwList {
 #define _uw_get_list_ptr(value)  \
     (  \
         (struct _UwList*) (  \
-            ((uint8_t*) (value)) + sizeof(_UwValueBase) \
+            ((uint8_t*) (value)) + sizeof(struct _UwValue) \
         )  \
     )
 
@@ -33,9 +33,10 @@ struct _UwList {
 
 bool       _uw_init_list          (UwValuePtr self);
 void       _uw_fini_list          (UwValuePtr self);
+void       _uw_list_unbrace       (UwValuePtr self);
 void       _uw_hash_list          (UwValuePtr self, UwHashContext* ctx);
 UwValuePtr _uw_copy_list          (UwValuePtr self);
-void       _uw_dump_list          (UwValuePtr self, int indent);
+void       _uw_dump_list          (UwValuePtr self, int indent, struct _UwValueChain* prev_compound);
 UwValuePtr _uw_list_to_string     (UwValuePtr self);
 bool       _uw_list_is_true       (UwValuePtr self);
 bool       _uw_list_equal_sametype(UwValuePtr self, UwValuePtr other);

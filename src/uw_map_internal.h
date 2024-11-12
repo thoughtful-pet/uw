@@ -36,7 +36,7 @@ struct _UwMap {
 #define _uw_get_map_ptr(value)  \
     (  \
         (struct _UwMap*) (  \
-            ((uint8_t*) (value)) + sizeof(_UwValueBase) \
+            ((uint8_t*) (value)) + sizeof(struct _UwValue) \
         )  \
     )
 
@@ -46,9 +46,10 @@ struct _UwMap {
 
 bool       _uw_init_map          (UwValuePtr self);
 void       _uw_fini_map          (UwValuePtr self);
+void       _uw_map_unbrace       (UwValuePtr self);
 void       _uw_hash_map          (UwValuePtr self, UwHashContext* ctx);
 UwValuePtr _uw_copy_map          (UwValuePtr self);
-void       _uw_dump_map          (UwValuePtr self, int indent);
+void       _uw_dump_map          (UwValuePtr self, int indent, struct _UwValueChain* prev_compound);
 UwValuePtr _uw_map_to_string     (UwValuePtr self);
 bool       _uw_map_is_true       (UwValuePtr self);
 bool       _uw_map_equal_sametype(UwValuePtr self, UwValuePtr other);

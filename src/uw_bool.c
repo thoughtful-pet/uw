@@ -23,7 +23,7 @@ UwValuePtr _uw_copy_bool(UwValuePtr self)
     return value;
 }
 
-void _uw_dump_bool(UwValuePtr self, int indent)
+void _uw_dump_bool(UwValuePtr self, int indent, struct _UwValueChain* prev_compound)
 {
     _uw_dump_start(self, indent);
     printf("%s\n", self->bool_value? "true" : "false");

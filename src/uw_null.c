@@ -18,7 +18,7 @@ UwValuePtr _uw_copy_null(UwValuePtr self)
     return uw_create_null();
 }
 
-void _uw_dump_null(UwValuePtr self, int indent)
+void _uw_dump_null(UwValuePtr self, int indent, struct _UwValueChain* prev_compound)
 {
     _uw_dump_start(self, indent);
     putchar('\n');

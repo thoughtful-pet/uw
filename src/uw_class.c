@@ -22,7 +22,7 @@ UwValuePtr _uw_copy_class(UwValuePtr self)
     return nullptr;
 }
 
-void _uw_dump_class(UwValuePtr self, int indent)
+void _uw_dump_class(UwValuePtr self, int indent, struct _UwValueChain* prev_compound)
 {
     _uw_dump_start(self, indent);
     putchar('\n');

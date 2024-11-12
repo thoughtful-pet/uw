@@ -9,7 +9,7 @@ extern "C" {
 bool       _uw_init_null          (UwValuePtr self);
 void       _uw_hash_null          (UwValuePtr self, UwHashContext* ctx);
 UwValuePtr _uw_copy_null          (UwValuePtr self);
-void       _uw_dump_null          (UwValuePtr self, int indent);
+void       _uw_dump_null          (UwValuePtr self, int indent, struct _UwValueChain* prev_compound);
 UwValuePtr _uw_null_to_string     (UwValuePtr self);
 bool       _uw_null_is_true       (UwValuePtr self);
 bool       _uw_null_equal_sametype(UwValuePtr self, UwValuePtr other);

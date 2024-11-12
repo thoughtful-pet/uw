@@ -28,7 +28,6 @@ UwValuePtr _uw_alloc_value(UwTypeId type_id)
         memset(value, 0, memsize);
         value->type_id  = type_id;
         value->refcount = 1;
-        value->compound = (t->unbrace)? 1 : 0;
         value->alloc_id = _uw_allocator.id;
     }
     return value;
@@ -77,76 +76,38 @@ UwValuePtr _uw_create(UwTypeId type_id)
     return nullptr;
 }
 
-void _uw_destroy(UwValuePtr value)
+void uw_delete(UwValuePtr* value)
 {
-    // finalize value: go down the inheritance chain and call `fini` method
-    UwType* type = _uw_types[value->type_id];
-    for (;;) {
-        uw_assert(type != nullptr);
-        type->fini(value);
-        if (type->ancestor_id == UwTypeId_Null) {
-            break;
-        }
-        type = _uw_types[type->ancestor_id];
-    }
-
-    // free value
-    _uw_free_value(value);
-}
-
-void uw_delete(UwValuePtr* value_ref)
-{
-    if (!value_ref) {
+    if (!value) {
         return;
     }
 
-    UwValuePtr v = *value_ref;
+    UwValuePtr v = *value;
     if (!v) {
         return;
     }
 
     uw_assert(v->refcount);
-
     if (0 == --v->refcount) {
 
-        if (v->compound && v->embrace_count) {
-
-            // call unbrace method
-            _uw_types[v->type_id]->unbrace(v);
-
-        } else {
-            // destroy value
-            _uw_destroy(v);
+        // finalize value
+        // go down inheritance chain and call `fini` method
+        UwType* type = _uw_types[v->type_id];
+        for (;;) {
+            uw_assert(type != nullptr);
+            type->fini(v);
+            if (type->ancestor_id == UwTypeId_Null) {
+                break;
+            }
+            type = _uw_types[type->ancestor_id];
         }
+
+        // free value
+        _uw_free_value(v);
     }
-    *value_ref = nullptr;
+    *value = nullptr;
 }
 
-bool _uw_unbrace(UwValuePtr* value_ref)
-{
-    if (!value_ref) {
-        return false;
-    }
-    UwValuePtr v = *value_ref;
-    if (!v) {
-        return false;
-    }
-    if (!v->compound) {
-        return false;
-    }
-    if (!v->embrace_count)
-    {
-        return false;
-    }
-    if (--v->embrace_count) {
-        return false;
-    }
-    if (!v->refcount) {
-        _uw_destroy(v);
-    }
-    *value_ref = nullptr;
-    return true;
-}
 
 UwType_Hash uw_hash(UwValuePtr value)
 {
@@ -154,16 +115,6 @@ UwType_Hash uw_hash(UwValuePtr value)
     _uw_hash_init(&ctx);
     _uw_call_hash(value, &ctx);
     return _uw_hash_finish(&ctx);
-}
-
-bool _uw_compound_value_seen(UwValuePtr value, struct _UwValueChain* prev_compound)
-{
-    for (struct _UwValueChain* prevc = prev_compound; prevc; prevc = prevc->prev) {
-        if (value == prevc->value) {
-            return true;
-        }
-    }
-    return false;
 }
 
 static void _uw_fini_integral(UwValuePtr self)
@@ -189,9 +140,6 @@ void _uw_dump_start(UwValuePtr value, int indent)
         printf(" %s (type id: %d)", type_name,value->type_id);
     }
     printf(" refcount=%zu; ", value->refcount);
-    if (value->compound) {
-        printf("compound; embrace_count=%zu; ", value->embrace_count);
-    }
 }
 
 void _uw_print_indent(int indent)
@@ -201,7 +149,7 @@ void _uw_print_indent(int indent)
     }
 }
 
-void _uw_dump(UwValuePtr value, int indent, struct _UwValueChain* prev_compound)
+void _uw_dump(UwValuePtr value, int indent)
 {
     if (value == nullptr) {
         _uw_print_indent(indent);
@@ -210,12 +158,12 @@ void _uw_dump(UwValuePtr value, int indent, struct _UwValueChain* prev_compound)
     }
     UwMethodDump fn_dump = _uw_types[value->type_id]->dump;
     uw_assert(fn_dump != nullptr);
-    fn_dump(value, 0, prev_compound);
+    fn_dump(value, 0);
 }
 
 void uw_dump(UwValuePtr value)
 {
-    _uw_dump(value, 0, nullptr);
+    _uw_dump(value, 0);
 }
 
 /****************************************************************
@@ -313,7 +261,6 @@ static UwType null_type = {
     .data_offset    = sizeof(_UwValueBase),
     .init           = _uw_init_null,
     .fini           = _uw_fini_integral,
-    .unbrace        = nullptr,
     .hash           = _uw_hash_null,
     .copy           = _uw_copy_null,
     .dump           = _uw_dump_null,
@@ -334,7 +281,6 @@ static UwType bool_type = {
     .data_offset    = sizeof(_UwValueBase),
     .init           = _uw_init_bool,
     .fini           = _uw_fini_integral,
-    .unbrace        = nullptr,
     .hash           = _uw_hash_bool,
     .copy           = _uw_copy_bool,
     .dump           = _uw_dump_bool,
@@ -357,7 +303,6 @@ static UwType int_type = {
     .data_offset    = sizeof(_UwValueBase),
     .init           = _uw_init_int,
     .fini           = _uw_fini_integral,
-    .unbrace        = nullptr,
     .hash           = _uw_hash_int,
     .copy           = _uw_copy_int,
     .dump           = _uw_dump_int,
@@ -383,7 +328,6 @@ static UwType float_type = {
     .data_offset    = sizeof(_UwValueBase),
     .init           = _uw_init_float,
     .fini           = _uw_fini_integral,
-    .unbrace        = nullptr,
     .hash           = _uw_hash_float,
     .copy           = _uw_copy_float,
     .dump           = _uw_dump_float,
@@ -408,7 +352,6 @@ static UwType string_type = {
     .data_offset    = sizeof(_UwValueBase),
     .init           = _uw_init_string,
     .fini           = _uw_fini_string,
-    .unbrace        = nullptr,
     .hash           = _uw_hash_string,
     .copy           = _uw_copy_string,
     .dump           = _uw_dump_string,
@@ -428,10 +371,9 @@ static UwType list_type = {
     .ancestor_id    = UwTypeId_Null,  // no ancestor
     .name           = "List",
     .data_size      = sizeof(struct _UwList),
-    .data_offset    = sizeof(struct _UwValue),  // include embrace_count
+    .data_offset    = sizeof(_UwValueBase),
     .init           = _uw_init_list,
     .fini           = _uw_fini_list,
-    .unbrace        = _uw_list_unbrace,
     .hash           = _uw_hash_list,
     .copy           = _uw_copy_list,
     .dump           = _uw_dump_list,
@@ -452,10 +394,9 @@ static UwType map_type = {
     .ancestor_id    = UwTypeId_Null,  // no ancestor
     .name           = "Map",
     .data_size      = sizeof(struct _UwMap),
-    .data_offset    = sizeof(struct _UwValue),  // include embrace_count
+    .data_offset    = sizeof(_UwValueBase),
     .init           = _uw_init_map,
     .fini           = _uw_fini_map,
-    .unbrace        = _uw_map_unbrace,
     .hash           = _uw_hash_map,
     .copy           = _uw_copy_map,
     .dump           = _uw_dump_map,
@@ -478,7 +419,6 @@ static UwType class_type = {
     .data_offset    = sizeof(_UwValueBase),
     .init           = _uw_init_class,
     .fini           = _uw_fini_integral,
-    .unbrace        = nullptr,
     .hash           = _uw_hash_class,
     .copy           = _uw_copy_class,
     .dump           = _uw_dump_class,
@@ -523,7 +463,6 @@ static UwType file_type = {
     .data_offset    = sizeof(_UwValueBase),
     .init           = _uw_init_file,
     .fini           = _uw_fini_file,
-    .unbrace        = nullptr,
     .hash           = _uw_hash_file,
     .copy           = _uw_copy_file,
     .dump           = _uw_dump_file,
@@ -557,7 +496,6 @@ static UwType stringio_type = {
     .data_offset    = sizeof(_UwValueBase) + sizeof(struct _UwString*),
     .init           = _uw_init_stringio,
     .fini           = _uw_fini_stringio,
-    .unbrace        = nullptr,
     .hash           = _uw_hash_string,
     .copy           = _uw_copy_stringio,
     .dump           = _uw_dump_string,

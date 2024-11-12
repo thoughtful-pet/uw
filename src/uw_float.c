@@ -31,7 +31,7 @@ UwValuePtr _uw_copy_float(UwValuePtr self)
     return value;
 }
 
-void _uw_dump_float(UwValuePtr self, int indent)
+void _uw_dump_float(UwValuePtr self, int indent, struct _UwValueChain* prev_compound)
 {
     _uw_dump_start(self, indent);
     printf("%f\n", self->float_value);

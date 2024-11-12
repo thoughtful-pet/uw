@@ -18,6 +18,16 @@ void _uw_fini_list(UwValuePtr self)
     _uw_delete_list(self->alloc_id, _uw_get_list_ptr(self));
 }
 
+void _uw_list_unbrace(UwValuePtr self)
+{
+    struct _UwList* list = _uw_get_list_ptr(self);
+    size_t n = list->length;
+    UwValuePtr* item_ref = list->items;
+    while (n--) {
+        _uw_unbrace(item_ref++);
+    }
+}
+
 void _uw_hash_list(UwValuePtr self, UwHashContext* ctx)
 {
     _uw_hash_uint64(ctx, self->type_id);
@@ -56,16 +66,44 @@ error:
     return nullptr;
 }
 
-void _uw_dump_list(UwValuePtr self, int indent)
+void _uw_dump_list(UwValuePtr self, int indent, struct _UwValueChain* prev_compound)
 {
     _uw_dump_start(self, indent);
+
+    if (_uw_compound_value_seen(self, prev_compound))
+    {
+        printf(" already dumped: this");
+        for (struct _UwValueChain* prevc = prev_compound; prevc; prevc = prevc->prev) {
+            if (self == prevc->value) {
+                printf("->this\n");
+                return;
+            }
+            printf("->%p", prevc->value);
+        }
+        printf("->NULL\n");
+        uw_assert(false);
+        return;
+    }
 
     struct _UwList* list = _uw_get_list_ptr(self);
     printf("%zu items, capacity=%zu\n", list->length, list->capacity);
 
     indent += 4;
     for (size_t i = 0; i < list->length; i++) {
-        _uw_call_dump(list->items[i], indent);
+
+        UwValuePtr item = list->items[i];
+        struct _UwValueChain* prevc;
+        struct _UwValueChain this_compound;
+
+        if (item->compound) {
+            prevc = &this_compound;
+            this_compound.prev = prev_compound;
+            this_compound.value = self;
+        } else {
+            prevc = prev_compound;
+        }
+
+        _uw_call_dump(item, indent, prevc);
     }
 }
 
@@ -135,7 +173,14 @@ void _uw_delete_list(UwAllocId alloc_id, struct _UwList* list)
 {
     if (list->items) {
         for (size_t i = 0; i < list->length; i++) {
-            uw_delete(&list->items[i]);
+            UwValuePtr item = list->items[i];
+            if (item) {  // can be already destroyed by unbrace
+                if (item->compound) {
+                    _uw_unbrace(&item);
+                } else {
+                    uw_delete(&item);
+                }
+            }
         }
         _uw_allocators[alloc_id].free(list->items);
         list->items = nullptr;
@@ -252,17 +297,25 @@ bool _uw_list_append_u32(UwValuePtr list, char32_t* item)
 bool _uw_list_append_uw(UwValuePtr list, UwValuePtr item)
 {
     uw_assert_list(list);
-    uw_assert(list != item);
 
     // use separate variable for proper cleaning on error
-    UwValuePtr item_ref = uw_makeref(item);
+    UwValuePtr item_ref = nullptr;
+    if (item->compound) {
+        item_ref = _uw_embrace(item);
+    } else {
+        item_ref = uw_makeref(item);
+    }
 
     if (_uw_list_append(list->alloc_id, _uw_get_list_ptr(list), item_ref)) {
         // item is on the list, return leaving refcount intact
         return true;
     }
     // append failed, decrement refcount
-    uw_delete(&item_ref);
+    if (item_ref->compound) {
+        _uw_unbrace(&item_ref);
+    } else {
+        uw_delete(&item_ref);
+    }
     return false;
 }
 
@@ -305,16 +358,25 @@ bool uw_list_append_ap(UwValuePtr list, va_list ap)
         if (ctype == -1) {
             break;
         }
-        {   // nested scope for autocleaning
-            UwValue item = uw_create_from_ctype(ctype, ap);
-            if (!item) {
-                goto error;
-            }
-            if (!_uw_list_append(alloc_id, _uw_get_list_ptr(list), uw_makeref(item))) {
-                goto error;
-            }
-            num_appended++;
+        UwValuePtr item = uw_create_from_ctype(ctype, ap);
+        if (!item) {
+            goto error;
         }
+        if (item->compound) {
+            _uw_embrace(item);
+            item->refcount--;
+        } else {
+            uw_makeref(item);
+        }
+        if (!_uw_list_append(alloc_id, _uw_get_list_ptr(list), item)) {
+            if (item->compound) {
+                _uw_unbrace(&item);
+            } else {
+                uw_delete(&item);
+            }
+            goto error;
+        }
+        num_appended++;
     }
     return true;
 
@@ -358,6 +420,10 @@ UwValuePtr uw_list_pop(UwValuePtr self)
         UwValuePtr* item_ptr = &list->items[list->length];
         UwValuePtr item = *item_ptr;
         *item_ptr = nullptr;
+        if (item->compound) {
+            uw_makeref(item);
+            _uw_unbrace(&item);
+        }
         return item;
     }
 }
@@ -421,7 +487,13 @@ UwValuePtr uw_list_slice(UwValuePtr self, size_t start_index, size_t end_index)
     UwValuePtr* src_item_ptr = &list->items[start_index];
     UwValuePtr* dest_item_ptr = result_list->items;
     for (size_t i = start_index; i < end_index; i++) {
-        *dest_item_ptr++ = uw_makeref(*src_item_ptr++);
+        UwValuePtr item = *src_item_ptr++;
+        if (item->compound) {
+            _uw_embrace(item);
+        } else {
+            uw_makeref(item);
+        }
+        *dest_item_ptr++ = item;
     }
     result_list->length = slice_len;
     return result;

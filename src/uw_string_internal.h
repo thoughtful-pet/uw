@@ -38,7 +38,7 @@ bool       _uw_init_string          (UwValuePtr self);
 void       _uw_fini_string          (UwValuePtr self);
 void       _uw_hash_string          (UwValuePtr self, UwHashContext* ctx);
 UwValuePtr _uw_copy_string          (UwValuePtr self);
-void       _uw_dump_string          (UwValuePtr self, int indent);
+void       _uw_dump_string          (UwValuePtr self, int indent, struct _UwValueChain* prev_compound);
 bool       _uw_string_is_true       (UwValuePtr self);
 bool       _uw_string_equal_sametype(UwValuePtr self, UwValuePtr other);
 bool       _uw_string_equal         (UwValuePtr self, UwValuePtr other);

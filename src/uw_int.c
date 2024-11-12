@@ -23,7 +23,7 @@ UwValuePtr _uw_copy_int(UwValuePtr self)
     return value;
 }
 
-void _uw_dump_int(UwValuePtr self, int indent)
+void _uw_dump_int(UwValuePtr self, int indent, struct _UwValueChain* prev_compound)
 {
     _uw_dump_start(self, indent);
     printf("%lld\n", (long long) self->int_value);

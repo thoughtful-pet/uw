@@ -114,7 +114,7 @@ UwValuePtr _uw_copy_string(UwValuePtr self)
     return result;
 }
 
-void _uw_dump_string(UwValuePtr self, int indent)
+void _uw_dump_string(UwValuePtr self, int indent, struct _UwValueChain* prev_compound)
 {
     _uw_dump_start(self, indent);
 

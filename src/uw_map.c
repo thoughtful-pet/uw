@@ -336,6 +336,19 @@ void _uw_fini_map(UwValuePtr self)
     delete_map(self->alloc_id, _uw_get_map_ptr(self));
 }
 
+void _uw_map_unbrace(UwValuePtr self)
+{
+    // unbrace values only
+    // XXX when value is destroyed, do we neeed to re-create hash table?
+    struct _UwMap* map = _uw_get_map_ptr(self);
+    size_t n = map->kv_pairs.length / 2;
+    UwValuePtr* item_ref = map->kv_pairs.items + 1;
+    while (n--) {
+        _uw_unbrace(item_ref);
+        item_ref += 2;
+    }
+}
+
 void _uw_hash_map(UwValuePtr self, UwHashContext* ctx)
 {
     _uw_hash_uint64(ctx, self->type_id);
@@ -375,6 +388,10 @@ UwValuePtr _uw_copy_map(UwValuePtr self)
         UwValuePtr key = uw_copy(map->kv_pairs.items[i++]);
         UwValuePtr value = uw_copy(map->kv_pairs.items[i++]);
         if (key && value) {
+            if (value->compound) {
+                _uw_embrace(value);
+                value->refcount--;
+            }
             if (update_map(result, key, value)) {
                 // key-value are successfully added to the map and should not be destroyed
                 continue;
@@ -382,29 +399,58 @@ UwValuePtr _uw_copy_map(UwValuePtr self)
         }
         // uh oh
         uw_delete(&key);
-        uw_delete(&value);
+        _uw_unbrace(&value);
         uw_delete(&result);
         return nullptr;
     }
     return result;
 }
 
-void _uw_dump_map(UwValuePtr self, int indent)
+void _uw_dump_map(UwValuePtr self, int indent, struct _UwValueChain* prev_compound)
 {
     _uw_dump_start(self, indent);
+
+    if (_uw_compound_value_seen(self, prev_compound))
+    {
+        puts(" already dumped, see above");
+        return;
+    }
 
     struct _UwMap* map = _uw_get_map_ptr(self);
     printf("%zu items, capacity=%zu\n", map->kv_pairs.length >> 1, map->kv_pairs.capacity >> 1);
 
     indent += 4;
     for (size_t i = 0; i < map->kv_pairs.length; i++) {
+
+        struct _UwValueChain* prevc;
+        struct _UwValueChain this_compound;
+
         _uw_print_indent(indent);
         printf("Key:\n");
-        _uw_call_dump(map->kv_pairs.items[i], indent);
+        UwValuePtr key = map->kv_pairs.items[i];
+
+        if (key->compound) {
+            prevc = &this_compound;
+            this_compound.prev = prev_compound;
+            this_compound.value = self;
+        } else {
+            prevc = prev_compound;
+        }
+        _uw_call_dump(key, indent, prevc);
         i++;
+
         _uw_print_indent(indent);
         printf("Value:\n");
-        _uw_call_dump(map->kv_pairs.items[i], indent);
+        UwValuePtr value = map->kv_pairs.items[i];
+
+        if (value->compound) {
+            prevc = &this_compound;
+            this_compound.prev = prev_compound;
+            this_compound.value = self;
+        } else {
+            prevc = prev_compound;
+        }
+        _uw_call_dump(value, indent, prevc);
     }
 
     _uw_print_indent(indent);
@@ -507,15 +553,24 @@ bool uw_map_update(UwValuePtr map, UwValuePtr key, UwValuePtr value)
 
     // use separate variables for proper cleaning on error
     UwValuePtr key_ref   = uw_copy(key);      // copy key for immutability
-    UwValuePtr value_ref = uw_makeref(value);
+    UwValuePtr value_ref = nullptr;
+    if (value->compound) {
+        value_ref = _uw_embrace(value);
+    } else {
+        value_ref = uw_makeref(value);
+    }
 
     if (update_map(map, key_ref, value_ref)) {
         // key-value references are successfully added to the map
         return true;
     }
-    // update failed, decrement refcount
+    // update failed
     uw_delete(&key_ref);
-    uw_delete(&value_ref);
+    if (value_ref->compound) {
+        _uw_unbrace(&value_ref);
+    } else {
+        uw_delete(&value_ref);
+    }
     return false;
 }
 
@@ -544,7 +599,12 @@ bool uw_map_update_ap(UwValuePtr map, va_list ap)
             if (!value) {
                 return false;
             }
+            if (value->compound) {
+                _uw_embrace(value);
+                value->refcount--;
+            }
             if (!update_map(map, key, value)) {
+                _uw_unbrace(&value);
                 return false;
             }
             // key-value are added to the map, prevent autocleaning
