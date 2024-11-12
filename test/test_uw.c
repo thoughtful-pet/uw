@@ -23,6 +23,42 @@ bool print_ok = false;
         num_tests++;  \
     } while (false)
 
+#define TEST_ALLOCATOR_ID  3
+
+unsigned num_allocated = 0;
+
+static void* test_alloc(size_t nbytes)
+{
+    void* result = malloc(nbytes);
+//    printf("alloc %zu bytes -> %p\n", nbytes, result);
+    num_allocated++;
+    return result;
+}
+
+static void* test_realloc(void* block, size_t nbytes)
+{
+    void* result = realloc(block, nbytes);
+    if (!block) {
+        num_allocated++;
+    }
+//    printf("realloc %p %zu bytes -> %p\n", block, nbytes, result);
+    return result;
+}
+
+static void test_free(void* block)
+{
+    free(block);
+//    printf("free %p\n", block);
+    num_allocated--;
+}
+
+static UwAllocator test_allocator = {
+    .id      = TEST_ALLOCATOR_ID,
+    .alloc   = test_alloc,
+    .realloc = test_realloc,
+    .free    = test_free
+};
+
 void test_integral_types()
 {
     // generics test
@@ -210,14 +246,14 @@ void test_integral_types()
     //TEST(uw_compare(bool_true, int_0) == UW_NEQ);
     TEST(!uw_equal (bool_true, int_0));
 
-    //TEST(uw_compare(bool_true, int_1) == UW_EQ);
-    TEST(uw_equal  (bool_true, int_1));
+    //TEST(uw_compare(bool_true, int_1) == UW_NEQ);
+    TEST(!uw_equal (bool_true, int_1));
 
-    //TEST(uw_compare(bool_true, int_neg1) == UW_EQ);
-    TEST(uw_equal  (bool_true, int_neg1));
+    //TEST(uw_compare(bool_true, int_neg1) == UW_NEQ);
+    TEST(!uw_equal (bool_true, int_neg1));
 
-    //TEST(uw_compare(bool_false, int_0) == UW_EQ);
-    TEST(uw_equal  (bool_false, int_0));
+    //TEST(uw_compare(bool_false, int_0) == UW_NEQ);
+    TEST(!uw_equal (bool_false, int_0));
 
     //TEST(uw_compare(bool_false, int_1) == UW_NEQ);
     TEST(!uw_equal (bool_false, int_1));
@@ -227,101 +263,101 @@ void test_integral_types()
 
     //TEST(uw_compare(bool_true, (char) 0) == UW_NEQ);
     TEST(!uw_equal (bool_true, (char) 0));
-    //TEST(uw_compare(bool_true, (char) 2) == UW_EQ);
-    TEST(uw_equal  (bool_true, (char) 2));
+    //TEST(uw_compare(bool_true, (char) 2) == UW_NEQ);
+    TEST(!uw_equal (bool_true, (char) 2));
 
-    //TEST(uw_compare(bool_false, (char) 0) == UW_EQ);
-    TEST(uw_equal  (bool_false, (char) 0));
+    //TEST(uw_compare(bool_false, (char) 0) == UW_NEQ);
+    TEST(!uw_equal (bool_false, (char) 0));
     //TEST(uw_compare(bool_false, (char) 2) == UW_NEQ);
     TEST(!uw_equal (bool_false, (char) 2));
 
     //TEST(uw_compare(bool_true, (unsigned char) 0) == UW_NEQ);
     TEST(!uw_equal (bool_true, (unsigned char) 0));
-    //TEST(uw_compare(bool_true, (unsigned char) 2) == UW_EQ);
-    TEST(uw_equal  (bool_true, (unsigned char) 2));
+    //TEST(uw_compare(bool_true, (unsigned char) 2) == UW_NEQ);
+    TEST(!uw_equal (bool_true, (unsigned char) 2));
 
-    //TEST(uw_compare(bool_false, (unsigned char) 0) == UW_EQ);
-    TEST(uw_equal  (bool_false, (unsigned char) 0));
+    //TEST(uw_compare(bool_false, (unsigned char) 0) == UW_NEQ);
+    TEST(!uw_equal (bool_false, (unsigned char) 0));
     //TEST(uw_compare(bool_false, (unsigned char) 2) == UW_NEQ);
     TEST(!uw_equal (bool_false, (unsigned char) 2));
 
     //TEST(uw_compare(bool_true, (short) 0) == UW_NEQ);
     TEST(!uw_equal (bool_true, (short) 0));
-    //TEST(uw_compare(bool_true, (short) 2) == UW_EQ);
-    TEST(uw_equal  (bool_true, (short) 2));
+    //TEST(uw_compare(bool_true, (short) 2) == UW_NEQ);
+    TEST(!uw_equal (bool_true, (short) 2));
 
-    //TEST(uw_compare(bool_false, (short) 0) == UW_EQ);
-    TEST(uw_equal  (bool_false, (short) 0));
+    //TEST(uw_compare(bool_false, (short) 0) == UW_NEQ);
+    TEST(!uw_equal (bool_false, (short) 0));
     //TEST(uw_compare(bool_false, (short) 2) == UW_NEQ);
     TEST(!uw_equal (bool_false, (short) 2));
 
     //TEST(uw_compare(bool_true, (unsigned short) 0) == UW_NEQ);
     TEST(!uw_equal (bool_true, (unsigned short) 0));
-    //TEST(uw_compare(bool_true, (unsigned short) 2) == UW_EQ);
-    TEST(uw_equal  (bool_true, (unsigned short) 2));
+    //TEST(uw_compare(bool_true, (unsigned short) 2) == UW_NEQ);
+    TEST(!uw_equal (bool_true, (unsigned short) 2));
 
-    //TEST(uw_compare(bool_false, (unsigned short) 0) == UW_EQ);
-    TEST(uw_equal  (bool_false, (unsigned short) 0));
+    //TEST(uw_compare(bool_false, (unsigned short) 0) == UW_NEQ);
+    TEST(!uw_equal (bool_false, (unsigned short) 0));
     //TEST(uw_compare(bool_false, (unsigned short) 2) == UW_NEQ);
     TEST(!uw_equal (bool_false, (unsigned short) 2));
 
     //TEST(uw_compare(bool_true, 0) == UW_NEQ);
     TEST(!uw_equal (bool_true, 0));
-    //TEST(uw_compare(bool_true, 2) == UW_EQ);
-    TEST(uw_equal  (bool_true, 2));
+    //TEST(uw_compare(bool_true, 2) == UW_NEQ);
+    TEST(!uw_equal (bool_true, 2));
 
-    //TEST(uw_compare(bool_false, 0) == UW_EQ);
-    TEST(uw_equal  (bool_false, 0));
+    //TEST(uw_compare(bool_false, 0) == UW_NEQ);
+    TEST(!uw_equal (bool_false, 0));
     //TEST(uw_compare(bool_false, 2) == UW_NEQ);
     TEST(!uw_equal (bool_false, 2));
 
     //TEST(uw_compare(bool_true, 0U) == UW_NEQ);
     TEST(!uw_equal (bool_true, 0U));
-    //TEST(uw_compare(bool_true, 2U) == UW_EQ);
-    TEST(uw_equal  (bool_true, 2U));
+    //TEST(uw_compare(bool_true, 2U) == UW_NEQ);
+    TEST(!uw_equal (bool_true, 2U));
 
-    //TEST(uw_compare(bool_false, 0U) == UW_EQ);
-    TEST(uw_equal  (bool_false, 0U));
+    //TEST(uw_compare(bool_false, 0U) == UW_NEQ);
+    TEST(!uw_equal (bool_false, 0U));
     //TEST(uw_compare(bool_false, 2U) == UW_NEQ);
     TEST(!uw_equal (bool_false, 2U));
 
     //TEST(uw_compare(bool_true, 0L) == UW_NEQ);
     TEST(!uw_equal (bool_true, 0L));
-    //TEST(uw_compare(bool_true, 2L) == UW_EQ);
-    TEST(uw_equal  (bool_true, 2L));
+    //TEST(uw_compare(bool_true, 2L) == UW_NEQ);
+    TEST(!uw_equal (bool_true, 2L));
 
-    //TEST(uw_compare(bool_false, 0L) == UW_EQ);
-    TEST(uw_equal  (bool_false, 0L));
+    //TEST(uw_compare(bool_false, 0L) == UW_NEQ);
+    TEST(!uw_equal (bool_false, 0L));
     //TEST(uw_compare(bool_false, 2L) == UW_NEQ);
     TEST(!uw_equal (bool_false, 2L));
 
     //TEST(uw_compare(bool_true, 0UL) == UW_NEQ);
     TEST(!uw_equal(bool_true, 0UL));
-    //TEST(uw_compare(bool_true, 2UL) == UW_EQ);
-    TEST(uw_equal(bool_true, 2UL));
+    //TEST(uw_compare(bool_true, 2UL) == UW_NEQ);
+    TEST(!uw_equal(bool_true, 2UL));
 
-    //TEST(uw_compare(bool_false, 0UL) == UW_EQ);
-    TEST(uw_equal  (bool_false, 0UL));
+    //TEST(uw_compare(bool_false, 0UL) == UW_NEQ);
+    TEST(!uw_equal  (bool_false, 0UL));
     //TEST(uw_compare(bool_false, 2UL) == UW_NEQ);
     TEST(!uw_equal (bool_false, 2UL));
 
     //TEST(uw_compare(bool_true, 0LL) == UW_NEQ);
     TEST(!uw_equal (bool_true, 0LL));
-    //TEST(uw_compare(bool_true, 2LL) == UW_EQ);
-    TEST(uw_equal  (bool_true, 2LL));
+    //TEST(uw_compare(bool_true, 2LL) == UW_NEQ);
+    TEST(!uw_equal  (bool_true, 2LL));
 
-    //TEST(uw_compare(bool_false, 0LL) == UW_EQ);
-    TEST(uw_equal  (bool_false, 0LL));
+    //TEST(uw_compare(bool_false, 0LL) == UW_NEQ);
+    TEST(!uw_equal  (bool_false, 0LL));
     //TEST(uw_compare(bool_false, 2LL) == UW_NEQ);
     TEST(!uw_equal (bool_false, 2LL));
 
     //TEST(uw_compare(bool_true, 0ULL) == UW_NEQ);
     TEST(!uw_equal (bool_true, 0ULL));
-    //TEST(uw_compare(bool_true, 2ULL) == UW_EQ);
-    TEST(uw_equal  (bool_true, 2ULL));
+    //TEST(uw_compare(bool_true, 2ULL) == UW_NEQ);
+    TEST(!uw_equal  (bool_true, 2ULL));
 
-    //TEST(uw_compare(bool_false, 0ULL) == UW_EQ);
-    TEST(uw_equal  (bool_false, 0ULL));
+    //TEST(uw_compare(bool_false, 0ULL) == UW_NEQ);
+    TEST(!uw_equal  (bool_false, 0ULL));
     //TEST(uw_compare(bool_false, 2ULL) == UW_NEQ);
     TEST(!uw_equal (bool_false, 2ULL));
 
@@ -329,14 +365,14 @@ void test_integral_types()
     //TEST(uw_compare(bool_true, f_0) == UW_NEQ);
     TEST(!uw_equal (bool_true, f_0));
 
-    //TEST(uw_compare(bool_true, f_1) == UW_EQ);
-    TEST(uw_equal  (bool_true, f_1));
+    //TEST(uw_compare(bool_true, f_1) == UW_NEQ);
+    TEST(!uw_equal (bool_true, f_1));
 
-    //TEST(uw_compare(bool_true, f_neg1) == UW_EQ);
-    TEST(uw_equal  (bool_true, f_neg1));
+    //TEST(uw_compare(bool_true, f_neg1) == UW_NEQ);
+    TEST(!uw_equal (bool_true, f_neg1));
 
-    //TEST(uw_compare(bool_false, f_0) == UW_EQ);
-    TEST(uw_equal  (bool_false, f_0));
+    //TEST(uw_compare(bool_false, f_0) == UW_NEQ);
+    TEST(!uw_equal (bool_false, f_0));
 
     //TEST(uw_compare(bool_false, f_1) == UW_NEQ);
     TEST(!uw_equal (bool_false, f_1));
@@ -346,41 +382,41 @@ void test_integral_types()
 
     //TEST(uw_compare(bool_true, 0.0f) == UW_NEQ);
     TEST(!uw_equal (bool_true, 0.0f));
-    //TEST(uw_compare(bool_true, 2.0f) == UW_EQ);
-    TEST(uw_equal  (bool_true, 2.0f));
+    //TEST(uw_compare(bool_true, 2.0f) == UW_NEQ);
+    TEST(!uw_equal (bool_true, 2.0f));
 
-    //TEST(uw_compare(bool_false, 0.0f) == UW_EQ);
-    TEST(uw_equal  (bool_false, 0.0f));
+    //TEST(uw_compare(bool_false, 0.0f) == UW_NEQ);
+    TEST(!uw_equal (bool_false, 0.0f));
     //TEST(uw_compare(bool_false, 2.0f) == UW_NEQ);
     TEST(!uw_equal (bool_false, 2.0f));
 
     //TEST(uw_compare(bool_true, 0.0f) == UW_NEQ);
     TEST(!uw_equal (bool_true, 0.0f));
-    //TEST(uw_compare(bool_true, 2.0f) == UW_EQ);
-    TEST(uw_equal  (bool_true, 2.0f));
+    //TEST(uw_compare(bool_true, 2.0f) == UW_NEQ);
+    TEST(!uw_equal (bool_true, 2.0f));
 
-    //TEST(uw_compare(bool_false, 0.0f) == UW_EQ);
-    TEST(uw_equal  (bool_false, 0.0f));
+    //TEST(uw_compare(bool_false, 0.0f) == UW_NEQ);
+    TEST(!uw_equal (bool_false, 0.0f));
     //TEST(uw_compare(bool_false, 2.0f) == UW_NEQ);
     TEST(!uw_equal (bool_false, 2.0f));
 
     //TEST(uw_compare(bool_true, 0.0) == UW_NEQ);
     TEST(!uw_equal (bool_true, 0.0));
-    //TEST(uw_compare(bool_true, 2.0) == UW_EQ);
-    TEST(uw_equal  (bool_true, 2.0));
+    //TEST(uw_compare(bool_true, 2.0) == UW_NEQ);
+    TEST(!uw_equal (bool_true, 2.0));
 
-    //TEST(uw_compare(bool_false, 0.0) == UW_EQ);
-    TEST(uw_equal  (bool_false, 0.0));
+    //TEST(uw_compare(bool_false, 0.0) == UW_NEQ);
+    TEST(!uw_equal (bool_false, 0.0));
     //TEST(uw_compare(bool_false, 2.0) == UW_NEQ);
     TEST(!uw_equal (bool_false, 2.0));
 
     //TEST(uw_compare(bool_true, 0.0) == UW_NEQ);
     TEST(!uw_equal (bool_true, 0.0));
-    //TEST(uw_compare(bool_true, 2.0) == UW_EQ);
-    TEST(uw_equal  (bool_true, 2.0));
+    //TEST(uw_compare(bool_true, 2.0) == UW_NEQ);
+    TEST(!uw_equal (bool_true, 2.0));
 
-    //TEST(uw_compare(bool_false, 0.0) == UW_EQ);
-    TEST(uw_equal  (bool_false, 0.0));
+    //TEST(uw_compare(bool_false, 0.0) == UW_NEQ);
+    TEST(!uw_equal (bool_false, 0.0));
     //TEST(uw_compare(bool_false, 2.0) == UW_NEQ);
     TEST(!uw_equal (bool_false, 2.0));
 
@@ -399,28 +435,28 @@ void test_integral_types()
     // int vs bool
     //TEST(uw_compare(int_0, bool_true) == UW_NEQ);
     TEST(!uw_equal (int_0, bool_true));
-    //TEST(uw_compare(int_0, bool_false) == UW_EQ);
-    TEST(uw_equal  (int_0, bool_false));
+    //TEST(uw_compare(int_0, bool_false) == UW_NEQ);
+    TEST(!uw_equal (int_0, bool_false));
     //TEST(uw_compare(int_0, true) == UW_NEQ);
     TEST(!uw_equal (int_0, true));
-    //TEST(uw_compare(int_0, false) == UW_EQ);
-    TEST(uw_equal  (int_0, false));
+    //TEST(uw_compare(int_0, false) == UW_NEQ);
+    TEST(!uw_equal (int_0, false));
 
-    //TEST(uw_compare(int_1, bool_true) == UW_EQ);
-    TEST(uw_equal  (int_1, bool_true));
+    //TEST(uw_compare(int_1, bool_true) == UW_NEQ);
+    TEST(!uw_equal (int_1, bool_true));
     //TEST(uw_compare(int_1, bool_false) == UW_NEQ);
     TEST(!uw_equal (int_1, bool_false));
-    //TEST(uw_compare(int_1, true) == UW_EQ);
-    TEST(uw_equal  (int_1, true));
+    //TEST(uw_compare(int_1, true) == UW_NEQ);
+    TEST(!uw_equal (int_1, true));
     //TEST(uw_compare(int_1, false) == UW_NEQ);
     TEST(!uw_equal (int_1, false));
 
-    //TEST(uw_compare(int_neg1, bool_true) == UW_EQ);
-    TEST(uw_equal  (int_neg1, bool_true));
+    //TEST(uw_compare(int_neg1, bool_true) == UW_NEQ);
+    TEST(!uw_equal (int_neg1, bool_true));
     //TEST(uw_compare(int_neg1, bool_false) == UW_NEQ);
     TEST(!uw_equal (int_neg1, bool_false));
-    //TEST(uw_compare(int_neg1, true) == UW_EQ);
-    TEST(uw_equal  (int_neg1, true));
+    //TEST(uw_compare(int_neg1, true) == UW_NEQ);
+    TEST(!uw_equal (int_neg1, true));
     //TEST(uw_compare(int_neg1, false) == UW_NEQ);
     TEST(!uw_equal (int_neg1, false));
 
@@ -557,28 +593,28 @@ void test_integral_types()
     // float vs bool
     //TEST(uw_compare(f_0, bool_true) == UW_NEQ);
     TEST(!uw_equal (f_0, bool_true));
-    //TEST(uw_compare(f_0, bool_false) == UW_EQ);
-    TEST(uw_equal  (f_0, bool_false));
+    //TEST(uw_compare(f_0, bool_false) == UW_NEQ);
+    TEST(!uw_equal  (f_0, bool_false));
     //TEST(uw_compare(f_0, true) == UW_NEQ);
     TEST(!uw_equal (f_0, true));
-    //TEST(uw_compare(f_0, false) == UW_EQ);
-    TEST(uw_equal  (f_0, false));
+    //TEST(uw_compare(f_0, false) == UW_NEQ);
+    TEST(!uw_equal (f_0, false));
 
-    //TEST(uw_compare(f_1, bool_true) == UW_EQ);
-    TEST(uw_equal  (f_1, bool_true));
+    //TEST(uw_compare(f_1, bool_true) == UW_NEQ);
+    TEST(!uw_equal (f_1, bool_true));
     //TEST(uw_compare(f_1, bool_false) == UW_NEQ);
     TEST(!uw_equal (f_1, bool_false));
-    //TEST(uw_compare(f_1, true) == UW_EQ);
-    TEST(uw_equal  (f_1, true));
+    //TEST(uw_compare(f_1, true) == UW_NEQ);
+    TEST(!uw_equal (f_1, true));
     //TEST(uw_compare(f_1, false) == UW_NEQ);
     TEST(!uw_equal (f_1, false));
 
-    //TEST(uw_compare(f_neg1, bool_true) == UW_EQ);
-    TEST(uw_equal  (f_neg1, bool_true));
+    //TEST(uw_compare(f_neg1, bool_true) == UW_NEQ);
+    TEST(!uw_equal (f_neg1, bool_true));
     //TEST(uw_compare(f_neg1, bool_false) == UW_NEQ);
     TEST(!uw_equal (f_neg1, bool_false));
-    //TEST(uw_compare(f_neg1, true) == UW_EQ);
-    TEST(uw_equal  (f_neg1, true));
+    //TEST(uw_compare(f_neg1, true) == UW_NEQ);
+    TEST(!uw_equal (f_neg1, true));
     //TEST(uw_compare(f_neg1, false) == UW_NEQ);
     TEST(!uw_equal (f_neg1, false));
 
@@ -1155,6 +1191,7 @@ void test_string()
         TEST(uw_equal(v, U"Hello/สวัสดี/Thanks/mulțumesc"));
         //uw_dump(v);
     }
+
     { // test split/join
         UwValue str = uw_create(U"สบาย/สบาย/yo/yo");
         UwValue list = uw_string_split(str, '/');
@@ -1254,9 +1291,9 @@ void test_map()
         uw_map_del(map, 25);
 
         TEST(uw_map_length(map) == 49);
-
 //        uw_dump(map);
     }
+
     {
         UwValue map = uw_create_map_va(
             uwc_charptr,  "let's",       uwc_charptr,   "go!",
@@ -1275,7 +1312,7 @@ void test_map()
             uwc_charptr,  "finally",     uwc_value_ptr, uw_create_map_va(uwc_charptr, "ok", uwc_charptr, "done", -1),
             -1
         );
-        (void) map;
+        TEST(map != nullptr);
 //        uw_dump(map);
     }
 }
@@ -1326,11 +1363,16 @@ void test_string_io()
     TEST(uw_read_line(sio) == nullptr);
 
     TEST(uw_start_read_lines(sio));
-    TEST(uw_equal(uw_read_line(sio), "one\n"));
+    uw_delete(&line);
+    line = uw_read_line(sio);
+    TEST(uw_equal(line, "one\n"));
 }
 
 int main(int argc, char* argv[])
 {
+    _uw_allocators[TEST_ALLOCATOR_ID] = test_allocator;
+    uw_set_allocator(TEST_ALLOCATOR_ID);
+
     test_integral_types();
     test_string();
     test_list();
@@ -1341,4 +1383,6 @@ int main(int argc, char* argv[])
     if (num_fail == 0) {
         printf("%d test%s OK\n", num_tests, (num_tests == 1)? "" : "s");
     }
+
+    printf("leaked blocks: %u\n", num_allocated);
 }
