@@ -2065,7 +2065,7 @@ UwValuePtr _uw_string_split_c32(UwValuePtr str, char32_t splitter)
         if (c == splitter) {
             // create substring
             size_t substr_len = i - start_i;
-            UwValuePtr substr = uw_create_empty_string(substr_len, char_size);
+            UwValue substr = uw_create_empty_string(substr_len, char_size);
             if (!substr) {
                 return nullptr;
             }
@@ -2088,7 +2088,7 @@ UwValuePtr _uw_string_split_c32(UwValuePtr str, char32_t splitter)
     // create final substring
     {
         size_t substr_len = i - start_i;
-        UwValuePtr substr = uw_create_empty_string(substr_len, char_size);
+        UwValue substr = uw_create_empty_string(substr_len, char_size);
         if (!substr) {
             return nullptr;
         }
