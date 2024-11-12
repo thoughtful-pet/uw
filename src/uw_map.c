@@ -87,10 +87,15 @@ static bool init_hash_table(UwAllocId alloc_id, struct _UwHashTable* ht, size_t 
 {
     size_t item_size = get_item_size(capacity);
     size_t memsize = item_size * capacity;
-    ht->items = _uw_allocators[alloc_id].alloc(memsize);
-    if (!ht->items) {
+
+    // reallocate items
+    // if map is new, ht is initialized to all zero
+    // if map is doubled, this reallocates block
+    uint8_t* new_items = _uw_allocators[alloc_id].realloc(ht->items, memsize);
+    if (!new_items) {
         return false;
     }
+    ht->items = new_items;
 
     memset(ht->items, 0, memsize);
 
@@ -377,6 +382,7 @@ UwValuePtr _uw_copy_map(UwValuePtr self)
         return nullptr;
     }
     struct _UwMap* result_map = _uw_get_map_ptr(result);
+
     if (!init_map(result->alloc_id, result_map, ht_capacity, length)) {
         _uw_free_value(result);
         return nullptr;
