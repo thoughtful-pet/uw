@@ -157,14 +157,19 @@ bool _uw_list_equal_ctype(UwValuePtr self, UwCType ctype, ...)
     return result;
 }
 
+static size_t round_capacity(size_t capacity)
+{
+    if (capacity <= UWLIST_INITIAL_CAPACITY) {
+        return (capacity + UWLIST_INITIAL_CAPACITY - 1) & ~(UWLIST_INITIAL_CAPACITY - 1);
+    } else {
+        return (capacity + UWLIST_CAPACITY_INCREMENT - 1) & ~(UWLIST_CAPACITY_INCREMENT - 1);
+    }
+}
+
 bool _uw_alloc_list(UwAllocId alloc_id, struct _UwList* list, size_t capacity)
 {
     list->length = 0;
-    if (capacity <= UWLIST_INITIAL_CAPACITY) {
-        list->capacity = (capacity + UWLIST_INITIAL_CAPACITY - 1) & ~(UWLIST_INITIAL_CAPACITY - 1);
-    } else {
-        list->capacity = (capacity + UWLIST_CAPACITY_INCREMENT - 1) & ~(UWLIST_CAPACITY_INCREMENT - 1);
-    }
+    list->capacity = round_capacity(capacity);
     list->items = _uw_allocators[alloc_id].alloc(list->capacity * sizeof(UwValuePtr));
     return list->items != nullptr;
 }
@@ -326,7 +331,7 @@ bool _uw_list_append(UwAllocId alloc_id, struct _UwList* list, UwValuePtr item)
     uw_assert(list->length <= list->capacity);
 
     if (list->length == list->capacity) {
-        size_t new_capacity = list->capacity + UWLIST_CAPACITY_INCREMENT;
+        size_t new_capacity = round_capacity(list->capacity + UWLIST_CAPACITY_INCREMENT);
         UwValuePtr* new_items = _uw_allocators[alloc_id].realloc(list->items, new_capacity * sizeof(UwValuePtr));
         if (!new_items) {
             return false;
@@ -447,7 +452,14 @@ void _uw_list_del(struct _UwList* list, size_t start_index, size_t end_index)
     }
 
     for (size_t i = start_index; i < end_index; i++) {
-        uw_delete(&list->items[i]);
+        UwValuePtr item = list->items[i];
+        if (item) {  // can be already destroyed by unbrace
+            if (item->compound) {
+                _uw_unbrace(&item);
+            } else {
+                uw_delete(&item);
+            }
+        }
     }
 
     size_t new_length = list->length - (end_index - start_index);

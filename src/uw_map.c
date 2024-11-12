@@ -196,7 +196,7 @@ static size_t lookup(struct _UwMap* map, UwValuePtr key, size_t* ht_index, size_
         UwValuePtr k = _uw_list_item(&map->kv_pairs, kv_index * 2);
 
         // compare keys
-        if (_uw_equal(k, key)) {
+        if (k->type_id == key->type_id && _uw_equal(k, key)) {
             // found key
             if (ht_index) {
                 *ht_index = index;
@@ -263,7 +263,10 @@ static inline bool double_hash_table(UwAllocId alloc_id, struct _UwMap* map)
 
 static bool update_map(UwValuePtr self, UwValuePtr key, UwValuePtr value)
 /*
- * This function does not increment refcount for key and value!
+ * This function increments refcount for key but does not do that for value!
+ * That's because key may be added to the map or may not.
+ * When adder, refcount is incremented.
+ * The caller should always call uw_delete for key when this function succedes.
  */
 {
     UwAllocId alloc_id = self->alloc_id;
@@ -283,7 +286,11 @@ static bool update_map(UwValuePtr self, UwValuePtr key, UwValuePtr value)
 
         // update only if value is different
         if (*v_ptr != value) {
-            uw_delete(v_ptr);
+            if ((*v_ptr)->compound) {
+                _uw_unbrace(v_ptr);
+            } else {
+                uw_delete(v_ptr);
+            }
             *v_ptr = value;
         }
         return true;
@@ -306,7 +313,9 @@ static bool update_map(UwValuePtr self, UwValuePtr key, UwValuePtr value)
 
     size_t ht_index = set_hash_table_item(ht, uw_hash(key), kv_index + 1);
 
-    if (!_uw_list_append(alloc_id, &map->kv_pairs, key)) {
+    UwValuePtr key_ref = uw_makeref(key);
+    if (!_uw_list_append(alloc_id, &map->kv_pairs, key_ref)) {
+        uw_delete(&key_ref);
         goto error;
     }
     if (!_uw_list_append(alloc_id, &map->kv_pairs, value)) {
@@ -399,7 +408,9 @@ UwValuePtr _uw_copy_map(UwValuePtr self)
                 value->refcount--;
             }
             if (update_map(result, key, value)) {
-                // key-value are successfully added to the map and should not be destroyed
+                // value is successfully added to the map
+                // uw_delete should always be called for key
+                uw_delete(&key);
                 continue;
             }
         }
@@ -567,7 +578,9 @@ bool uw_map_update(UwValuePtr map, UwValuePtr key, UwValuePtr value)
     }
 
     if (update_map(map, key_ref, value_ref)) {
-        // key-value references are successfully added to the map
+        // value is successfully added to the map
+        // uw_delete should always be called for key
+        uw_delete(&key_ref);
         return true;
     }
     // update failed
@@ -598,25 +611,27 @@ bool uw_map_update_ap(UwValuePtr map, va_list ap)
         if (ctype == -1) {
             break;
         }
-        {   // nested scope for autocleaning
-            UwValue key = uw_create_from_ctype(ctype, ap);
-            ctype = va_arg(ap, int);
-            UwValue value = uw_create_from_ctype(ctype, ap);
-            if (!value) {
-                return false;
-            }
-            if (value->compound) {
-                _uw_embrace(value);
-                value->refcount--;
-            }
-            if (!update_map(map, key, value)) {
-                _uw_unbrace(&value);
-                return false;
-            }
-            // key-value are added to the map, prevent autocleaning
-            key = nullptr;
-            value = nullptr;
+        UwValuePtr key = uw_create_from_ctype(ctype, ap);
+        if (!key) {
+            return false;
         }
+        ctype = va_arg(ap, int);
+        UwValuePtr value = uw_create_from_ctype(ctype, ap);
+        if (!value) {
+            uw_delete(&key);
+            return false;
+        }
+        if (value->compound) {
+            _uw_embrace(value);
+            value->refcount--;
+        }
+        if (!update_map(map, key, value)) {
+            uw_delete(&key);
+            _uw_unbrace(&value);  // no need to check for compound value
+                                  // refcount is zero and it will be deleted anyway
+            return false;
+        }
+        uw_delete(&key);
     }
     return true;
 }
