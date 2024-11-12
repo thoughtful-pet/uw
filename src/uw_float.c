@@ -58,9 +58,8 @@ bool _uw_float_equal(UwValuePtr self, UwValuePtr other)
     UwTypeId t = other->type_id;
     for (;;) {
         switch (t) {
-            case UwTypeId_Bool:  return ((UwType_Bool) self->float_value) == other->bool_value;
-            case UwTypeId_Int:   return                self->float_value  == (UwType_Float) other->int_value;
-            case UwTypeId_Float: return                self->float_value  == other->float_value;
+            case UwTypeId_Int:   return self->float_value == (UwType_Float) other->int_value;
+            case UwTypeId_Float: return self->float_value == other->float_value;
             default: {
                 // check base class
                 t = _uw_types[t]->ancestor_id;
@@ -78,8 +77,6 @@ bool _uw_float_equal_ctype(UwValuePtr self, UwCType ctype, ...)
     va_list ap;
     va_start(ap);
     switch (ctype) {
-        case uwc_bool:      { bool a = va_arg(ap, int /*bool*/), b = self->float_value; result = a == b; break; }
-
         case uwc_char:      result = self->float_value == (UwType_Float)           (char) va_arg(ap,          int); break;
         case uwc_uchar:     result = self->float_value == (UwType_Float)  (unsigned char) va_arg(ap, unsigned int); break;
         case uwc_short:     result = self->float_value == (UwType_Float)          (short) va_arg(ap,          int); break;
