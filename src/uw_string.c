@@ -1941,7 +1941,7 @@ void uw_string_truncate(UwValuePtr str, size_t position)
     }
 }
 
-ssize_t uw_strscan(UwValuePtr str, char32_t chr, size_t start_pos)
+bool uw_string_indexof(UwValuePtr str, char32_t chr, size_t start_pos, size_t* result)
 {
     uw_assert_string(str);
     struct _UwString* s = *_uw_get_string_pptr(str);
@@ -1954,11 +1954,14 @@ ssize_t uw_strscan(UwValuePtr str, char32_t chr, size_t start_pos)
     for (size_t i = start_pos; i < length; i++) {
         char32_t codepoint = strmeth->get_char(ptr);
         if (codepoint == chr) {
-            return i;
+            if (result) {
+                *result = i;
+            }
+            return true;
         }
         ptr += s->char_size + 1;
     }
-    return -1;
+    return false;
 }
 
 void uw_string_ltrim(UwValuePtr str)

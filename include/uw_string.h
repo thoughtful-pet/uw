@@ -58,11 +58,6 @@ char32_t uw_string_at(UwValuePtr str, size_t position);
  * If position is beyond end of line return 0.
  */
 
-//bool string_indexof(UwValuePtr str, char32_t chr, size_t start_pos, size_t* result);
-/*
- * Find first occurence of `chr`.
- */
-
 void uw_string_erase(UwValuePtr str, size_t start_pos, size_t end_pos);
 /*
  * Erase characters from `start_pos` to `end_pos`.
@@ -73,11 +68,13 @@ void uw_string_truncate(UwValuePtr str, size_t position);
  * Truncate string at given `position`.
  */
 
-ssize_t uw_strscan(UwValuePtr str, char32_t chr, size_t start_pos);
+bool uw_string_indexof(UwValuePtr str, char32_t chr, size_t start_pos, size_t* result);
 /*
- * Find `chr` in `str` starting from `start_pos`.
+ * Find first occurence of `chr` in `str` starting from `start_pos`.
  *
- * Return position of character or -1.
+ * Return true if character is found and write its position to `result`.
+ * `result` can be nullptr if position is not needed and the function
+ * is called just to check if `chr` is in `str`.
  */
 
 
