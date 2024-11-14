@@ -139,8 +139,8 @@ static inline UwValuePtr uw_move(UwValuePtr* v)
  * Allocators
  */
 
-typedef void* (*UwAlloc)  (size_t nbytes);
-typedef void* (*UwRealloc)(void* block, size_t nbytes);
+typedef void* (*UwAlloc)  (unsigned nbytes);
+typedef void* (*UwRealloc)(void* block, unsigned nbytes);
 typedef void  (*UwFree)   (void* block);
 
 typedef struct {

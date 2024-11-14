@@ -190,7 +190,7 @@ bool _uw_file_set_name(UwValuePtr self, UwValuePtr file_name)
  * FileReader interface methods
  */
 
-ssize_t _uw_file_read(UwValuePtr self, void* buffer, size_t buffer_size)
+bool _uw_file_read(UwValuePtr self, void* buffer, unsigned buffer_size, unsigned* bytes_read)
 {
     struct _UwFile* f = _uw_get_data_ptr(self, UwTypeId_File, struct _UwFile*);
 
@@ -199,14 +199,19 @@ ssize_t _uw_file_read(UwValuePtr self, void* buffer, size_t buffer_size)
         result = read(f->fd, buffer, buffer_size);
     } while (result < 0 && errno == EINTR);
 
-    return result;
+    if (result < 0) {
+        return false;
+    } else {
+        *bytes_read = (unsigned) result;
+        return true;
+    }
 }
 
 /****************************************************************
  * FileWriter interface methods
  */
 
-ssize_t _uw_file_write(UwValuePtr self, void* data, size_t size)
+bool _uw_file_write(UwValuePtr self, void* data, unsigned size, unsigned* bytes_written)
 {
     struct _UwFile* f = _uw_get_data_ptr(self, UwTypeId_File, struct _UwFile*);
 
@@ -215,7 +220,12 @@ ssize_t _uw_file_write(UwValuePtr self, void* data, size_t size)
         result = write(f->fd, data, size);
     } while (result < 0 && errno == EINTR);
 
-    return result;
+    if (result < 0) {
+        return false;
+    } else {
+        *bytes_written = (unsigned) result;
+        return true;
+    }
 }
 
 /****************************************************************
@@ -289,9 +299,8 @@ bool _uw_file_read_line_inplace(UwValuePtr self, UwValuePtr line)
                 // end of file
                 return uw_strlen(line) != 0;
             }
-            f->data_size = _uw_file_read(self, f->buffer, LINE_READER_BUFFER_SIZE);
             f->position = 0;
-            if (f->data_size <= 0) {
+            if (!_uw_file_read(self, f->buffer, LINE_READER_BUFFER_SIZE, &f->data_size)) {
                 // end of file or error
                 return uw_strlen(line) != 0;
             }
@@ -313,7 +322,7 @@ bool _uw_file_read_line_inplace(UwValuePtr self, UwValuePtr line)
                     }
                     f->position++;
                     f->partial_utf8[f->partial_utf8_len++] = c;
-                    size_t bytes_processed;
+                    unsigned bytes_processed;
                     if (!uw_string_append_utf8(line, f->partial_utf8, f->partial_utf8_len, &bytes_processed)) {
                         // out of memory
                         return false;
@@ -331,8 +340,8 @@ bool _uw_file_read_line_inplace(UwValuePtr self, UwValuePtr line)
         if (lf) {
             // found newline, don't care about partial UTF-8
             lf++;
-            size_t end_pos = lf - f->buffer;
-            size_t bytes_processed;
+            unsigned end_pos = lf - f->buffer;
+            unsigned bytes_processed;
 
             if (!uw_string_append_utf8(line, start, end_pos - f->position, &bytes_processed)) {
                 // out of memory
@@ -342,8 +351,8 @@ bool _uw_file_read_line_inplace(UwValuePtr self, UwValuePtr line)
             return true;
 
         } else {
-            size_t n = f->data_size - f->position;
-            size_t bytes_processed;
+            unsigned n = f->data_size - f->position;
+            unsigned bytes_processed;
             if (!uw_string_append_utf8(line, start, n, &bytes_processed)) {
                 // out of memory
                 return false;
@@ -458,20 +467,20 @@ bool uw_file_set_name(UwValuePtr file, UwValuePtr file_name)
     return iface->set_name(file, file_name);
 }
 
-ssize_t uw_file_read(UwValuePtr file, void* buffer, size_t buffer_size)
+bool uw_file_read(UwValuePtr file, void* buffer, unsigned buffer_size, unsigned* bytes_read)
 {
     UwInterface_FileReader* iface = uw_get_interface(file, FileReader);
     if (!iface) {
         return -1;
     }
-    return iface->read(file, buffer, buffer_size);
+    return iface->read(file, buffer, buffer_size, bytes_read);
 }
 
-ssize_t uw_file_write(UwValuePtr file, void* data, size_t size)
+bool uw_file_write(UwValuePtr file, void* data, unsigned size, unsigned* bytes_written)
 {
     UwInterface_FileWriter* iface = uw_get_interface(file, FileWriter);
     if (!iface) {
         return -1;
     }
-    return iface->write(file, data, size);
+    return iface->write(file, data, size, bytes_written);
 }

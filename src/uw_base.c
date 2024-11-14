@@ -22,7 +22,7 @@
 UwValuePtr _uw_alloc_value(UwTypeId type_id)
 {
     UwType* t = _uw_types[type_id];
-    size_t memsize = t->data_offset + t->data_size;
+    unsigned memsize = t->data_offset + t->data_size;
     UwValuePtr value = _uw_allocator.alloc(memsize);
     if (value) {
         memset(value, 0, memsize);
@@ -222,24 +222,34 @@ void uw_dump(UwValuePtr value)
  * Allocators.
  */
 
-static void* malloc_nofail(size_t nbytes)
+static void* std_malloc(unsigned nbytes)
+{
+    return malloc(nbytes);
+}
+
+static void* std_realloc(void* block, unsigned nbytes)
+{
+    return realloc(block, nbytes);
+}
+
+static void* malloc_nofail(unsigned nbytes)
 {
     void* block = malloc(nbytes);
     if (!block) {
         char msg[64];
-        sprintf(msg, "malloc(%zu)", nbytes);
+        sprintf(msg, "malloc(%u)", nbytes);
         perror(msg);
         exit(1);
     }
     return block;
 }
 
-static void* realloc_nofail(void* block, size_t nbytes)
+static void* realloc_nofail(void* block, unsigned nbytes)
 {
     void* new_block = realloc(block, nbytes);
     if (!new_block) {
         char msg[64];
-        sprintf(msg, "realloc(%p, %zu)", block, nbytes);
+        sprintf(msg, "realloc(%p, %u)", block, nbytes);
         perror(msg);
         exit(1);
     }
@@ -249,8 +259,8 @@ static void* realloc_nofail(void* block, size_t nbytes)
 UwAllocator _uw_allocators[1 << UW_ALLOCATOR_BITWIDTH] = {
     {
         .id      = UW_ALLOCATOR_STD,
-        .alloc   = malloc,
-        .realloc = realloc,
+        .alloc   = std_malloc,
+        .realloc = std_realloc,
         .free    = free
     },
     {
@@ -263,8 +273,8 @@ UwAllocator _uw_allocators[1 << UW_ALLOCATOR_BITWIDTH] = {
 
 thread_local UwAllocator _uw_allocator = {
     .id      = UW_ALLOCATOR_STD,
-    .alloc   = malloc,
-    .realloc = realloc,
+    .alloc   = std_malloc,
+    .realloc = std_realloc,
     .free    = free
 };
 

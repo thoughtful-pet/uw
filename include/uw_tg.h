@@ -172,7 +172,7 @@ bool _uw_string_append_u8_wrapper(UwValuePtr dest, char* src);
             UwValuePtr: _uw_string_append_substring_uw           \
     )((dest), (src), (src_start_pos), (src_end_pos))
 
-bool _uw_string_append_substring_u8_wrapper(UwValuePtr dest, char* src, size_t src_start_pos, size_t src_end_pos);
+bool _uw_string_append_substring_u8_wrapper(UwValuePtr dest, char* src, unsigned src_start_pos, unsigned src_end_pos);
 
 /*
  * Substring comparison functions.
@@ -186,7 +186,7 @@ bool _uw_string_append_substring_u8_wrapper(UwValuePtr dest, char* src, size_t s
         UwValuePtr: _uw_substring_eq_uw           \
     )((a), (start_pos), (end_pos), (b))
 
-bool _uw_substring_eq_u8_wrapper(UwValuePtr a, size_t start_pos, size_t end_pos, char* b);
+bool _uw_substring_eq_u8_wrapper(UwValuePtr a, unsigned start_pos, unsigned end_pos, char* b);
 
 #define uw_string_split(str, splitters) _Generic((splitters),  \
               char32_t: _uw_string_split_c32,            \

@@ -55,7 +55,7 @@ UwValuePtr _uw_create_string_u8_wrapper(char* initializer)
     return _uw_create_string_u8((char8_t*) initializer);
 }
 
-bool _uw_substring_eq_u8_wrapper(UwValuePtr a, size_t start_pos, size_t end_pos, char* b)
+bool _uw_substring_eq_u8_wrapper(UwValuePtr a, unsigned start_pos, unsigned end_pos, char* b)
 {
     return _uw_substring_eq_u8(a, start_pos, end_pos, (char8_t*) b);
 }
@@ -65,7 +65,7 @@ bool _uw_string_append_u8_wrapper(UwValuePtr dest, char* src)
     return _uw_string_append_u8(dest, (char8_t*) src);
 }
 
-bool _uw_string_append_substring_u8_wrapper(UwValuePtr dest, char* src, size_t src_start_pos, size_t src_end_pos)
+bool _uw_string_append_substring_u8_wrapper(UwValuePtr dest, char* src, unsigned src_start_pos, unsigned src_end_pos)
 {
     return _uw_string_append_substring_u8(dest, (char8_t*) src, src_start_pos, src_end_pos);
 }

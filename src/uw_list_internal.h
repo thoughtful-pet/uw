@@ -15,9 +15,9 @@ extern "C" {
 #define UWLIST_CAPACITY_INCREMENT  16
 
 struct _UwList {
-    size_t length;
-    size_t capacity;
     UwValuePtr* items;
+    unsigned length;
+    unsigned capacity;
 };
 
 #define _uw_get_list_ptr(value)  \
@@ -47,22 +47,22 @@ bool       _uw_list_equal_ctype   (UwValuePtr self, UwCType ctype, ...);
  * Helpers
  */
 
-static inline size_t _uw_list_length(struct _UwList* list)
+static inline unsigned _uw_list_length(struct _UwList* list)
 {
     return list->length;
 }
 
-static inline UwValuePtr _uw_list_item(struct _UwList* list, size_t index)
+static inline UwValuePtr _uw_list_item(struct _UwList* list, unsigned index)
 {
     return list->items[index];
 }
 
-static inline UwValuePtr* _uw_list_item_ptr(struct _UwList* list, size_t index)
+static inline UwValuePtr* _uw_list_item_ptr(struct _UwList* list, unsigned index)
 {
     return &list->items[index];
 }
 
-bool _uw_alloc_list(UwAllocId alloc_id, struct _UwList* list, size_t capacity);
+bool _uw_alloc_list(UwAllocId alloc_id, struct _UwList* list, unsigned capacity);
 /*
  * - allocate list items
  * - set list->length = 0
@@ -87,7 +87,7 @@ bool _uw_list_append(UwAllocId alloc_id, struct _UwList* list, UwValuePtr item);
  * This function does not increment item's refcount!
  */
 
-void _uw_list_del(struct _UwList* list, size_t start_index, size_t end_index);
+void _uw_list_del(struct _UwList* list, unsigned start_index, unsigned end_index);
 /*
  * Delete items from list.
  */

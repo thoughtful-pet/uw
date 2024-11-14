@@ -18,8 +18,8 @@ struct _UwFile {
     // line reader data
     // XXX okay for now, revise later
     char8_t* buffer;
-    size_t   position;  // in the buffer
-    size_t   data_size; // in the buffer
+    unsigned position;  // in the buffer
+    unsigned data_size; // in the buffer
     char8_t  partial_utf8[4];  // UTF-8 sequence may span adjacent reads
     unsigned partial_utf8_len;
     UwValuePtr pushback;  // for unread_line
@@ -54,13 +54,13 @@ bool       _uw_file_set_name(UwValuePtr self, UwValuePtr file_name);
  * FileReader interface methods
  */
 
-ssize_t _uw_file_read(UwValuePtr self, void* buffer, size_t buffer_size);
+bool _uw_file_read(UwValuePtr self, void* buffer, unsigned buffer_size, unsigned* bytes_read);
 
 /****************************************************************
  * FileWriter interface methods
  */
 
-ssize_t _uw_file_write(UwValuePtr self, void* data, size_t size);
+bool _uw_file_write(UwValuePtr self, void* data, unsigned size, unsigned* bytes_written);
 
 /****************************************************************
  * LineReader interface methods

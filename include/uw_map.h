@@ -55,12 +55,12 @@ void _uw_map_del_u8   (UwValuePtr map, char8_t*     key);
 void _uw_map_del_u32  (UwValuePtr map, char32_t*    key);
 void _uw_map_del_uw   (UwValuePtr map, UwValuePtr   key);
 
-size_t uw_map_length(UwValuePtr map);
+unsigned uw_map_length(UwValuePtr map);
 /*
  * Return the number of items in `map`.
  */
 
-bool uw_map_item(UwValuePtr map, size_t index, UwValuePtr* key, UwValuePtr* value);
+bool uw_map_item(UwValuePtr map, unsigned index, UwValuePtr* key, UwValuePtr* value);
 /*
  * Get key-value pair from the map.
  * Return true if `index` is valid.

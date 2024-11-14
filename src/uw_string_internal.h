@@ -64,8 +64,8 @@ bool       _uw_string_equal_ctype   (UwValuePtr self, UwCType ctype, ...);
  * and test suite, that's why a separate file.
  */
 
-typedef size_t (*CapGetter)(struct _UwString* str);
-typedef void   (*CapSetter)(struct _UwString* str, size_t n);
+typedef unsigned (*CapGetter)(struct _UwString* str);
+typedef void     (*CapSetter)(struct _UwString* str, unsigned n);
 
 typedef struct {
     CapGetter   get_length;
@@ -90,7 +90,7 @@ static inline uint8_t string_header_size(uint8_t cap_size, uint8_t char_size)
     }
 }
 
-static inline uint8_t* get_char_ptr(struct _UwString* str, size_t start_pos)
+static inline uint8_t* get_char_ptr(struct _UwString* str, unsigned start_pos)
 {
     struct _UwString s = *str;
     return ((uint8_t*) str) + string_header_size(s.cap_size + 1, s.char_size + 1) + start_pos * (s.char_size + 1);
@@ -102,17 +102,17 @@ static inline uint8_t* get_char_ptr(struct _UwString* str, size_t start_pos)
 
 typedef char32_t (*GetChar)(uint8_t* p);
 typedef void     (*PutChar)(uint8_t* p, char32_t c);
-typedef void     (*Hash)(uint8_t* self_ptr, size_t length, UwHashContext* ctx);
-typedef uint8_t  (*MaxCharSize)(uint8_t* self_ptr, size_t length);
-typedef bool     (*Equal)(uint8_t* self_ptr, struct _UwString* other, size_t other_start_pos, size_t length);
-typedef bool     (*EqualCStr)(uint8_t* self_ptr, char* other, size_t length);
-typedef bool     (*EqualUtf8)(uint8_t* self_ptr, char8_t* other, size_t length);
-typedef bool     (*EqualUtf32)(uint8_t* self_ptr, char32_t* other, size_t length);
-typedef void     (*CopyTo)(uint8_t* self_ptr, struct _UwString* dest, size_t dest_start_pos, size_t length);
-typedef void     (*CopyToUtf8)(uint8_t* self_ptr, char* dest_ptr, size_t length);
-typedef size_t   (*CopyFromCStr)(uint8_t* self_ptr, char* src_ptr, size_t length);
-typedef size_t   (*CopyFromUtf8)(uint8_t* self_ptr, char8_t* src_ptr, size_t length);
-typedef size_t   (*CopyFromUtf32)(uint8_t* self_ptr, char32_t* src_ptr, size_t length);
+typedef void     (*Hash)(uint8_t* self_ptr, unsigned length, UwHashContext* ctx);
+typedef uint8_t  (*MaxCharSize)(uint8_t* self_ptr, unsigned length);
+typedef bool     (*Equal)(uint8_t* self_ptr, struct _UwString* other, unsigned other_start_pos, unsigned length);
+typedef bool     (*EqualCStr)(uint8_t* self_ptr, char* other, unsigned length);
+typedef bool     (*EqualUtf8)(uint8_t* self_ptr, char8_t* other, unsigned length);
+typedef bool     (*EqualUtf32)(uint8_t* self_ptr, char32_t* other, unsigned length);
+typedef void     (*CopyTo)(uint8_t* self_ptr, struct _UwString* dest, unsigned dest_start_pos, unsigned length);
+typedef void     (*CopyToUtf8)(uint8_t* self_ptr, char* dest_ptr, unsigned length);
+typedef unsigned (*CopyFromCStr)(uint8_t* self_ptr, char* src_ptr, unsigned length);
+typedef unsigned (*CopyFromUtf8)(uint8_t* self_ptr, char8_t* src_ptr, unsigned length);
+typedef unsigned (*CopyFromUtf32)(uint8_t* self_ptr, char32_t* src_ptr, unsigned length);
 
 typedef struct {
     GetChar       get_char;

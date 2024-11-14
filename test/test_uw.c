@@ -27,21 +27,21 @@ bool print_ok = false;
 
 unsigned num_allocated = 0;
 
-static void* test_alloc(size_t nbytes)
+static void* test_alloc(unsigned nbytes)
 {
     void* result = malloc(nbytes);
-//    printf("alloc %zu bytes -> %p\n", nbytes, result);
+//    printf("alloc %u bytes -> %p\n", nbytes, result);
     num_allocated++;
     return result;
 }
 
-static void* test_realloc(void* block, size_t nbytes)
+static void* test_realloc(void* block, unsigned nbytes)
 {
     void* result = realloc(block, nbytes);
     if (!block) {
         num_allocated++;
     }
-//    printf("realloc %p %zu bytes -> %p\n", block, nbytes, result);
+//    printf("realloc %p %u bytes -> %p\n", block, nbytes, result);
     return result;
 }
 
@@ -914,6 +914,7 @@ void test_string()
         //uw_dump(v);
     }
 
+#if UINT_WIDTH > 32
     { // testing cap_size=8 char_size=1
         UwValue v = uw_create_empty_string2(8, 1);
         s = *_uw_get_string_pptr(v);
@@ -925,6 +926,7 @@ void test_string()
         TEST(s->block_count == 3);
         //uw_dump(v);
     }
+#endif
 
     { // testing cap_size=1 char_size=2
         UwValue v = uw_create_empty_string(0, 2);
@@ -1062,6 +1064,7 @@ void test_string()
         //uw_dump(v);
     }
 
+#if UINT_WIDTH > 32
     { // testing cap_size=8 char_size=2
         UwValue v = uw_create_empty_string2(8, 2);
         //uw_dump(s_8_2);
@@ -1074,6 +1077,7 @@ void test_string()
         TEST(s->block_count == 3);
         //uw_dump(v);
     }
+#endif
 
     { // testing cap_size=1 char_size=3
         UwValue v = uw_create_empty_string(0, 3);
@@ -1111,6 +1115,7 @@ void test_string()
         //uw_dump(v);
     }
 
+#if UINT_WIDTH > 32
     { // testing cap_size=8 char_size=3
         UwValue v = uw_create_empty_string2(8, 3);
         s = *_uw_get_string_pptr(v);
@@ -1122,6 +1127,7 @@ void test_string()
         TEST(s->block_count == 3);
         //uw_dump(v);
     }
+#endif
 
     { // testing cap_size=1 char_size=4
         UwValue v = uw_create_empty_string(0, 4);
@@ -1159,6 +1165,7 @@ void test_string()
         //uw_dump(v);
     }
 
+#if UINT_WIDTH > 32
     { // testing cap_size=8 char_size=4
         UwValue v = uw_create_empty_string2(8, 4);
         s = *_uw_get_string_pptr(v);
@@ -1170,6 +1177,7 @@ void test_string()
         TEST(s->block_count == 3);
         //uw_dump(v);
     }
+#endif
 
     { // test trimming
         UwValue v = uw_create(u8"  สวัสดี   ");
@@ -1207,7 +1215,7 @@ void test_list()
 
     TEST(uw_list_length(list) == 0);
 
-    for(int i = 0; i < 1000; i++) {
+    for(unsigned i = 0; i < 1000; i++) {
         {
             UwValue item = uw_create(i);
 
@@ -1215,7 +1223,7 @@ void test_list()
             TEST(item->refcount == 2);
         }
 
-        TEST(uw_list_length(list) == (size_t)(i + 1));
+        TEST(uw_list_length(list) == i + 1);
 
         {
             UwValue v = uw_list_item(list, i);

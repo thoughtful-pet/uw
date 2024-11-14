@@ -15,14 +15,14 @@ extern "C" {
 
 struct _UwHashTable;
 
-typedef size_t (*_UwHtGet)(struct _UwHashTable* ht, size_t index);
-typedef void   (*_UwHtSet)(struct _UwHashTable* ht, size_t index, size_t value);
+typedef unsigned (*_UwHtGet)(struct _UwHashTable* ht, unsigned index);
+typedef void     (*_UwHtSet)(struct _UwHashTable* ht, unsigned index, unsigned value);
 
 struct _UwHashTable {
     uint8_t item_size;   // in bytes
     UwType_Hash hash_bitmask;  // calculated from item_size
-    size_t items_used;
-    size_t capacity;
+    unsigned items_used;
+    unsigned capacity;
     _UwHtGet get_item;  // getter function for specific item size
     _UwHtSet set_item;  // setter function for specific item size
     uint8_t* items;     // items have variable size

@@ -20,7 +20,7 @@
 //#define TRACE(...)  printf(__VA_ARGS__)
 #define TRACE(...)
 
-void _uw_hash_init(UwHashContext* ctx /*, size_t len*/)
+void _uw_hash_init(UwHashContext* ctx)
 {
     ctx->seed = RAPID_SEED ^ rapid_mix(RAPID_SEED ^ RAPID_SECRET_0, RAPID_SECRET_1) /* ^ len */;
     ctx->see1 = ctx->seed;

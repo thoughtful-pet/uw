@@ -13,7 +13,7 @@ UwValuePtr  uw_create_string_cstr(char*      initializer);
 UwValuePtr _uw_create_string_u8  (char8_t*   initializer);
 UwValuePtr _uw_create_string_u32 (char32_t*  initializer);
 
-UwValuePtr uw_create_empty_string(size_t capacity, uint8_t char_size);
+UwValuePtr uw_create_empty_string(unsigned capacity, uint8_t char_size);
 
 uint8_t uw_string_char_size(UwValuePtr s);
 
@@ -24,7 +24,7 @@ bool  uw_equal_cstr(UwValuePtr a, char* b);
 bool _uw_equal_u8  (UwValuePtr a, char8_t* b);
 bool _uw_equal_u32 (UwValuePtr a, char32_t* b);
 
-size_t uw_strlen(UwValuePtr str);
+unsigned uw_strlen(UwValuePtr str);
 /*
  * Return length of string.
  */
@@ -42,33 +42,33 @@ void uw_string_copy_buf(UwValuePtr str, char* buffer);
  * Encode multibyte chars to UTF-8.
  */
 
-UwValuePtr uw_string_get_substring(UwValuePtr str, size_t start_pos, size_t end_pos);
+UwValuePtr uw_string_get_substring(UwValuePtr str, unsigned start_pos, unsigned end_pos);
 /*
  * Get substring from `start_pos` to `end_pos`.
  */
 
-bool  uw_substring_eq_cstr(UwValuePtr a, size_t start_pos, size_t end_pos, char*      b);
-bool _uw_substring_eq_u8  (UwValuePtr a, size_t start_pos, size_t end_pos, char8_t*   b);
-bool _uw_substring_eq_u32 (UwValuePtr a, size_t start_pos, size_t end_pos, char32_t*  b);
-bool _uw_substring_eq_uw  (UwValuePtr a, size_t start_pos, size_t end_pos, UwValuePtr b);
+bool  uw_substring_eq_cstr(UwValuePtr a, unsigned start_pos, unsigned end_pos, char*      b);
+bool _uw_substring_eq_u8  (UwValuePtr a, unsigned start_pos, unsigned end_pos, char8_t*   b);
+bool _uw_substring_eq_u32 (UwValuePtr a, unsigned start_pos, unsigned end_pos, char32_t*  b);
+bool _uw_substring_eq_uw  (UwValuePtr a, unsigned start_pos, unsigned end_pos, UwValuePtr b);
 
-char32_t uw_string_at(UwValuePtr str, size_t position);
+char32_t uw_string_at(UwValuePtr str, unsigned position);
 /*
  * Return character at `position`.
  * If position is beyond end of line return 0.
  */
 
-void uw_string_erase(UwValuePtr str, size_t start_pos, size_t end_pos);
+void uw_string_erase(UwValuePtr str, unsigned start_pos, unsigned end_pos);
 /*
  * Erase characters from `start_pos` to `end_pos`.
  */
 
-void uw_string_truncate(UwValuePtr str, size_t position);
+void uw_string_truncate(UwValuePtr str, unsigned position);
 /*
  * Truncate string at given `position`.
  */
 
-bool uw_string_indexof(UwValuePtr str, char32_t chr, size_t start_pos, size_t* result);
+bool uw_string_indexof(UwValuePtr str, char32_t chr, unsigned start_pos, unsigned* result);
 /*
  * Find first occurence of `chr` in `str` starting from `start_pos`.
  *
@@ -96,7 +96,7 @@ bool _uw_string_append_u8  (UwValuePtr dest, char8_t*   src);
 bool _uw_string_append_u32 (UwValuePtr dest, char32_t*  src);
 bool _uw_string_append_uw  (UwValuePtr dest, UwValuePtr src);
 
-bool uw_string_append_utf8(UwValuePtr dest, char8_t* buffer, size_t size, size_t* bytes_processed);
+bool uw_string_append_utf8(UwValuePtr dest, char8_t* buffer, unsigned size, unsigned* bytes_processed);
 /*
  * Append UTF-8-encoded characters from `buffer`.
  * Write the number of bytes processed to `bytes_processed`, which can be less
@@ -105,7 +105,7 @@ bool uw_string_append_utf8(UwValuePtr dest, char8_t* buffer, size_t size, size_t
  * Return false if out of memory.
  */
 
-bool uw_string_append_buffer(UwValuePtr dest, uint8_t* buffer, size_t size);
+bool uw_string_append_buffer(UwValuePtr dest, uint8_t* buffer, unsigned size);
 /*
  * Append bytes from `buffer`.
  * `dest` char size must be 1.
@@ -117,17 +117,17 @@ bool uw_string_append_buffer(UwValuePtr dest, uint8_t* buffer, size_t size);
  * Insert functions
  * TODO other types
  */
-bool _uw_string_insert_many_c32(UwValuePtr str, size_t position, char32_t value, size_t n);
+bool _uw_string_insert_many_c32(UwValuePtr str, unsigned position, char32_t value, unsigned n);
 
 /*
  * Append substring functions.
  *
  * Append `src` substring starting from `src_start_pos` to `src_end_pos`.
  */
-bool  uw_string_append_substring_cstr(UwValuePtr dest, char*      src, size_t src_start_pos, size_t src_end_pos);
-bool _uw_string_append_substring_u8  (UwValuePtr dest, char8_t*   src, size_t src_start_pos, size_t src_end_pos);
-bool _uw_string_append_substring_u32 (UwValuePtr dest, char32_t*  src, size_t src_start_pos, size_t src_end_pos);
-bool _uw_string_append_substring_uw  (UwValuePtr dest, UwValuePtr src, size_t src_start_pos, size_t src_end_pos);
+bool  uw_string_append_substring_cstr(UwValuePtr dest, char*      src, unsigned src_start_pos, unsigned src_end_pos);
+bool _uw_string_append_substring_u8  (UwValuePtr dest, char8_t*   src, unsigned src_start_pos, unsigned src_end_pos);
+bool _uw_string_append_substring_u32 (UwValuePtr dest, char32_t*  src, unsigned src_start_pos, unsigned src_end_pos);
+bool _uw_string_append_substring_uw  (UwValuePtr dest, UwValuePtr src, unsigned src_start_pos, unsigned src_end_pos);
 
 /*
  * Split functions.
@@ -159,7 +159,7 @@ UwValuePtr _uw_string_join_uw (UwValuePtr separator, UwValuePtr list);
  * Miiscellaneous helper functions.
  */
 
-size_t uw_strlen_in_utf8(UwValuePtr str);
+unsigned uw_strlen_in_utf8(UwValuePtr str);
 /*
  * Return length of str as if was encoded in UTF-8.
  */
@@ -178,18 +178,18 @@ void* uw_string_data_ptr(UwValuePtr str);
 
 void _uw_putchar32_utf8(char32_t codepoint);
 
-size_t utf8_strlen(char8_t* str);
+unsigned utf8_strlen(char8_t* str);
 /*
  * Count the number of codepoints in UTF8-encoded string.
  */
 
-size_t utf8_strlen2(char8_t* str, uint8_t* char_size);
+unsigned utf8_strlen2(char8_t* str, uint8_t* char_size);
 /*
  * Count the number of codepoints in UTF8-encoded string
  * and find max char size.
  */
 
-size_t utf8_strlen2_buf(char8_t* buffer, size_t* size, uint8_t* char_size);
+unsigned utf8_strlen2_buf(char8_t* buffer, unsigned* size, uint8_t* char_size);
 /*
  * Count the number of codepoints in the buffer and find max char size.
  *
@@ -201,17 +201,17 @@ size_t utf8_strlen2_buf(char8_t* buffer, size_t* size, uint8_t* char_size);
  * incomplete sequence.
  */
 
-char8_t* utf8_skip(char8_t* str, size_t n);
+char8_t* utf8_skip(char8_t* str, unsigned n);
 /*
  * Skip `n` characters, return pointer to `n`th char.
  */
 
-size_t u32_strlen(char32_t* str);
+unsigned u32_strlen(char32_t* str);
 /*
  * Find length of null-terminated `str`.
  */
 
-size_t u32_strlen2(char32_t* str, uint8_t* char_size);
+unsigned u32_strlen2(char32_t* str, uint8_t* char_size);
 /*
  * Find both length of null-terminated `str` and max char size in one go.
  */
@@ -221,7 +221,7 @@ char32_t* u32_strchr(char32_t* str, char32_t chr);
  * Find the first occurrence of `chr` in the null-terminated `str`.
  */
 
-uint8_t u32_char_size(char32_t* str, size_t max_len);
+uint8_t u32_char_size(char32_t* str, unsigned max_len);
 /*
  * Find the maximal size of character in `str`, up to `max_len` or null terminator.
  */

@@ -65,7 +65,7 @@ bool _uw_stringio_read_line_inplace(UwValuePtr self, UwValuePtr line)
         return false;
     }
 
-    size_t lf_pos;
+    unsigned lf_pos;
     if (!uw_string_indexof(self, '\n', sio->line_position, &lf_pos)) {
         lf_pos = uw_strlen(self) - 1;
     }

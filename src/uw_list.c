@@ -21,7 +21,7 @@ void _uw_fini_list(UwValuePtr self)
 void _uw_list_unbrace(UwValuePtr self)
 {
     struct _UwList* list = _uw_get_list_ptr(self);
-    size_t n = list->length;
+    unsigned n = list->length;
     UwValuePtr* item_ref = list->items;
     while (n--) {
         _uw_unbrace(item_ref++);
@@ -32,7 +32,7 @@ void _uw_hash_list(UwValuePtr self, UwHashContext* ctx)
 {
     _uw_hash_uint64(ctx, self->type_id);
     struct _UwList* list = _uw_get_list_ptr(self);
-    for (size_t i = 0; i < list->length; i++) {
+    for (unsigned i = 0; i < list->length; i++) {
         UwValuePtr item = list->items[i];
         _uw_call_hash(item, ctx);
     }
@@ -50,7 +50,7 @@ UwValuePtr _uw_copy_list(UwValuePtr self)
         // deep copy
         UwValuePtr* src_item_ptr = list->items;
         UwValuePtr* dest_item_ptr = result_list->items;
-        for (size_t i = 0; i < list->length; i++) {
+        for (unsigned i = 0; i < list->length; i++) {
             UwValuePtr new_item = uw_copy(*src_item_ptr++);
             if (!new_item) {
                 goto error;
@@ -86,10 +86,10 @@ void _uw_dump_list(UwValuePtr self, int indent, struct _UwValueChain* prev_compo
     }
 
     struct _UwList* list = _uw_get_list_ptr(self);
-    printf("%zu items, capacity=%zu\n", list->length, list->capacity);
+    printf("%u items, capacity=%u\n", list->length, list->capacity);
 
     indent += 4;
-    for (size_t i = 0; i < list->length; i++) {
+    for (unsigned i = 0; i < list->length; i++) {
 
         UwValuePtr item = list->items[i];
         struct _UwValueChain* prevc;
@@ -157,7 +157,7 @@ bool _uw_list_equal_ctype(UwValuePtr self, UwCType ctype, ...)
     return result;
 }
 
-static size_t round_capacity(size_t capacity)
+static unsigned round_capacity(unsigned capacity)
 {
     if (capacity <= UWLIST_INITIAL_CAPACITY) {
         return (capacity + UWLIST_INITIAL_CAPACITY - 1) & ~(UWLIST_INITIAL_CAPACITY - 1);
@@ -166,7 +166,7 @@ static size_t round_capacity(size_t capacity)
     }
 }
 
-bool _uw_alloc_list(UwAllocId alloc_id, struct _UwList* list, size_t capacity)
+bool _uw_alloc_list(UwAllocId alloc_id, struct _UwList* list, unsigned capacity)
 {
     list->length = 0;
     list->capacity = round_capacity(capacity);
@@ -177,7 +177,7 @@ bool _uw_alloc_list(UwAllocId alloc_id, struct _UwList* list, size_t capacity)
 void _uw_delete_list(UwAllocId alloc_id, struct _UwList* list)
 {
     if (list->items) {
-        for (size_t i = 0; i < list->length; i++) {
+        for (unsigned i = 0; i < list->length; i++) {
             UwValuePtr item = list->items[i];
             if (item) {  // can be already destroyed by unbrace
                 if (item->compound) {
@@ -212,7 +212,7 @@ UwValuePtr uw_create_list_ap(va_list ap)
     return list;
 }
 
-size_t uw_list_length(UwValuePtr list)
+unsigned uw_list_length(UwValuePtr list)
 {
     uw_assert_list(list);
     return _uw_list_length(_uw_get_list_ptr(list));
@@ -220,7 +220,7 @@ size_t uw_list_length(UwValuePtr list)
 
 bool _uw_list_eq(struct _UwList* a, struct _UwList* b)
 {
-    size_t n = a->length;
+    unsigned n = a->length;
     if (b->length != n) {
         // lists have different lengths
         return false;
@@ -331,7 +331,7 @@ bool _uw_list_append(UwAllocId alloc_id, struct _UwList* list, UwValuePtr item)
     uw_assert(list->length <= list->capacity);
 
     if (list->length == list->capacity) {
-        size_t new_capacity = round_capacity(list->capacity + UWLIST_CAPACITY_INCREMENT);
+        unsigned new_capacity = round_capacity(list->capacity + UWLIST_CAPACITY_INCREMENT);
         UwValuePtr* new_items = _uw_allocators[alloc_id].realloc(list->items, new_capacity * sizeof(UwValuePtr));
         if (!new_items) {
             return false;
@@ -357,7 +357,7 @@ bool uw_list_append_ap(UwValuePtr list, va_list ap)
     uw_assert_list(list);
 
     UwAllocId alloc_id = list->alloc_id;
-    size_t num_appended = 0;
+    unsigned num_appended = 0;
     for (;;) {
         int ctype = va_arg(ap, int);
         if (ctype == -1) {
@@ -398,7 +398,7 @@ error:
     return false;
 }
 
-UwValuePtr uw_list_item(UwValuePtr self, ssize_t index)
+UwValuePtr uw_list_item(UwValuePtr self, int index)
 {
     uw_assert_list(self);
 
@@ -408,7 +408,7 @@ UwValuePtr uw_list_item(UwValuePtr self, ssize_t index)
         index = list->length + index;
         uw_assert(index >= 0);
     } else {
-        uw_assert(((size_t) index) < list->length);
+        uw_assert(((unsigned) index) < list->length);
     }
     return  uw_makeref(list->items[index]);
 }
@@ -433,13 +433,13 @@ UwValuePtr uw_list_pop(UwValuePtr self)
     }
 }
 
-void uw_list_del(UwValuePtr self, size_t start_index, size_t end_index)
+void uw_list_del(UwValuePtr self, unsigned start_index, unsigned end_index)
 {
     uw_assert_list(self);
     _uw_list_del(_uw_get_list_ptr(self), start_index, end_index);
 }
 
-void _uw_list_del(struct _UwList* list, size_t start_index, size_t end_index)
+void _uw_list_del(struct _UwList* list, unsigned start_index, unsigned end_index)
 {
     if (list->length == 0) {
         return;
@@ -451,7 +451,7 @@ void _uw_list_del(struct _UwList* list, size_t start_index, size_t end_index)
         return;
     }
 
-    for (size_t i = start_index; i < end_index; i++) {
+    for (unsigned i = start_index; i < end_index; i++) {
         UwValuePtr item = list->items[i];
         if (item) {  // can be already destroyed by unbrace
             if (item->compound) {
@@ -462,8 +462,8 @@ void _uw_list_del(struct _UwList* list, size_t start_index, size_t end_index)
         }
     }
 
-    size_t new_length = list->length - (end_index - start_index);
-    size_t tail_length = list->length - end_index;
+    unsigned new_length = list->length - (end_index - start_index);
+    unsigned tail_length = list->length - end_index;
     if (tail_length) {
         memmove(&list->items[start_index], &list->items[end_index], tail_length * sizeof(UwValuePtr));
         memset(&list->items[new_length], 0, (list->length - new_length) * sizeof(UwValuePtr));
@@ -472,10 +472,10 @@ void _uw_list_del(struct _UwList* list, size_t start_index, size_t end_index)
     list->length = new_length;
 }
 
-UwValuePtr uw_list_slice(UwValuePtr self, size_t start_index, size_t end_index)
+UwValuePtr uw_list_slice(UwValuePtr self, unsigned start_index, unsigned end_index)
 {
     struct _UwList* list = _uw_get_list_ptr(self);
-    size_t length = _uw_list_length(list);
+    unsigned length = _uw_list_length(list);
 
     if (end_index > length) {
         end_index = length;
@@ -484,7 +484,7 @@ UwValuePtr uw_list_slice(UwValuePtr self, size_t start_index, size_t end_index)
         // return empty list
         return uw_create_list();
     }
-    size_t slice_len = end_index - start_index;
+    unsigned slice_len = end_index - start_index;
 
     UwValuePtr result = _uw_alloc_value(UwTypeId_List);
     if (!result) {
@@ -498,7 +498,7 @@ UwValuePtr uw_list_slice(UwValuePtr self, size_t start_index, size_t end_index)
 
     UwValuePtr* src_item_ptr = &list->items[start_index];
     UwValuePtr* dest_item_ptr = result_list->items;
-    for (size_t i = start_index; i < end_index; i++) {
+    for (unsigned i = start_index; i < end_index; i++) {
         UwValuePtr item = *src_item_ptr++;
         if (item->compound) {
             _uw_embrace(item);

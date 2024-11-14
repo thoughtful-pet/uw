@@ -8,7 +8,7 @@ extern "C" {
 
 struct _UwStringIO {
     // line reader data
-    size_t line_position;
+    unsigned line_position;
     UwValuePtr pushback;
 };
 

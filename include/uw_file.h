@@ -34,7 +34,7 @@ typedef struct {
  * FileReader interface
  */
 
-typedef ssize_t (*UwMethodReadFile)(UwValuePtr self, void* buffer, size_t buffer_size);
+typedef bool (*UwMethodReadFile)(UwValuePtr self, void* buffer, unsigned buffer_size, unsigned* bytes_read);
 
 typedef struct {
     UwMethodReadFile read;
@@ -45,7 +45,7 @@ typedef struct {
  * FileWriter interface
  */
 
-typedef ssize_t (*UwMethodWriteFile)(UwValuePtr self, void* data, size_t size);
+typedef bool (*UwMethodWriteFile)(UwValuePtr self, void* data, unsigned size, unsigned* bytes_written);
 
 // XXX truncate
 
@@ -73,8 +73,8 @@ void       uw_file_close   (UwValuePtr file);
 bool       uw_file_set_fd  (UwValuePtr file, int fd);
 UwValuePtr uw_file_get_name(UwValuePtr file);
 bool       uw_file_set_name(UwValuePtr file, UwValuePtr file_name);
-ssize_t    uw_file_read    (UwValuePtr file, void* buffer, size_t buffer_size);
-ssize_t    uw_file_write   (UwValuePtr file, void* data, size_t size);
+bool       uw_file_read    (UwValuePtr file, void* buffer, unsigned buffer_size, unsigned* bytes_read);
+bool       uw_file_write   (UwValuePtr file, void* data, unsigned size, unsigned* bytes_written);
 
 #ifdef __cplusplus
 }

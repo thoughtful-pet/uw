@@ -50,7 +50,7 @@
  * The general rule is to use autocleaned variables in small scopes,
  * especially if such variables are used in a loop body:
  *
- *  for (size_t i = 0, n = uw_list_length(mylist); i < n; i++) {
+ *  for (unsigned i = 0, n = uw_list_length(mylist); i < n; i++) {
  *      {
  *          UwValue item = uw_list_item(mylist, i);
  *

@@ -14,7 +14,7 @@ static inline UwValuePtr uw_create_list()
 UwValuePtr uw_create_list_va(...);
 UwValuePtr uw_create_list_ap(va_list ap);
 
-size_t uw_list_length(UwValuePtr list);
+unsigned uw_list_length(UwValuePtr list);
 
 bool _uw_list_append_null (UwValuePtr list, UwType_Null  item);
 bool _uw_list_append_bool (UwValuePtr list, UwType_Bool  item);
@@ -27,7 +27,7 @@ bool _uw_list_append_uw   (UwValuePtr list, UwValuePtr   item);
 bool uw_list_append_va(UwValuePtr list, ...);
 bool uw_list_append_ap(UwValuePtr list, va_list ap);
 
-UwValuePtr uw_list_item(UwValuePtr list, ssize_t index);
+UwValuePtr uw_list_item(UwValuePtr list, int index);
 /*
  * Return reference to list item. Negative indexes are allowed: -1 last item.
  * It's the caller's responsibility to destroy returned value to avoid memory leaks.
@@ -41,13 +41,13 @@ UwValuePtr uw_list_pop(UwValuePtr list);
  * The simplest way is assigning it to an UwValue.
  */
 
-void uw_list_del(UwValuePtr list, size_t start_index, size_t end_index);
+void uw_list_del(UwValuePtr list, unsigned start_index, unsigned end_index);
 /*
  * Delete items from list.
  * `end_index` is exclusive, i.e. the number of items to delete equals to end_index - start_index..
  */
 
-UwValuePtr uw_list_slice(UwValuePtr list, size_t start_index, size_t end_index);
+UwValuePtr uw_list_slice(UwValuePtr list, unsigned start_index, unsigned end_index);
 /*
  * Return shallow copy of the given range of list.
  */
