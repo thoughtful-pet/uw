@@ -277,7 +277,7 @@ void uw_set_allocator(UwAllocId alloc_id)
  * Global list of interfaces initialized with built-in interfaces.
  */
 
-bool _uw_registered_interfaces[1 << UW_INTERFACE_BITWIDTH] = {
+bool _uw_registered_interfaces[UW_INTERFACE_CAPACITY] = {
     [UwInterfaceId_Logic]        = true,
     [UwInterfaceId_Arithmetic]   = true,
     [UwInterfaceId_Bitwise]      = true,
@@ -292,7 +292,7 @@ bool _uw_registered_interfaces[1 << UW_INTERFACE_BITWIDTH] = {
 
 int uw_register_interface()
 {
-    for (int i = 0; i < (1 << UW_INTERFACE_BITWIDTH); i++) {
+    for (int i = 0; i < UW_INTERFACE_CAPACITY; i++) {
         if (!_uw_registered_interfaces[i]) {
             _uw_registered_interfaces[i] = true;
             return i;
@@ -574,7 +574,7 @@ static UwType stringio_type = {
     }
 };
 
-UwType* _uw_types[1 << UW_TYPE_BITWIDTH] = {
+UwType* _uw_types[UW_TYPE_CAPACITY] = {
 
     [UwTypeId_Null]   = &null_type,
     [UwTypeId_Bool]   = &bool_type,
@@ -591,7 +591,7 @@ UwType* _uw_types[1 << UW_TYPE_BITWIDTH] = {
 
 int uw_add_type(UwType* type)
 {
-    for (int i = 0; i < (1 << UW_TYPE_BITWIDTH); i++) {
+    for (int i = 0; i < UW_TYPE_CAPACITY; i++) {
         if (_uw_types[i] == nullptr) {
             _uw_types[i] = type;
             return i;

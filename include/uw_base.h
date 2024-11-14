@@ -1,5 +1,16 @@
 #pragma once
 
+/*
+ * Configuration:
+ *
+ * UW_TYPE_BITWIDTH        default: 8
+ * UW_ALLOCATOR_BITWIDTH   default: 2
+ * UW_INTERFACE_BITWIDTH   default: 8
+ *
+ * UW_TYPE_CAPACITY        default: 1 << UW_TYPE_BITWIDTH
+ * UW_INTERFACE_CAPACITY   default: 1 << UW_INTERFACE_BITWIDTH
+ */
+
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -33,6 +44,15 @@ extern "C" {
 // and the size of _uw_types array.
 #ifndef UW_TYPE_BITWIDTH
 #   define UW_TYPE_BITWIDTH  8
+#endif
+
+#ifndef UW_TYPE_CAPACITY
+#    define UW_TYPE_CAPACITY  (1 << UW_TYPE_BITWIDTH)
+#else
+#    if UW_TYPE_CAPACITY > (1 << UW_TYPE_BITWIDTH)
+#        undef UW_TYPE_CAPACITY
+#        define UW_TYPE_CAPACITY  (1 << UW_TYPE_BITWIDTH)
+#    endif
 #endif
 
 #ifndef UW_ALLOCATOR_BITWIDTH
@@ -215,7 +235,16 @@ typedef enum {
 #   define UW_INTERFACE_BITWIDTH  8
 #endif
 
-extern bool _uw_registered_interfaces[1 << UW_INTERFACE_BITWIDTH];
+#ifndef UW_INTERFACE_CAPACITY
+#    define UW_INTERFACE_CAPACITY  (1 << UW_INTERFACE_BITWIDTH)
+#else
+#    if UW_INTERFACE_CAPACITY > (1 << UW_INTERFACE_BITWIDTH)
+#        undef UW_INTERFACE_CAPACITY
+#        define UW_INTERFACE_CAPACITY  (1 << UW_INTERFACE_BITWIDTH)
+#    endif
+#endif
+
+extern bool _uw_registered_interfaces[UW_INTERFACE_CAPACITY];
 /*
  * Global list of registered interfaces.
  * Its purpose is simply track assigned ids.
@@ -320,7 +349,7 @@ typedef struct {
     UwMethodEqualCType equal_ctype;
 
     // extra interfaces
-    void* interfaces[1 << UW_INTERFACE_BITWIDTH];
+    void* interfaces[UW_INTERFACE_CAPACITY];
 
 } UwType;
 
@@ -359,7 +388,7 @@ typedef struct {
 #define uw_assert_file(value)      uw_assert(uw_is_file    (value))
 #define uw_assert_stringio(value)  uw_assert(uw_is_stringio(value))
 
-extern UwType* _uw_types[1 << UW_TYPE_BITWIDTH];
+extern UwType* _uw_types[UW_TYPE_CAPACITY];
 /*
  * Global list of types initialized with built-in types.
  */
