@@ -1373,6 +1373,8 @@ int main(int argc, char* argv[])
     _uw_allocators[TEST_ALLOCATOR_ID] = test_allocator;
     uw_set_allocator(TEST_ALLOCATOR_ID);
 
+    printf("Types capacity: %d; interfaces capacity: %d\n", UW_TYPE_CAPACITY, UW_INTERFACE_CAPACITY);
+
     test_integral_types();
     test_string();
     test_list();

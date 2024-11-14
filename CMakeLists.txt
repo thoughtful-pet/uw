@@ -27,8 +27,10 @@ add_library(uw STATIC
 
 target_include_directories(uw PUBLIC . include)
 target_compile_definitions(uw PUBLIC DEBUG)
+target_compile_definitions(uw PUBLIC UW_TYPE_CAPACITY=16 UW_INTERFACE_CAPACITY=16)
 
 add_executable(test_uw test/test_uw.c)
 
 target_compile_definitions(test_uw PUBLIC DEBUG)
 target_link_libraries(test_uw uw ICU::uc)
+target_compile_definitions(test_uw PUBLIC UW_TYPE_CAPACITY=16 UW_INTERFACE_CAPACITY=16)
