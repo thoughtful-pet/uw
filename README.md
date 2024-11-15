@@ -11,3 +11,9 @@ This software is full of fleas, meow.
 Yet another variant type for C.
 
 Initial purpose: parsers.
+
+## Building
+
+The following environment variables are honoured:
+
+* `UW_WITHOUT_ICU`: if defined (the value does not matter), build without ICU dependency

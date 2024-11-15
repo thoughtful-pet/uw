@@ -6,7 +6,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_compile_options(-Wall -Wextra -pedantic -Werror -Wno-gnu -Wno-unused-parameter -Wno-format-pedantic)
 
-find_package(ICU COMPONENTS uc REQUIRED)
+find_package(ICU COMPONENTS uc)
 
 add_library(uw STATIC
     src/uw_base.c
@@ -29,8 +29,17 @@ target_include_directories(uw PUBLIC . include)
 target_compile_definitions(uw PUBLIC DEBUG)
 target_compile_definitions(uw PUBLIC UW_TYPE_CAPACITY=16 UW_INTERFACE_CAPACITY=16)
 
+if(DEFINED ICU_FOUND AND NOT DEFINED ENV{UW_WITHOUT_ICU})
+    target_compile_definitions(uw PUBLIC UW_WITH_ICU)
+endif()
+
 add_executable(test_uw test/test_uw.c)
 
 target_compile_definitions(test_uw PUBLIC DEBUG)
-target_link_libraries(test_uw uw ICU::uc)
 target_compile_definitions(test_uw PUBLIC UW_TYPE_CAPACITY=16 UW_INTERFACE_CAPACITY=16)
+target_link_libraries(test_uw uw)
+
+if(DEFINED ICU_FOUND AND NOT DEFINED ENV{UW_WITHOUT_ICU})
+    target_compile_definitions(test_uw PUBLIC UW_WITH_ICU)
+    target_link_libraries(test_uw ICU::uc)
+endif()

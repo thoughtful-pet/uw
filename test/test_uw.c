@@ -59,6 +59,19 @@ static UwAllocator test_allocator = {
     .free    = test_free
 };
 
+void test_icu()
+{
+#   ifdef UW_WITH_ICU
+        puts("With ICU");
+        TEST(uw_char_isspace(' '));
+        TEST(uw_char_isspace(0x2003));
+#   else
+        puts("Without ICU");
+        TEST(uw_char_isspace(' '));
+        TEST(!uw_char_isspace(0x2003));
+#   endif
+}
+
 void test_integral_types()
 {
     // generics test
@@ -1383,6 +1396,7 @@ int main(int argc, char* argv[])
 
     printf("Types capacity: %d; interfaces capacity: %d\n", UW_TYPE_CAPACITY, UW_INTERFACE_CAPACITY);
 
+    test_icu();
     test_integral_types();
     test_string();
     test_list();

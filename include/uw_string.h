@@ -1,7 +1,11 @@
 #pragma once
 
-// ICU library for character classification:
-#include <unicode/uchar.h>
+#include <ctype.h>
+
+#ifdef UW_WITH_ICU
+    // ICU library for character classification:
+#   include <unicode/uchar.h>
+#endif
 
 #include <uw_ctype.h>
 
@@ -226,24 +230,33 @@ uint8_t u32_char_size(char32_t* str, unsigned max_len);
  * Find the maximal size of character in `str`, up to `max_len` or null terminator.
  */
 
-#define uw_char_lower(c)  u_tolower(c)
-#define uw_char_upper(c)  u_toupper(c)
+#ifdef UW_WITH_ICU
+#   define uw_char_lower(c)  u_tolower(c)
+#   define uw_char_upper(c)  u_toupper(c)
+#else
+#   define uw_char_lower(c)  tolower(c)
+#   define uw_char_upper(c)  toupper(c)
+#endif
 
 /****************************************************************
  * Character classification functions
  */
 
-#define uw_char_isspace(c)  u_isspace(c)
+#ifdef UW_WITH_ICU
+#   define uw_char_isspace(c)  u_isspace(c)
+#else
+#   define uw_char_isspace(c)  isspace(c)
+#endif
 /*
  * Return true if `c` is a whitespace character.
  */
 
-#define uw_char_isdigit(c)  ('0' <= (c) && (c) <= '9')
+#define uw_char_isdigit(c)  isdigit(c)
 /*
  * Return true if `c` is an ASCII digit.
  * Do not consider any other unicode digits because this function
- * is used in conjunction with standard C library which does
- * not support unicode character classification.
+ * is used in conjunction with standard C library (string to number conversion)
+ * that does not support unicode character classification.
  */
 
 /****************************************************************
