@@ -26,20 +26,43 @@ add_library(uw STATIC
 )
 
 target_include_directories(uw PUBLIC . include)
-target_compile_definitions(uw PUBLIC DEBUG)
-target_compile_definitions(uw PUBLIC UW_TYPE_CAPACITY=16 UW_INTERFACE_CAPACITY=16)
 
-if(DEFINED ICU_FOUND AND NOT DEFINED ENV{UW_WITHOUT_ICU})
-    target_compile_definitions(uw PUBLIC UW_WITH_ICU)
-endif()
+# test
 
 add_executable(test_uw test/test_uw.c)
 
-target_compile_definitions(test_uw PUBLIC DEBUG)
-target_compile_definitions(test_uw PUBLIC UW_TYPE_CAPACITY=16 UW_INTERFACE_CAPACITY=16)
 target_link_libraries(test_uw uw)
 
 if(DEFINED ICU_FOUND AND NOT DEFINED ENV{UW_WITHOUT_ICU})
-    target_compile_definitions(test_uw PUBLIC UW_WITH_ICU)
     target_link_libraries(test_uw ICU::uc)
 endif()
+
+# common definitions
+
+set(common_defs_targets uw test_uw)
+
+foreach(TARGET ${common_defs_targets})
+
+    if(DEFINED ENV{DEBUG})
+        target_compile_definitions(${TARGET} PUBLIC DEBUG)
+    endif()
+
+    if(DEFINED ENV{UW_TYPE_BITWIDTH})
+        target_compile_definitions(${TARGET} PUBLIC UW_TYPE_BITWIDTH=$ENV{UW_TYPE_BITWIDTH})
+    endif()
+    if(DEFINED ENV{UW_TYPE_CAPACITY})
+        target_compile_definitions(${TARGET} PUBLIC UW_TYPE_CAPACITY=$ENV{UW_TYPE_CAPACITY})
+    endif()
+
+    if(DEFINED ENV{UW_INTERFACE_BITWIDTH})
+        target_compile_definitions(${TARGET} PUBLIC UW_INTERFACE_BITWIDTH=$ENV{UW_INTERFACE_BITWIDTH})
+    endif()
+    if(DEFINED ENV{UW_INTERFACE_CAPACITY})
+        target_compile_definitions(${TARGET} PUBLIC UW_INTERFACE_CAPACITY=$ENV{UW_INTERFACE_CAPACITY})
+    endif()
+
+    if(DEFINED ICU_FOUND AND NOT DEFINED ENV{UW_WITHOUT_ICU})
+        target_compile_definitions(${TARGET} PUBLIC UW_WITH_ICU)
+    endif()
+
+endforeach(TARGET)

@@ -839,9 +839,13 @@ void test_string()
         TEST(uw_equal(v2, U"hello everybody"));
         TEST(!uw_equal(v, U"hello Everybody"));
         TEST(!uw_equal(v2, U"hello Everybody"));
-        TEST(!uw_eq_fast(*_uw_get_string_pptr(v), *_uw_get_string_pptr(v2)));  // not equal because capacity is different
+#       ifdef DEBUG
+            TEST(!uw_eq_fast(*_uw_get_string_pptr(v), *_uw_get_string_pptr(v2)));  // not equal because capacity is different
+#       endif
         UwValue v3 = uw_create("hello everybody");
-        TEST(uw_eq_fast(*_uw_get_string_pptr(v2), *_uw_get_string_pptr(v3)));
+#       ifdef DEBUG
+            TEST(uw_eq_fast(*_uw_get_string_pptr(v2), *_uw_get_string_pptr(v3)));
+#       endif
 
         // test C string
         UW_CSTRING_LOCAL(cv3, v3);
@@ -903,6 +907,7 @@ void test_string()
         //uw_dump(v);
     }
 
+#   ifdef DEBUG
     { // testing cap_size=2 char_size=1
         UwValue v = uw_create_empty_string2(2, 1);
         s = *_uw_get_string_pptr(v);
@@ -927,7 +932,7 @@ void test_string()
         //uw_dump(v);
     }
 
-#if UINT_WIDTH > 32
+#   if UINT_WIDTH > 32
     { // testing cap_size=8 char_size=1
         UwValue v = uw_create_empty_string2(8, 1);
         s = *_uw_get_string_pptr(v);
@@ -939,7 +944,8 @@ void test_string()
         TEST(s->block_count == 3);
         //uw_dump(v);
     }
-#endif
+#   endif
+#   endif
 
     { // testing cap_size=1 char_size=2
         UwValue v = uw_create_empty_string(0, 2);
@@ -1003,9 +1009,13 @@ void test_string()
         TEST(uw_equal(v2, U"สบายสบาย"));
         TEST(!uw_equal(v, U"ความสบาย"));
         TEST(!uw_equal(v2, U"ความสบาย"));
-        TEST(!uw_eq_fast(*_uw_get_string_pptr(v), *_uw_get_string_pptr(v2)));  // not equal because capacity is different
-        UwValue v3 = uw_create("สบายสบาย");
-        TEST(uw_eq_fast(*_uw_get_string_pptr(v2), *_uw_get_string_pptr(v3)));
+#       ifdef DEBUG
+            TEST(!uw_eq_fast(*_uw_get_string_pptr(v), *_uw_get_string_pptr(v2)));  // not equal because capacity is different
+#       endif
+#       ifdef DEBUG
+            UwValue v3 = uw_create("สบายสบาย");
+            TEST(uw_eq_fast(*_uw_get_string_pptr(v2), *_uw_get_string_pptr(v3)));
+#       endif
 
         // test substring
         TEST(uw_substring_eq(v, 3, 5, u8"ยส"));
@@ -1053,6 +1063,7 @@ void test_string()
 //        //uw_dump(v);
     }
 
+#   ifdef DEBUG
     { // testing cap_size=2 char_size=2
         UwValue v = uw_create_empty_string2(2, 2);
         s = *_uw_get_string_pptr(v);
@@ -1077,7 +1088,7 @@ void test_string()
         //uw_dump(v);
     }
 
-#if UINT_WIDTH > 32
+#   if UINT_WIDTH > 32
     { // testing cap_size=8 char_size=2
         UwValue v = uw_create_empty_string2(8, 2);
         //uw_dump(s_8_2);
@@ -1090,7 +1101,8 @@ void test_string()
         TEST(s->block_count == 3);
         //uw_dump(v);
     }
-#endif
+#   endif
+#   endif
 
     { // testing cap_size=1 char_size=3
         UwValue v = uw_create_empty_string(0, 3);
@@ -1104,6 +1116,7 @@ void test_string()
         //uw_dump(v);
     }
 
+#   ifdef DEBUG
     { // testing cap_size=2 char_size=3
         UwValue v = uw_create_empty_string2(2, 3);
         s = *_uw_get_string_pptr(v);
@@ -1128,7 +1141,7 @@ void test_string()
         //uw_dump(v);
     }
 
-#if UINT_WIDTH > 32
+#   if UINT_WIDTH > 32
     { // testing cap_size=8 char_size=3
         UwValue v = uw_create_empty_string2(8, 3);
         s = *_uw_get_string_pptr(v);
@@ -1140,7 +1153,8 @@ void test_string()
         TEST(s->block_count == 3);
         //uw_dump(v);
     }
-#endif
+#   endif
+#   endif
 
     { // testing cap_size=1 char_size=4
         UwValue v = uw_create_empty_string(0, 4);
@@ -1154,6 +1168,7 @@ void test_string()
         //uw_dump(v);
     }
 
+#   ifdef DEBUG
     { // testing cap_size=2 char_size=4
         UwValue v = uw_create_empty_string2(2, 4);
         s = *_uw_get_string_pptr(v);
@@ -1190,7 +1205,8 @@ void test_string()
         TEST(s->block_count == 3);
         //uw_dump(v);
     }
-#endif
+#   endif
+#   endif
 
     { // test trimming
         UwValue v = uw_create(u8"  สวัสดี   ");
