@@ -1,33 +1,26 @@
-#include <stdarg.h>
-
 #include "include/uw_base.h"
+#include "include/uw_string.h"
 #include "src/uw_null_internal.h"
 
-bool _uw_init_null(UwValuePtr self)
+UwResult _uw_null_create(UwTypeId type_id, va_list ap)
 {
-    return true;
+    return UwNull();
 }
 
-void _uw_hash_null(UwValuePtr self, UwHashContext* ctx)
+void _uw_null_hash(UwValuePtr self, UwHashContext* ctx)
 {
-    _uw_hash_uint64(ctx, self->type_id);
+    _uw_hash_uint64(ctx, UwTypeId_Null);
 }
 
-UwValuePtr _uw_copy_null(UwValuePtr self)
+void _uw_null_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
-    return uw_create_null();
+    _uw_dump_start(fp, self, first_indent);
+    fputc('\n', fp);
 }
 
-void _uw_dump_null(UwValuePtr self, int indent, struct _UwValueChain* prev_compound)
+UwResult _uw_null_to_string(UwValuePtr self)
 {
-    _uw_dump_start(self, indent);
-    putchar('\n');
-}
-
-UwValuePtr _uw_null_to_string(UwValuePtr self)
-{
-    // XXX not implemented yet
-    return nullptr;
+    return UwString_1_12(4, 'n', 'u', 'l', 'l', 0, 0, 0, 0, 0, 0, 0, 0);
 }
 
 bool _uw_null_is_true(UwValuePtr self)
@@ -42,24 +35,19 @@ bool _uw_null_equal_sametype(UwValuePtr self, UwValuePtr other)
 
 bool _uw_null_equal(UwValuePtr self, UwValuePtr other)
 {
-    return uw_is_null(other);
-}
+    UwTypeId t = other->type_id;
+    for (;;) {
+        switch (t) {
+            case UwTypeId_Null:
+                return true;
 
-bool _uw_null_equal_ctype(UwValuePtr self, UwCType ctype, ...)
-{
-    bool result = false;
-    va_list ap;
-    va_start(ap);
-    switch (ctype) {
-        case uwc_nullptr:   result = true; break;
-        case uwc_value_ptr:
-        case uwc_value_makeref: {
-            UwValuePtr other = va_arg(ap, UwValuePtr);
-            result = uw_is_null(other);
-            break;
+            default: {
+                // check base class
+                t = _uw_types[t]->ancestor_id;
+                if (t == UwTypeId_Null) {
+                    return false;
+                }
+            }
         }
-        default: break;
     }
-    va_end(ap);
-    return result;
 }

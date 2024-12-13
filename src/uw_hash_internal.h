@@ -13,7 +13,13 @@ struct _UwHashContext {
 };
 
 void _uw_hash_init(UwHashContext* ctx);
-void _uw_hash_uint64(UwHashContext* ctx, uint64_t data);  // this prototype is duplicated in uw_base.h
+
+// the following prototypes are duplicated in uw_base.h
+void _uw_hash_uint64(UwHashContext* ctx, uint64_t data);
+void _uw_hash_buffer(UwHashContext* ctx, void* buffer, size_t length);
+void _uw_hash_string(UwHashContext* ctx, char* str);
+void _uw_hash_string32(UwHashContext* ctx, char32_t* str);
+
 UwType_Hash _uw_hash_finish(UwHashContext* ctx);
 
 #ifdef __cplusplus

@@ -7,17 +7,9 @@
 #   include <unicode/uchar.h>
 #endif
 
-#include <uw_ctype.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-UwValuePtr  uw_create_string_cstr(char*      initializer);
-UwValuePtr _uw_create_string_u8  (char8_t*   initializer);
-UwValuePtr _uw_create_string_u32 (char32_t*  initializer);
-
-UwValuePtr uw_create_empty_string(unsigned capacity, uint8_t char_size);
 
 uint8_t uw_string_char_size(UwValuePtr s);
 
@@ -36,7 +28,6 @@ unsigned uw_strlen(UwValuePtr str);
 CStringPtr uw_string_to_cstring(UwValuePtr str);
 /*
  * Create C string.
- * XXX decode multibyte ???
  */
 
 void uw_string_copy_buf(UwValuePtr str, char* buffer);
@@ -46,15 +37,10 @@ void uw_string_copy_buf(UwValuePtr str, char* buffer);
  * Encode multibyte chars to UTF-8.
  */
 
-UwValuePtr uw_string_get_substring(UwValuePtr str, unsigned start_pos, unsigned end_pos);
+UwResult uw_string_get_substring(UwValuePtr str, unsigned start_pos, unsigned end_pos);
 /*
  * Get substring from `start_pos` to `end_pos`.
  */
-
-bool  uw_substring_eq_cstr(UwValuePtr a, unsigned start_pos, unsigned end_pos, char*      b);
-bool _uw_substring_eq_u8  (UwValuePtr a, unsigned start_pos, unsigned end_pos, char8_t*   b);
-bool _uw_substring_eq_u32 (UwValuePtr a, unsigned start_pos, unsigned end_pos, char32_t*  b);
-bool _uw_substring_eq_uw  (UwValuePtr a, unsigned start_pos, unsigned end_pos, UwValuePtr b);
 
 char32_t uw_string_at(UwValuePtr str, unsigned position);
 /*
@@ -62,14 +48,16 @@ char32_t uw_string_at(UwValuePtr str, unsigned position);
  * If position is beyond end of line return 0.
  */
 
-void uw_string_erase(UwValuePtr str, unsigned start_pos, unsigned end_pos);
+bool uw_string_erase(UwValuePtr str, unsigned start_pos, unsigned end_pos);
 /*
  * Erase characters from `start_pos` to `end_pos`.
+ * This may make a copy of string, so checking return value is mandatory.
  */
 
-void uw_string_truncate(UwValuePtr str, unsigned position);
+bool uw_string_truncate(UwValuePtr str, unsigned position);
 /*
  * Truncate string at given `position`.
+ * This may make a copy of string, so checking return value is mandatory.
  */
 
 bool uw_string_indexof(UwValuePtr str, char32_t chr, unsigned start_pos, unsigned* result);
@@ -81,87 +69,12 @@ bool uw_string_indexof(UwValuePtr str, char32_t chr, unsigned start_pos, unsigne
  * is called just to check if `chr` is in `str`.
  */
 
+bool uw_string_ltrim(UwValuePtr str);
+bool uw_string_rtrim(UwValuePtr str);
+bool uw_string_trim(UwValuePtr str);
 
-void uw_string_ltrim(UwValuePtr str);
-void uw_string_rtrim(UwValuePtr str);
-void uw_string_trim(UwValuePtr str);
-
-void uw_string_lower(UwValuePtr str);
-void uw_string_upper(UwValuePtr str);
-
-
-/*
- * Append functions
- */
-bool _uw_string_append_char(UwValuePtr dest, char       c);
-bool  uw_string_append_cstr(UwValuePtr dest, char*      src);
-bool _uw_string_append_c32 (UwValuePtr dest, char32_t   c);
-bool _uw_string_append_u8  (UwValuePtr dest, char8_t*   src);
-bool _uw_string_append_u32 (UwValuePtr dest, char32_t*  src);
-bool _uw_string_append_uw  (UwValuePtr dest, UwValuePtr src);
-
-bool uw_string_append_utf8(UwValuePtr dest, char8_t* buffer, unsigned size, unsigned* bytes_processed);
-/*
- * Append UTF-8-encoded characters from `buffer`.
- * Write the number of bytes processed to `bytes_processed`, which can be less
- * than `size` if buffer ends with incomplete UTF-8 sequence.
- *
- * Return false if out of memory.
- */
-
-bool uw_string_append_buffer(UwValuePtr dest, uint8_t* buffer, unsigned size);
-/*
- * Append bytes from `buffer`.
- * `dest` char size must be 1.
- *
- * Return false if out of memory.
- */
-
-/*
- * Insert functions
- * TODO other types
- */
-bool _uw_string_insert_many_c32(UwValuePtr str, unsigned position, char32_t value, unsigned n);
-
-/*
- * Append substring functions.
- *
- * Append `src` substring starting from `src_start_pos` to `src_end_pos`.
- */
-bool  uw_string_append_substring_cstr(UwValuePtr dest, char*      src, unsigned src_start_pos, unsigned src_end_pos);
-bool _uw_string_append_substring_u8  (UwValuePtr dest, char8_t*   src, unsigned src_start_pos, unsigned src_end_pos);
-bool _uw_string_append_substring_u32 (UwValuePtr dest, char32_t*  src, unsigned src_start_pos, unsigned src_end_pos);
-bool _uw_string_append_substring_uw  (UwValuePtr dest, UwValuePtr src, unsigned src_start_pos, unsigned src_end_pos);
-
-/*
- * Split functions.
- * Return list of strings.
- */
-UwValuePtr uw_string_split(UwValuePtr str);  // split by spaces
-
-UwValuePtr _uw_string_split_c32(UwValuePtr str, char32_t splitter);
-
-UwValuePtr  uw_string_split_any_cstr(UwValuePtr str, char*      splitters);
-UwValuePtr _uw_string_split_any_u8  (UwValuePtr str, char8_t*   splitters);
-UwValuePtr _uw_string_split_any_u32 (UwValuePtr str, char32_t*  splitters);
-UwValuePtr _uw_string_split_any_uw  (UwValuePtr str, UwValuePtr splitters);
-
-UwValuePtr  uw_string_split_strict_cstr(UwValuePtr str, char*      splitter);
-UwValuePtr _uw_string_split_strict_u8  (UwValuePtr str, char8_t*   splitter);
-UwValuePtr _uw_string_split_strict_u32 (UwValuePtr str, char32_t*  splitter);
-UwValuePtr _uw_string_split_strict_uw  (UwValuePtr str, UwValuePtr splitter);
-
-/*
- * Join list items. Return string value.
- */
-UwValuePtr _uw_string_join_c32(char32_t   separator, UwValuePtr list);
-UwValuePtr _uw_string_join_u8 (char8_t*   separator, UwValuePtr list);
-UwValuePtr _uw_string_join_u32(char32_t*  separator, UwValuePtr list);
-UwValuePtr _uw_string_join_uw (UwValuePtr separator, UwValuePtr list);
-
-/*
- * Miiscellaneous helper functions.
- */
+bool uw_string_lower(UwValuePtr str);
+bool uw_string_upper(UwValuePtr str);
 
 unsigned uw_strlen_in_utf8(UwValuePtr str);
 /*
@@ -180,7 +93,7 @@ void* uw_string_data_ptr(UwValuePtr str);
  * The function is intended for file I/O operations.
  */
 
-void _uw_putchar32_utf8(char32_t codepoint);
+void _uw_putchar32_utf8(FILE* fp, char32_t codepoint);
 
 unsigned utf8_strlen(char8_t* str);
 /*
@@ -220,6 +133,13 @@ unsigned u32_strlen2(char32_t* str, uint8_t* char_size);
  * Find both length of null-terminated `str` and max char size in one go.
  */
 
+int u32_strcmp     (char32_t* a, char32_t* b);
+int u32_strcmp_cstr(char32_t* a, char*     b);
+int u32_strcmp_u8  (char32_t* a, char8_t*  b);
+/*
+ * Compare  null-terminated strings.
+ */
+
 char32_t* u32_strchr(char32_t* str, char32_t chr);
 /*
  * Find the first occurrence of `chr` in the null-terminated `str`.
@@ -237,6 +157,12 @@ uint8_t u32_char_size(char32_t* str, unsigned max_len);
 #   define uw_char_lower(c)  tolower(c)
 #   define uw_char_upper(c)  toupper(c)
 #endif
+
+UwResult _uw_strcat_va(...);
+
+#define uw_strcat(...)  _uw_strcat_va(__VA_ARGS__, UwVaEnd())
+
+UwResult uw_strcat_ap(va_list ap);
 
 /****************************************************************
  * Character classification functions
@@ -260,12 +186,328 @@ uint8_t u32_char_size(char32_t* str, unsigned max_len);
  */
 
 /****************************************************************
- * Debug functions
+ * Constructors
  */
 
+#define uw_create_string(initializer) _Generic((initializer),   \
+                 char*: _uw_create_string_u8_wrapper, \
+              char8_t*: _uw_create_string_u8,         \
+             char32_t*: _uw_create_string_u32,        \
+            UwValuePtr: _uw_create_string             \
+    )((dest), (src))
+
+UwResult  uw_create_string_cstr(char*      initializer);
+UwResult _uw_create_string_u8  (char8_t*   initializer);
+UwResult _uw_create_string_u32 (char32_t*  initializer);
+
+static inline UwResult _uw_create_string(UwValuePtr initializer)
+{
+    return _uw_create(UwTypeId_String, initializer);
+}
+
+static inline UwResult _uw_create_string_u8_wrapper(char8_t* initializer)
+{
+    return _uw_create_string_u8((char8_t*) initializer);
+}
+
+UwResult uw_create_empty_string(unsigned capacity, uint8_t char_size);
+
 #ifdef DEBUG
-    UwValuePtr uw_create_empty_string2(uint8_t cap_size, uint8_t char_size);
+    UwResult uw_create_empty_string2(uint8_t cap_size, uint8_t char_size);
 #endif
+
+/****************************************************************
+ * Append functions
+ */
+
+#define uw_string_append_char(dest, chr) _Generic((chr), \
+                  char: _uw_string_append_char, \
+         unsigned char: _uw_string_append_char, \
+              char32_t: _uw_string_append_c32,  \
+                   int: _uw_string_append_c32   \
+    )((dest), (chr))
+
+bool _uw_string_append_char(UwValuePtr dest, char       c);
+bool _uw_string_append_c32 (UwValuePtr dest, char32_t   c);
+
+#define uw_string_append(dest, src) _Generic((src),   \
+              char32_t: _uw_string_append_c32,        \
+                   int: _uw_string_append_c32,        \
+                 char*: _uw_string_append_u8_wrapper, \
+              char8_t*: _uw_string_append_u8,         \
+             char32_t*: _uw_string_append_u32,        \
+            UwValuePtr: _uw_string_append             \
+    )((dest), (src))
+
+bool  uw_string_append_cstr(UwValuePtr dest, char*      src);
+bool _uw_string_append_u8  (UwValuePtr dest, char8_t*   src);
+bool _uw_string_append_u32 (UwValuePtr dest, char32_t*  src);
+bool _uw_string_append     (UwValuePtr dest, UwValuePtr src);
+
+static inline bool _uw_string_append_u8_wrapper(UwValuePtr dest, char* src)
+{
+    return _uw_string_append_u8(dest, (char8_t*) src);
+}
+
+bool uw_string_append_utf8(UwValuePtr dest, char8_t* buffer, unsigned size, unsigned* bytes_processed);
+/*
+ * Append UTF-8-encoded characters from `buffer`.
+ * Write the number of bytes processed to `bytes_processed`, which can be less
+ * than `size` if buffer ends with incomplete UTF-8 sequence.
+ *
+ * Return false if out of memory.
+ */
+
+bool uw_string_append_buffer(UwValuePtr dest, uint8_t* buffer, unsigned size);
+/*
+ * Append bytes from `buffer`.
+ * `dest` char size must be 1.
+ *
+ * Return false if out of memory.
+ */
+
+/****************************************************************
+ * Insert functions
+ * TODO other types
+ */
+
+#define uw_string_insert_chars(str, position, chr, n) _Generic((chr), \
+              char32_t: _uw_string_insert_many_c32,   \
+                   int: _uw_string_insert_many_c32    \
+    )((str), (position), (chr), (n))
+
+bool _uw_string_insert_many_c32(UwValuePtr str, unsigned position, char32_t chr, unsigned n);
+
+/****************************************************************
+ * Append substring functions.
+ *
+ * Append `src` substring starting from `src_start_pos` to `src_end_pos`.
+ */
+
+#define uw_string_append_substring(dest, src, src_start_pos, src_end_pos) _Generic((src), \
+                 char*: _uw_string_append_substring_u8_wrapper,  \
+              char8_t*: _uw_string_append_substring_u8,          \
+             char32_t*: _uw_string_append_substring_u32,         \
+            UwValuePtr: _uw_string_append_substring              \
+    )((dest), (src), (src_start_pos), (src_end_pos))
+
+bool  uw_string_append_substring_cstr(UwValuePtr dest, char*      src, unsigned src_start_pos, unsigned src_end_pos);
+bool _uw_string_append_substring_u8  (UwValuePtr dest, char8_t*   src, unsigned src_start_pos, unsigned src_end_pos);
+bool _uw_string_append_substring_u32 (UwValuePtr dest, char32_t*  src, unsigned src_start_pos, unsigned src_end_pos);
+bool _uw_string_append_substring     (UwValuePtr dest, UwValuePtr src, unsigned src_start_pos, unsigned src_end_pos);
+
+static inline bool _uw_string_append_substring_u8_wrapper(UwValuePtr dest, char* src, unsigned src_start_pos, unsigned src_end_pos)
+{
+    return _uw_string_append_substring_u8(dest, (char8_t*) src, src_start_pos, src_end_pos);
+}
+
+/****************************************************************
+ * Substring comparison functions.
+ *
+ * Compare `str_a` from `start_pos` to `end_pos` with `str_b`.
+ */
+
+#define uw_substring_eq(a, start_pos, end_pos, b) _Generic((b), \
+             char*: _uw_substring_eq_u8_wrapper,  \
+          char8_t*: _uw_substring_eq_u8,          \
+         char32_t*: _uw_substring_eq_u32,         \
+        UwValuePtr: _uw_substring_eq              \
+    )((a), (start_pos), (end_pos), (b))
+
+bool  uw_substring_eq_cstr(UwValuePtr a, unsigned start_pos, unsigned end_pos, char*      b);
+bool _uw_substring_eq_u8  (UwValuePtr a, unsigned start_pos, unsigned end_pos, char8_t*   b);
+bool _uw_substring_eq_u32 (UwValuePtr a, unsigned start_pos, unsigned end_pos, char32_t*  b);
+bool _uw_substring_eq     (UwValuePtr a, unsigned start_pos, unsigned end_pos, UwValuePtr b);
+
+static inline bool _uw_substring_eq_u8_wrapper(UwValuePtr a, unsigned start_pos, unsigned end_pos, char* b)
+{
+    return _uw_substring_eq_u8(a, start_pos, end_pos, (char8_t*) b);
+}
+
+/****************************************************************
+ * Split functions.
+ * Return list of strings.
+ */
+
+UwResult uw_string_split(UwValuePtr str);  // split by spaces
+UwResult uw_string_split_chr(UwValuePtr str, char32_t splitter);
+
+#define uw_string_split_any(str, splitters) _Generic((splitters),  \
+                 char*: _uw_string_split_any_u8_wrapper, \
+              char8_t*: _uw_string_split_any_u8,         \
+             char32_t*: _uw_string_split_any_u32,        \
+            UwValuePtr: _uw_string_split_any             \
+    )((str), (splitters))
+
+UwResult  uw_string_split_any_cstr(UwValuePtr str, char*      splitters);
+UwResult _uw_string_split_any_u8  (UwValuePtr str, char8_t*   splitters);
+UwResult _uw_string_split_any_u32 (UwValuePtr str, char32_t*  splitters);
+UwResult _uw_string_split_any     (UwValuePtr str, UwValuePtr splitters);
+
+static inline UwResult _uw_string_split_any_u8_wrapper(UwValuePtr str, char* splitters)
+{
+    return _uw_string_split_any_u8(str, (char8_t*) splitters);
+}
+
+#define uw_string_split_strict(str, splitter) _Generic((splitter),  \
+              char32_t: _uw_string_split_c32,               \
+                   int: _uw_string_split_c32,               \
+                 char*: _uw_string_split_strict_u8_wrapper, \
+              char8_t*: _uw_string_split_strict_u8,         \
+             char32_t*: _uw_string_split_strict_u32,        \
+            UwValuePtr: _uw_string_split_strict             \
+    )((str), (splitter))
+
+UwResult  uw_string_split_strict_cstr(UwValuePtr str, char*      splitter);
+UwResult _uw_string_split_strict_u8  (UwValuePtr str, char8_t*   splitter);
+UwResult _uw_string_split_strict_u32 (UwValuePtr str, char32_t*  splitter);
+UwResult _uw_string_split_strict     (UwValuePtr str, UwValuePtr splitter);
+
+static inline UwResult _uw_string_split_strict_u8_wrapper(UwValuePtr str, char* splitter)
+{
+    return _uw_string_split_strict_u8(str, (char8_t*) splitter);
+}
+
+/****************************************************************
+ * Join list items. Return string value.
+ */
+
+#define uw_string_join(separator, list) _Generic((separator), \
+              char32_t: _uw_string_join_c32,        \
+                   int: _uw_string_join_c32,        \
+                 char*: _uw_string_join_u8_wrapper, \
+              char8_t*: _uw_string_join_u8,         \
+             char32_t*: _uw_string_join_u32,        \
+            UwValuePtr: _uw_string_join             \
+    )((separator), (list))
+
+UwResult _uw_string_join_c32(char32_t   separator, UwValuePtr list);
+UwResult _uw_string_join_u8 (char8_t*   separator, UwValuePtr list);
+UwResult _uw_string_join_u32(char32_t*  separator, UwValuePtr list);
+UwResult _uw_string_join    (UwValuePtr separator, UwValuePtr list);
+
+static inline UwResult _uw_string_join_u8_wrapper(char* separator, UwValuePtr list)
+{
+    return _uw_string_join_u8((char8_t*) separator, list);
+}
+
+/****************************************************************
+ * String variable declarations and rvalues with initialization
+ */
+
+#define __UWDECL_String_1_12(name, len, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11)  \
+    /* declare String variable, character size 1 byte, up to 12 chars */  \
+    _UwValue name = {  \
+        ._type_id = UwTypeId_String,  \
+        {  .is_embedded = 1 },  \
+        .str_length = (len),  \
+        .str_capacity = 12,  \
+        .str_1[0] = (c0),  \
+        .str_1[1] = (c1),  \
+        .str_1[2] = (c2),  \
+        .str_1[3] = (c3),  \
+        .str_1[4] = (c4),  \
+        .str_1[5] = (c5),  \
+        .str_1[6] = (c6),  \
+        .str_1[7] = (c7),  \
+        .str_1[8] = (c8),  \
+        .str_1[9] = (c9),  \
+        .str_1[10] = (c10),  \
+        .str_1[11] = (c11)  \
+    }
+
+#define UWDECL_String_1_12(len, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11)  \
+    _UW_VALUE_AUTOCLEAN __UWDECL_String_1_12(v, (len), (c0), (c1), (c2), (c3), (c4), (c5), (c6), (c7), (c8), (c9), (c10), (c11))
+
+#define UwString_1_12(len, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11)  \
+    /* make String rvalue, character size 1 byte, up to 12 chars */  \
+    ({  \
+        __UWDECL_String_1_12(v, (len), (c0), (c1), (c2), (c3), (c4), (c5), (c6), (c7), (c8), (c9), (c10), (c11));  \
+        static_assert((len) <= _UWC_LENGTH_OF(v.str_1));  \
+        v;  \
+    })
+
+#define __UWDECL_String_2_6(name, len, c0, c1, c2, c3, c4, c5)  \
+    /* declare String variable, character size 2 bytes, up to 6 chars */  \
+    _UwValue name = {  \
+        ._type_id = UwTypeId_String,  \
+        {  \
+            .char_size = 1,  \
+            .is_embedded = 1  \
+        },  \
+        .str_length = (len),  \
+        .str_capacity = 6,  \
+        .str_2[0] = (c0),  \
+        .str_2[1] = (c1),  \
+        .str_2[2] = (c2),  \
+        .str_2[3] = (c3),  \
+        .str_2[4] = (c4),  \
+        .str_2[5] = (c5)  \
+    }
+
+#define UWDECL_String_2_6(len, c0, c1, c2, c3, c4, c5)  \
+    _UW_VALUE_AUTOCLEAN __UWDECL_String_2_6(v, (len), (c0), (c1), (c2), (c3), (c4), (c5))
+
+#define UwString_2_6(len, c0, c1, c2, c3, c4, c5)  \
+    /* make String rvalue, character size 2 bytes, up to 6 chars */  \
+    ({  \
+        __UWDECL_String_2_6(v, (len), (c0), (c1), (c2), (c3), (c4), (c5));  \
+        static_assert((len) <= _UWC_LENGTH_OF(v.str_2));  \
+        v;  \
+    })
+
+#define __UWDECL_String_3_4(name, len, c0, c1, c2, c3)  \
+    /* declare String variable, character size 3 bytes, up to 4 chars */  \
+    _UwValue name = {  \
+        ._type_id = UwTypeId_String,  \
+        {  \
+            .char_size = 2,  \
+            .is_embedded = 1  \
+        },  \
+        .str_length = (len),  \
+        .str_capacity = 4,  \
+        .str_3[0] = {{ [0] = (uint8_t) (c0), [1] = (uint8_t) ((c0) >> 8), [2] = (uint8_t) ((c0) >> 16) }},  \
+        .str_3[1] = {{ [0] = (uint8_t) (c1), [1] = (uint8_t) ((c1) >> 8), [2] = (uint8_t) ((c1) >> 16) }},  \
+        .str_3[2] = {{ [0] = (uint8_t) (c2), [1] = (uint8_t) ((c2) >> 8), [2] = (uint8_t) ((c2) >> 16) }},  \
+        .str_3[3] = {{ [0] = (uint8_t) (c3), [1] = (uint8_t) ((c3) >> 8), [2] = (uint8_t) ((c3) >> 16) }}  \
+    }
+
+#define UWDECL_String_3_4(len, c0, c1, c2, c3)  \
+    _UW_VALUE_AUTOCLEAN __UWDECL_String_3_4(v, (len), (c0), (c1), (c2), (c3))
+
+#define UwString_3_4(len, c0, c1, c2, c3)  \
+    /* make String rvalue, character size 3 bytes, up to 4 chars */  \
+    ({  \
+        __UWDECL_String_3_4(v, (len), (c0), (c1), (c2), (c3));  \
+        static_assert((len) <= _UWC_LENGTH_OF(v.str_3));  \
+        v;  \
+    })
+
+#define __UWDECL_String_4_3(name, len, c0, c1, c2)  \
+    /* declare String variable, character size 4 bytes, up to 3 chars */  \
+    _UwValue name = {  \
+        ._type_id = UwTypeId_String,  \
+        {  \
+            .char_size = 3,  \
+            .is_embedded = 1  \
+        },  \
+        .str_length = (len),  \
+        .str_capacity = 3,  \
+        .str_4[0] = (c0),  \
+        .str_4[1] = (c1),  \
+        .str_4[2] = (c2)  \
+    }
+
+#define UWDECL_String_4_3(len, c0, c1, c2)  \
+    _UW_VALUE_AUTOCLEAN __UWDECL_String_4_3(v, (len), (c0), (c1), (c2))
+
+#define UwString_4_3(len, c0, c1, c2)  \
+    /* make String rvalue, character size 4 bytes, up to 3 chars */  \
+    ({  \
+        __UWDECL_String_4_3(v, (len), (c0), (c1), (c2));  \
+        static_assert((len) <= _UWC_LENGTH_OF(v.str_4));  \
+        v;  \
+    })
 
 #ifdef __cplusplus
 }

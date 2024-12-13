@@ -9,20 +9,25 @@ add_compile_options(-Wall -Wextra -pedantic -Werror -Wno-gnu -Wno-unused-paramet
 find_package(ICU COMPONENTS uc)
 
 add_library(uw STATIC
+    src/uw_alloc_debug.c
+    src/uw_alloc_std.c
     src/uw_base.c
-    src/uw_hash.c
-    src/uw_ctype.c
-    src/uw_null.c
     src/uw_bool.c
-    src/uw_int.c
+    src/uw_charptr.c
+    src/uw_class.c
+    src/uw_compound.c
+    src/uw_file.c
     src/uw_float.c
-    src/uw_string.c
+    src/uw_hash.c
+    src/uw_int.c
     src/uw_list.c
     src/uw_map.c
-    src/uw_class.c
-    src/uw_file.c
+    src/uw_null.c
+    src/uw_signed.c
+    src/uw_status.c
+    src/uw_string.c
     src/uw_string_io.c
-    src/uw_tg.c
+    src/uw_unsigned.c
 )
 
 target_include_directories(uw PUBLIC . include)
@@ -47,15 +52,8 @@ foreach(TARGET ${common_defs_targets})
         target_compile_definitions(${TARGET} PUBLIC DEBUG)
     endif()
 
-    if(DEFINED ENV{UW_TYPE_BITWIDTH})
-        target_compile_definitions(${TARGET} PUBLIC UW_TYPE_BITWIDTH=$ENV{UW_TYPE_BITWIDTH})
-    endif()
     if(DEFINED ENV{UW_TYPE_CAPACITY})
         target_compile_definitions(${TARGET} PUBLIC UW_TYPE_CAPACITY=$ENV{UW_TYPE_CAPACITY})
-    endif()
-
-    if(DEFINED ENV{UW_INTERFACE_BITWIDTH})
-        target_compile_definitions(${TARGET} PUBLIC UW_INTERFACE_BITWIDTH=$ENV{UW_INTERFACE_BITWIDTH})
     endif()
     if(DEFINED ENV{UW_INTERFACE_CAPACITY})
         target_compile_definitions(${TARGET} PUBLIC UW_INTERFACE_CAPACITY=$ENV{UW_INTERFACE_CAPACITY})

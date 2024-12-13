@@ -3,149 +3,165 @@
 #include "include/uw_base.h"
 #include "include/uw_file.h"
 #include "include/uw_string_io.h"
-#include "src/uw_null_internal.h"
 #include "src/uw_bool_internal.h"
+#include "src/uw_charptr_internal.h"
 #include "src/uw_class_internal.h"
+#include "src/uw_file_internal.h"
+#include "src/uw_float_internal.h"
 #include "src/uw_hash_internal.h"
 #include "src/uw_int_internal.h"
-#include "src/uw_float_internal.h"
-#include "src/uw_string_internal.h"
-#include "src/uw_string_io_internal.h"
 #include "src/uw_list_internal.h"
 #include "src/uw_map_internal.h"
-#include "src/uw_file_internal.h"
+#include "src/uw_null_internal.h"
+#include "src/uw_signed_internal.h"
+#include "src/uw_status_internal.h"
+#include "src/uw_string_internal.h"
+#include "src/uw_string_io_internal.h"
+#include "src/uw_unsigned_internal.h"
 
 /****************************************************************
  * Basic functions
  */
 
-UwValuePtr _uw_alloc_value(UwTypeId type_id)
+[[noreturn]]
+void uw_panic(char* fmt, ...)
 {
-    UwType* t = _uw_types[type_id];
-    unsigned memsize = t->data_offset + t->data_size;
-    UwValuePtr value = _uw_allocator.alloc(memsize);
-    if (value) {
-        memset(value, 0, memsize);
-        value->type_id  = type_id;
-        value->refcount = 1;
-        value->compound = (t->unbrace)? 1 : 0;
-        value->alloc_id = _uw_allocator.id;
-    }
-    return value;
+    va_list ap;
+    va_start(ap);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+    exit(1);
 }
 
-static bool call_init(UwValuePtr value, UwTypeId type_id)
+UwResult _uw_create(UwTypeId type_id, ...)
 /*
- * Helper function for _uw_create.
+ * Constructor.
  */
 {
-    UwType* type = _uw_types[type_id];
-    uw_assert(type != nullptr);
+    va_list ap;
+    va_start(ap);
+    UwValue result = _uw_types[type_id]->create(type_id, ap);
+    va_end(ap);
+    return uw_move(&result);
+}
 
-    if (type->ancestor_id != UwTypeId_Null) {
-        if (!call_init(value, type->ancestor_id)) {
-            return false;
-        }
-    }
-    UwMethodInit init = _uw_types[type_id]->init;
-    uw_assert(init != nullptr);
-    if (init(value)) {
+bool _uw_alloc_extra_data(UwValuePtr v)
+{
+    if (_uw_types[v->type_id]->data_optional) {
+        // extra_data is optional, not creating
+        v->extra_data = nullptr;
         return true;
     }
-    // init failed, call fini for already initialized ancestors
-    for (;;) {
-        type = _uw_types[type->ancestor_id];
-        if (type->id == UwTypeId_Null) {
-            break;
-        }
-        type->fini(value);
-    }
-    return false;
+    return _uw_mandatory_alloc_extra_data(v);
 }
 
-UwValuePtr _uw_create(UwTypeId type_id)
+bool _uw_mandatory_alloc_extra_data(UwValuePtr v)
 {
-    UwValuePtr value = _uw_alloc_value(type_id);
-    if (value) {
-        // initialize value
-        // go down inheritance chain and call `init` method bottom->top
-        if (call_init(value, type_id)) {
-            return  value;
+    UwType* t = _uw_types[v->type_id];
+    unsigned memsize = t->data_offset + t->data_size;
+    if (memsize) {
+        _UwExtraData* extra_data = t->allocator->alloc(memsize);
+        if (!extra_data) {
+            return false;
         }
-        _uw_free_value(value);
+        extra_data->refcount = 1;
+        v->extra_data = extra_data;
+    } else {
+        v->extra_data = nullptr;
     }
-    return nullptr;
-}
-
-void _uw_destroy(UwValuePtr value)
-{
-    // finalize value: go down the inheritance chain and call `fini` method
-    UwType* type = _uw_types[value->type_id];
-    for (;;) {
-        uw_assert(type != nullptr);
-        type->fini(value);
-        if (type->ancestor_id == UwTypeId_Null) {
-            break;
-        }
-        type = _uw_types[type->ancestor_id];
-    }
-
-    // free value
-    _uw_free_value(value);
-}
-
-void uw_delete(UwValuePtr* value_ref)
-{
-    if (!value_ref) {
-        return;
-    }
-
-    UwValuePtr v = *value_ref;
-    if (!v) {
-        return;
-    }
-
-    uw_assert(v->refcount);
-
-    if (0 == --v->refcount) {
-
-        if (v->compound && v->embrace_count) {
-
-            // call unbrace method
-            _uw_types[v->type_id]->unbrace(v);
-
-        } else {
-            // destroy value
-            _uw_destroy(v);
-        }
-    }
-    *value_ref = nullptr;
-}
-
-bool _uw_unbrace(UwValuePtr* value_ref)
-{
-    if (!value_ref) {
-        return false;
-    }
-    UwValuePtr v = *value_ref;
-    if (!v) {
-        return false;
-    }
-    if (!v->compound) {
-        return false;
-    }
-    if (!v->embrace_count)
-    {
-        return false;
-    }
-    if (--v->embrace_count) {
-        return false;
-    }
-    if (!v->refcount) {
-        _uw_destroy(v);
-    }
-    *value_ref = nullptr;
     return true;
+}
+
+void _uw_free_extra_data(UwValuePtr v)
+{
+    if (v->extra_data) {
+        UwType* t = _uw_types[v->type_id];
+        unsigned memsize = t->data_offset + t->data_size;
+        if (memsize) {
+            t->allocator->free(v->extra_data, memsize);
+        } else {
+            uw_dump(stderr, v);
+            uw_panic("Extra data is allocated, but memsize evaluates to zero");
+        }
+        v->extra_data = nullptr;
+    }
+}
+
+static UwResult default_create(UwTypeId type_id, va_list ap)
+/*
+ * Default implementation of create method for types that have extra data.
+ */
+{
+    UwValue result = {};
+    result.type_id    = type_id;
+    result.extra_data = nullptr;
+    if (!_uw_alloc_extra_data(&result)) {
+        return UwOOM();
+    }
+    UwMethodInit fn_init = _uw_types[type_id]->init;
+    if (!fn_init) {
+        return uw_move(&result);
+    }
+    UwValue status = fn_init(&result, ap);
+    if (uw_ok(&status)) {
+        return uw_move(&result);
+    } else {
+        return uw_move(&status);
+    }
+}
+
+static UwResult default_clone(UwValuePtr self)
+/*
+ * Default implementation of clone method.
+ */
+{
+    if (self->extra_data) {
+        self->extra_data->refcount++;
+    }
+    return *self;
+}
+
+static void default_destroy(UwValuePtr self)
+/*
+ * Default implementation of destroy method for types that have extra data.
+ */
+{
+    _UwExtraData* extra_data = self->extra_data;
+
+    if (!extra_data) {
+        return;
+    }
+    if (extra_data->refcount) {
+        extra_data->refcount--;
+    }
+    if (extra_data->refcount) {
+        return;
+    }
+    if (_uw_types[self->type_id]->compound) {
+
+        _UwCompoundData* cdata = (_UwCompoundData*) self->extra_data;
+
+        if (cdata->destroying) {
+            return;
+        }
+
+        if (_uw_is_embraced(cdata)) {
+
+            // we have a parent, check if there is a cyclic reference
+            if (!_uw_need_break_cyclic_refs(cdata)) {
+                // can't destroy self, because it's still a part of some object
+                return;
+            }
+            // there are breakable cyclic references, okay to destroy
+        }
+        cdata->destroying = true;
+    }
+    // finalize value
+    _uw_call_fini(self);
+    _uw_free_extra_data(self);
+
+    // reset value
+    self->type_id = UwTypeId_Null;
 }
 
 UwType_Hash uw_hash(UwValuePtr value)
@@ -156,135 +172,88 @@ UwType_Hash uw_hash(UwValuePtr value)
     return _uw_hash_finish(&ctx);
 }
 
-bool _uw_compound_value_seen(UwValuePtr value, struct _UwValueChain* prev_compound)
+UwValuePtr _uw_on_chain(UwValuePtr value, _UwCompoundChain* tail)
 {
-    for (struct _UwValueChain* prevc = prev_compound; prevc; prevc = prevc->prev) {
-        if (value == prevc->value) {
-            return true;
+    while (tail) {
+        if (value->extra_data == tail->value->extra_data) {
+            return tail->value;
         }
+        tail = tail->prev;
     }
-    return false;
-}
-
-static void _uw_fini_integral(UwValuePtr self)
-/*
- * Finalization stub for integral types.
- */
-{
+    return nullptr;
 }
 
 /****************************************************************
  * Dump functions.
  */
 
-void _uw_dump_start(UwValuePtr value, int indent)
+void _uw_dump_start(FILE* fp, UwValuePtr value, int indent)
 {
     char* type_name = _uw_types[value->type_id]->name;
 
-    _uw_print_indent(indent);
-    printf("%p", value);
+    _uw_print_indent(fp, indent);
+    fprintf(fp, "%p", value);
     if (type_name == nullptr) {
-        printf(" BAD TYPE %d", value->type_id);
+        fprintf(fp, " BAD TYPE %d", value->type_id);
     } else {
-        printf(" %s (type id: %d)", type_name,value->type_id);
-    }
-    printf(" refcount=%zu; ", value->refcount);
-    if (value->compound) {
-        printf("compound; embrace_count=%zu; ", value->embrace_count);
+        fprintf(fp, " %s (type id: %d)", type_name, value->type_id);
     }
 }
 
-void _uw_print_indent(int indent)
+void _uw_dump_base_extra_data(FILE* fp, _UwExtraData* extra_data)
+{
+    if (extra_data) {
+        fprintf(fp, " extra data %p refcount=%u;", extra_data, extra_data->refcount);
+    } else {
+        fprintf(fp, " ERROR: extra data is NULL;");
+    }
+}
+
+void _uw_print_indent(FILE* fp, int indent)
 {
     for (int i = 0; i < indent; i++ ) {
-        putchar(' ');
+        fputc(' ', fp);
     }
 }
 
-void _uw_dump(UwValuePtr value, int indent, struct _UwValueChain* prev_compound)
+void _uw_dump(FILE* fp, UwValuePtr value, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
     if (value == nullptr) {
-        _uw_print_indent(indent);
-        printf("nullptr\n");
+        _uw_print_indent(fp, first_indent);
+        fprintf(fp, "nullptr\n");
         return;
     }
     UwMethodDump fn_dump = _uw_types[value->type_id]->dump;
     uw_assert(fn_dump != nullptr);
-    fn_dump(value, 0, prev_compound);
+    fn_dump(value, fp, first_indent, next_indent, tail);
 }
 
-void uw_dump(UwValuePtr value)
+void uw_dump(FILE* fp, UwValuePtr value)
 {
-    _uw_dump(value, 0, nullptr);
+    _uw_dump(fp, value, 0, 0, nullptr);
 }
 
 /****************************************************************
- * Allocators.
+ * Miscellaneous helpers
  */
 
-static void* std_malloc(unsigned nbytes)
+bool uw_charptr_to_string(UwValuePtr v)
 {
-    return malloc(nbytes);
-}
-
-static void* std_realloc(void* block, unsigned nbytes)
-{
-    return realloc(block, nbytes);
-}
-
-static void* malloc_nofail(unsigned nbytes)
-{
-    void* block = malloc(nbytes);
-    if (!block) {
-        char msg[64];
-        sprintf(msg, "malloc(%u)", nbytes);
-        perror(msg);
-        exit(1);
+    if (!uw_is_charptr(v)) {
+        return true;
     }
-    return block;
-}
-
-static void* realloc_nofail(void* block, unsigned nbytes)
-{
-    void* new_block = realloc(block, nbytes);
-    if (!new_block) {
-        char msg[64];
-        sprintf(msg, "realloc(%p, %u)", block, nbytes);
-        perror(msg);
-        exit(1);
+    UwValue result = _uw_charptr_to_string(v);
+    if (uw_ok(&result)) {
+        *v = uw_move(&result);
+        return true;
+    } else {
+        uw_destroy(&result);  // make error checker happy
+        return false;
     }
-    return new_block;
-}
-
-UwAllocator _uw_allocators[1 << UW_ALLOCATOR_BITWIDTH] = {
-    {
-        .id      = UW_ALLOCATOR_STD,
-        .alloc   = std_malloc,
-        .realloc = std_realloc,
-        .free    = free
-    },
-    {
-        .id      = UW_ALLOCATOR_STD_NOFAIL,
-        .alloc   = malloc_nofail,
-        .realloc = realloc_nofail,
-        .free    = free
-    }
-};
-
-thread_local UwAllocator _uw_allocator = {
-    .id      = UW_ALLOCATOR_STD,
-    .alloc   = std_malloc,
-    .realloc = std_realloc,
-    .free    = free
-};
-
-void uw_set_allocator(UwAllocId alloc_id)
-{
-    _uw_allocator = _uw_allocators[alloc_id];
 }
 
 /****************************************************************
- * Global list of interfaces initialized with built-in interfaces.
+ * Global list of interfaces
  */
 
 bool _uw_registered_interfaces[UW_INTERFACE_CAPACITY] = {
@@ -293,6 +262,7 @@ bool _uw_registered_interfaces[UW_INTERFACE_CAPACITY] = {
     [UwInterfaceId_Bitwise]      = true,
     [UwInterfaceId_Comparison]   = true,
     [UwInterfaceId_RandomAccess] = true,
+    [UwInterfaceId_String]       = true,
     [UwInterfaceId_List]         = true,
     [UwInterfaceId_File]         = true,
     [UwInterfaceId_FileReader]   = true,
@@ -318,20 +288,24 @@ int uw_register_interface()
 static UwType null_type = {
     .id             = UwTypeId_Null,
     .ancestor_id    = UwTypeId_Null,  // no ancestor; Null can't be an ancestor for any type
+    .compound       = false,
+    .data_optional  = true,
     .name           = "Null",
+    .data_offset    = 0,
     .data_size      = 0,
-    .data_offset    = sizeof(_UwValueBase),
-    .init           = _uw_init_null,
-    .fini           = _uw_fini_integral,
-    .unbrace        = nullptr,
-    .hash           = _uw_hash_null,
-    .copy           = _uw_copy_null,
-    .dump           = _uw_dump_null,
+    .allocator      = nullptr,
+    .create         = _uw_null_create,
+    .destroy        = nullptr,
+    .init           = nullptr,
+    .fini           = nullptr,
+    .clone          = nullptr,
+    .hash           = _uw_null_hash,
+    .deepcopy       = nullptr,
+    .dump           = _uw_null_dump,
     .to_string      = _uw_null_to_string,
     .is_true        = _uw_null_is_true,
     .equal_sametype = _uw_null_equal_sametype,
     .equal          = _uw_null_equal,
-    .equal_ctype    = _uw_null_equal_ctype,
 
     .interfaces = {}
 };
@@ -339,20 +313,24 @@ static UwType null_type = {
 static UwType bool_type = {
     .id             = UwTypeId_Bool,
     .ancestor_id    = UwTypeId_Null,  // no ancestor
+    .compound       = false,
+    .data_optional  = true,
     .name           = "Bool",
-    .data_size      = sizeof(UwType_Bool),
-    .data_offset    = sizeof(_UwValueBase),
-    .init           = _uw_init_bool,
-    .fini           = _uw_fini_integral,
-    .unbrace        = nullptr,
-    .hash           = _uw_hash_bool,
-    .copy           = _uw_copy_bool,
-    .dump           = _uw_dump_bool,
+    .data_offset    = 0,
+    .data_size      = 0,
+    .allocator      = nullptr,
+    .create         = _uw_bool_create,
+    .destroy        = nullptr,
+    .init           = nullptr,
+    .fini           = nullptr,
+    .clone          = nullptr,
+    .hash           = _uw_bool_hash,
+    .deepcopy       = nullptr,
+    .dump           = _uw_bool_dump,
     .to_string      = _uw_bool_to_string,
     .is_true        = _uw_bool_is_true,
     .equal_sametype = _uw_bool_equal_sametype,
     .equal          = _uw_bool_equal,
-    .equal_ctype    = _uw_bool_equal_ctype,
 
     .interfaces = {
         // [UwInterfaceId_Logic] = &bool_type_logic_interface
@@ -362,20 +340,84 @@ static UwType bool_type = {
 static UwType int_type = {
     .id             = UwTypeId_Int,
     .ancestor_id    = UwTypeId_Null,  // no ancestor
+    .compound       = false,
+    .data_optional  = true,
     .name           = "Int",
-    .data_size      = sizeof(UwType_Int),
-    .data_offset    = sizeof(_UwValueBase),
-    .init           = _uw_init_int,
-    .fini           = _uw_fini_integral,
-    .unbrace        = nullptr,
-    .hash           = _uw_hash_int,
-    .copy           = _uw_copy_int,
-    .dump           = _uw_dump_int,
+    .data_offset    = 0,
+    .data_size      = 0,
+    .allocator      = nullptr,
+    .create         = _uw_int_create,
+    .destroy        = nullptr,
+    .init           = nullptr,
+    .fini           = nullptr,
+    .clone          = nullptr,
+    .hash           = _uw_int_hash,
+    .deepcopy       = nullptr,
+    .dump           = _uw_int_dump,
     .to_string      = _uw_int_to_string,
     .is_true        = _uw_int_is_true,
     .equal_sametype = _uw_int_equal_sametype,
     .equal          = _uw_int_equal,
-    .equal_ctype    = _uw_int_equal_ctype,
+
+    .interfaces = {
+        // [UwInterfaceId_Logic]      = &int_type_logic_interface,
+        // [UwInterfaceId_Arithmetic] = &int_type_arithmetic_interface,
+        // [UwInterfaceId_Bitwise]    = &int_type_bitwise_interface,
+        // [UwInterfaceId_Comparison] = &int_type_comparison_interface
+    }
+};
+
+static UwType signed_type = {
+    .id             = UwTypeId_Signed,
+    .ancestor_id    = UwTypeId_Int,
+    .compound       = false,
+    .data_optional  = true,
+    .name           = "Signed",
+    .data_offset    = 0,
+    .data_size      = 0,
+    .allocator      = nullptr,
+    .create         = _uw_signed_create,
+    .destroy        = nullptr,
+    .init           = nullptr,
+    .fini           = nullptr,
+    .clone          = nullptr,
+    .hash           = _uw_signed_hash,
+    .deepcopy       = nullptr,
+    .dump           = _uw_signed_dump,
+    .to_string      = _uw_signed_to_string,
+    .is_true        = _uw_signed_is_true,
+    .equal_sametype = _uw_signed_equal_sametype,
+    .equal          = _uw_signed_equal,
+
+    .interfaces = {
+        // [UwInterfaceId_Logic]      = &int_type_logic_interface,
+        // [UwInterfaceId_Arithmetic] = &int_type_arithmetic_interface,
+        // [UwInterfaceId_Bitwise]    = &int_type_bitwise_interface,
+        // [UwInterfaceId_Comparison] = &int_type_comparison_interface
+    }
+};
+
+static UwType unsigned_type = {
+    .id             = UwTypeId_Unsigned,
+    .ancestor_id    = UwTypeId_Int,
+    .compound       = false,
+    .data_optional  = true,
+    .name           = "Unsigned",
+    .data_offset    = 0,
+    .data_size      = 0,
+    .allocator      = nullptr,
+    .create         = _uw_unsigned_create,
+    .destroy        = nullptr,
+    .init           = nullptr,
+    .fini           = nullptr,
+    .clone          = nullptr,
+    .hash           = _uw_unsigned_hash,
+    .deepcopy       = nullptr,
+    .dump           = _uw_unsigned_dump,
+    .to_string      = _uw_unsigned_to_string,
+    .is_true        = _uw_unsigned_is_true,
+    .equal_sametype = _uw_unsigned_equal_sametype,
+    .equal          = _uw_unsigned_equal,
 
     .interfaces = {
         // [UwInterfaceId_Logic]      = &int_type_logic_interface,
@@ -388,20 +430,24 @@ static UwType int_type = {
 static UwType float_type = {
     .id             = UwTypeId_Float,
     .ancestor_id    = UwTypeId_Null,  // no ancestor
+    .compound       = false,
+    .data_optional  = true,
     .name           = "Float",
-    .data_size      = sizeof(UwType_Float),
-    .data_offset    = sizeof(_UwValueBase),
-    .init           = _uw_init_float,
-    .fini           = _uw_fini_integral,
-    .unbrace        = nullptr,
-    .hash           = _uw_hash_float,
-    .copy           = _uw_copy_float,
-    .dump           = _uw_dump_float,
+    .data_offset    = 0,
+    .data_size      = 0,
+    .allocator      = nullptr,
+    .create         = _uw_float_create,
+    .destroy        = nullptr,
+    .init           = nullptr,
+    .fini           = nullptr,
+    .clone          = nullptr,
+    .hash           = _uw_float_hash,
+    .deepcopy       = nullptr,
+    .dump           = _uw_float_dump,
     .to_string      = _uw_float_to_string,
     .is_true        = _uw_float_is_true,
     .equal_sametype = _uw_float_equal_sametype,
     .equal          = _uw_float_equal,
-    .equal_ctype    = _uw_float_equal_ctype,
 
     .interfaces = {
         // [UwInterfaceId_Logic]      = &float_type_logic_interface,
@@ -413,43 +459,76 @@ static UwType float_type = {
 static UwType string_type = {
     .id             = UwTypeId_String,
     .ancestor_id    = UwTypeId_Null,  // no ancestor
+    .compound       = false,
+    .data_optional  = true,
     .name           = "String",
-    .data_size      = sizeof(struct _UwString*),
-    .data_offset    = sizeof(_UwValueBase),
-    .init           = _uw_init_string,
-    .fini           = _uw_fini_string,
-    .unbrace        = nullptr,
-    .hash           = _uw_hash_string,
-    .copy           = _uw_copy_string,
-    .dump           = _uw_dump_string,
-    .to_string      = _uw_copy_string,  // yes, simply make a copy
+    .data_offset    = offsetof(struct _UwStringExtraData, string_data),
+    .data_size      = 0,
+    .allocator      = &_uw_default_allocator,
+    .create         = _uw_string_create,
+    .destroy        = _uw_string_destroy,
+    .init           = nullptr,           // custom constructor performs all the initialization
+    .fini           = nullptr,           // there's nothing to finalize, just run custom destructor
+    .clone          = _uw_string_clone,
+    .hash           = _uw_string_hash,
+    .deepcopy       = _uw_string_clone,  // strings are COW so copy is clone
+    .dump           = _uw_string_dump,
+    .to_string      = _uw_string_clone,  // yes, simply make a copy
     .is_true        = _uw_string_is_true,
     .equal_sametype = _uw_string_equal_sametype,
     .equal          = _uw_string_equal,
-    .equal_ctype    = _uw_string_equal_ctype,
 
     .interfaces = {
         // [UwInterfaceId_RandomAccess] = &string_type_random_access_interface
     }
 };
 
+static UwType charptr_type = {
+    .id             = UwTypeId_CharPtr,
+    .ancestor_id    = UwTypeId_Null,  // no ancestor
+    .compound       = false,
+    .data_optional  = true,
+    .name           = "CharPtr",
+    .data_offset    = 0,
+    .data_size      = 0,
+    .allocator      = nullptr,
+    .create         = _uw_charptr_create,
+    .destroy        = nullptr,
+    .init           = nullptr,
+    .fini           = nullptr,
+    .clone          = _uw_charptr_to_string,
+    .hash           = _uw_charptr_hash,
+    .deepcopy       = _uw_charptr_to_string,
+    .dump           = _uw_charptr_dump,
+    .to_string      = _uw_charptr_to_string,
+    .is_true        = _uw_charptr_is_true,
+    .equal_sametype = _uw_charptr_equal_sametype,
+    .equal          = _uw_charptr_equal,
+
+    .interfaces = {}
+};
+
 static UwType list_type = {
     .id             = UwTypeId_List,
     .ancestor_id    = UwTypeId_Null,  // no ancestor
+    .compound       = true,
+    .data_optional  = false,
     .name           = "List",
+    .data_offset    = offsetof(struct _UwListExtraData, list_data),
     .data_size      = sizeof(struct _UwList),
-    .data_offset    = sizeof(struct _UwValue),  // include embrace_count
-    .init           = _uw_init_list,
-    .fini           = _uw_fini_list,
-    .unbrace        = _uw_list_unbrace,
-    .hash           = _uw_hash_list,
-    .copy           = _uw_copy_list,
-    .dump           = _uw_dump_list,
+    .allocator      = &_uw_default_allocator,
+    .create         = default_create,
+    .destroy        = default_destroy,
+    .init           = _uw_list_init,
+    .fini           = _uw_list_fini,
+    .clone          = default_clone,
+    .hash           = _uw_list_hash,
+    .deepcopy       = _uw_list_deepcopy,
+    .dump           = _uw_list_dump,
     .to_string      = _uw_list_to_string,
     .is_true        = _uw_list_is_true,
     .equal_sametype = _uw_list_equal_sametype,
     .equal          = _uw_list_equal,
-    .equal_ctype    = _uw_list_equal_ctype,
 
     .interfaces = {
         // [UwInterfaceId_RandomAccess] = &list_type_random_access_interface,
@@ -460,88 +539,126 @@ static UwType list_type = {
 static UwType map_type = {
     .id             = UwTypeId_Map,
     .ancestor_id    = UwTypeId_Null,  // no ancestor
+    .compound       = true,
+    .data_optional  = false,
     .name           = "Map",
+    .data_offset    = offsetof(struct _UwMapExtraData, map_data),
     .data_size      = sizeof(struct _UwMap),
-    .data_offset    = sizeof(struct _UwValue),  // include embrace_count
-    .init           = _uw_init_map,
-    .fini           = _uw_fini_map,
-    .unbrace        = _uw_map_unbrace,
-    .hash           = _uw_hash_map,
-    .copy           = _uw_copy_map,
-    .dump           = _uw_dump_map,
+    .allocator      = &_uw_default_allocator,
+    .create         = default_create,
+    .destroy        = default_destroy,
+    .init           = _uw_map_init,
+    .fini           = _uw_map_fini,
+    .clone          = default_clone,
+    .hash           = _uw_map_hash,
+    .deepcopy       = _uw_map_deepcopy,
+    .dump           = _uw_map_dump,
     .to_string      = _uw_map_to_string,
     .is_true        = _uw_map_is_true,
     .equal_sametype = _uw_map_equal_sametype,
     .equal          = _uw_map_equal,
-    .equal_ctype    = _uw_map_equal_ctype,
 
     .interfaces = {
         // [UwInterfaceId_RandomAccess] = &map_type_random_access_interface
     }
 };
 
+static UwType status_type = {
+    .id             = UwTypeId_Status,
+    .ancestor_id    = UwTypeId_Null,  // no ancestor
+    .compound       = false,
+    .data_optional  = true,
+    .name           = "Status",
+    .data_offset    = offsetof(struct _UwStatusExtraData, status_desc),  // extra_data is optional and not allocated by default
+    .data_size      = sizeof(char*),
+    .allocator      = &_uw_default_allocator,
+    .create         = default_create,
+    .destroy        = default_destroy,
+    .init           = nullptr,
+    .fini           = _uw_status_fini,
+    .clone          = default_clone,
+    .hash           = _uw_status_hash,
+    .deepcopy       = _uw_status_deepcopy,
+    .dump           = _uw_status_dump,
+    .to_string      = _uw_status_to_string,
+    .is_true        = _uw_status_is_true,
+    .equal_sametype = _uw_status_equal_sametype,
+    .equal          = _uw_status_equal,
+
+    .interfaces = {}
+};
+
 static UwType class_type = {
     .id             = UwTypeId_Class,
     .ancestor_id    = UwTypeId_Null,  // no ancestor
+    .compound       = false,
+    .data_optional  = false,
     .name           = "Class",
+    .data_offset    = 0,
     .data_size      = 0,
-    .data_offset    = sizeof(_UwValueBase),
-    .init           = _uw_init_class,
-    .fini           = _uw_fini_integral,
-    .unbrace        = nullptr,
-    .hash           = _uw_hash_class,
-    .copy           = _uw_copy_class,
-    .dump           = _uw_dump_class,
+    .allocator      = &_uw_default_allocator,
+    .create         = default_create,
+    .destroy        = default_destroy,
+    .init           = nullptr,
+    .fini           = nullptr,
+    .clone          = default_clone,
+    .hash           = _uw_class_hash,
+    .deepcopy       = _uw_class_deepcopy,
+    .dump           = _uw_class_dump,
     .to_string      = _uw_class_to_string,
     .is_true        = _uw_class_is_true,
     .equal_sametype = _uw_class_equal_sametype,
     .equal          = _uw_class_equal,
-    .equal_ctype    = _uw_class_equal_ctype,
 
     .interfaces = {}
 };
 
 static UwInterface_File file_type_file_interface = {
-    .open     = _uw_file_open,
-    .close    = _uw_file_close,
-    .set_fd   = _uw_file_set_fd,
-    .get_name = _uw_file_get_name,
-    .set_name = _uw_file_set_name
+    .open     = _uwi_file_open,
+    .close    = _uwi_file_close,
+    .set_fd   = _uwi_file_set_fd,
+    .get_name = _uwi_file_get_name,
+    .set_name = _uwi_file_set_name
 };
 
 static UwInterface_FileReader file_type_file_reader_interface = {
-    .read = _uw_file_read
+    .read = _uwi_file_read
 };
 
 static UwInterface_FileWriter file_type_file_writer_interface = {
-    .write = _uw_file_write
+    .write = _uwi_file_write
 };
 
 static UwInterface_LineReader file_type_line_reader_interface = {
-    .start             = _uw_file_start_read_lines,
-    .read_line         = _uw_file_read_line,
-    .read_line_inplace = _uw_file_read_line_inplace,
-    .unread_line       = _uw_file_unread_line,
-    .stop              = _uw_file_stop_read_lines
+    .start             = _uwi_file_start_read_lines,
+    .read_line         = _uwi_file_read_line,
+    .read_line_inplace = _uwi_file_read_line_inplace,
+    .get_line_number   = _uwi_file_get_line_number,
+    .unread_line       = _uwi_file_unread_line,
+    .stop              = _uwi_file_stop_read_lines
 };
 
 static UwType file_type = {
     .id             = UwTypeId_File,
     .ancestor_id    = UwTypeId_Null,  // no ancestor
+    .compound       = false,
+    .data_optional  = false,
     .name           = "File",
+    .data_offset    = offsetof(struct _UwFileExtraData, file_data),
     .data_size      = sizeof(struct _UwFile),
-    .data_offset    = sizeof(_UwValueBase),
-    .init           = _uw_init_file,
-    .fini           = _uw_fini_file,
-    .unbrace        = nullptr,
-    .hash           = _uw_hash_file,
-    .copy           = _uw_copy_file,
-    .dump           = _uw_dump_file,
+    .allocator      = &_uw_default_allocator,
+    .create         = default_create,
+    .destroy        = default_destroy,
+    .init           = _uw_file_init,
+    .fini           = _uw_file_fini,
+    .clone          = default_clone,
+    .hash           = _uw_file_hash,
+    .deepcopy       = _uw_file_deepcopy,
+    .dump           = _uw_file_dump,
     .to_string      = _uw_file_to_string,
     .is_true        = _uw_file_is_true,
     .equal_sametype = _uw_file_equal_sametype,
     .equal          = _uw_file_equal,
-    .equal_ctype    = _uw_file_equal_ctype,
 
     .interfaces = {
         [UwInterfaceId_File]       = &file_type_file_interface,
@@ -552,30 +669,35 @@ static UwType file_type = {
 };
 
 static UwInterface_LineReader stringio_type_line_reader_interface = {
-    .start             = _uw_stringio_start_read_lines,
-    .read_line         = _uw_stringio_read_line,
-    .read_line_inplace = _uw_stringio_read_line_inplace,
-    .unread_line       = _uw_stringio_unread_line,
-    .stop              = _uw_stringio_stop_read_lines
+    .start             = _uwi_stringio_start_read_lines,
+    .read_line         = _uwi_stringio_read_line,
+    .read_line_inplace = _uwi_stringio_read_line_inplace,
+    .get_line_number   = _uwi_stringio_get_line_number,
+    .unread_line       = _uwi_stringio_unread_line,
+    .stop              = _uwi_stringio_stop_read_lines
 };
 
 static UwType stringio_type = {
     .id             = UwTypeId_StringIO,
-    .ancestor_id    = UwTypeId_String,  // it's a subclass!
+    .ancestor_id    = UwTypeId_Null,  // no ancestor
+    .compound       = false,
+    .data_optional  = false,
     .name           = "StringIO",
+    .data_offset    = offsetof(struct _UwStringIOExtraData, stringio_data),
     .data_size      = sizeof(struct _UwStringIO),
-    .data_offset    = sizeof(_UwValueBase) + sizeof(struct _UwString*),
-    .init           = _uw_init_stringio,
-    .fini           = _uw_fini_stringio,
-    .unbrace        = nullptr,
-    .hash           = _uw_hash_string,
-    .copy           = _uw_copy_stringio,
-    .dump           = _uw_dump_string,
-    .to_string      = _uw_copy_string,  // yes, simply make a copy of string
-    .is_true        = _uw_string_is_true,
-    .equal_sametype = _uw_string_equal_sametype,
-    .equal          = _uw_string_equal,
-    .equal_ctype    = _uw_string_equal_ctype,
+    .allocator      = &_uw_default_allocator,
+    .create         = default_create,
+    .destroy        = default_destroy,
+    .init           = _uw_stringio_init,
+    .fini           = _uw_stringio_fini,
+    .clone          = default_clone,
+    .hash           = _uw_stringio_hash,
+    .deepcopy       = _uw_stringio_deepcopy,
+    .dump           = _uw_stringio_dump,
+    .to_string      = _uw_stringio_to_string,
+    .is_true        = _uw_stringio_is_true,
+    .equal_sametype = _uw_stringio_equal_sametype,
+    .equal          = _uw_stringio_equal,
 
     // in a subclass all interfaces of base classes must be in place:
     .interfaces = {
@@ -586,14 +708,18 @@ static UwType stringio_type = {
 
 UwType* _uw_types[UW_TYPE_CAPACITY] = {
 
-    [UwTypeId_Null]   = &null_type,
-    [UwTypeId_Bool]   = &bool_type,
-    [UwTypeId_Int]    = &int_type,
-    [UwTypeId_Float]  = &float_type,
-    [UwTypeId_String] = &string_type,
-    [UwTypeId_List]   = &list_type,
-    [UwTypeId_Map]    = &map_type,
-    [UwTypeId_Class]  = &class_type,
+    [UwTypeId_Null]     = &null_type,
+    [UwTypeId_Bool]     = &bool_type,
+    [UwTypeId_Int]      = &int_type,
+    [UwTypeId_Signed]   = &signed_type,
+    [UwTypeId_Unsigned] = &unsigned_type,
+    [UwTypeId_Float]    = &float_type,
+    [UwTypeId_String]   = &string_type,
+    [UwTypeId_CharPtr]  = &charptr_type,
+    [UwTypeId_List]     = &list_type,
+    [UwTypeId_Map]      = &map_type,
+    [UwTypeId_Status]   = &status_type,
+    [UwTypeId_Class]    = &class_type,
     [UwTypeId_File]     = &file_type,
     [UwTypeId_StringIO] = &stringio_type
 };
@@ -619,8 +745,8 @@ int uw_subclass(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_si
 
     type->ancestor_id = ancestor_id;
     type->name = name;
-    type->data_size = data_size;
     type->data_offset = ancestor->data_offset + ancestor->data_size;
+    type->data_size = data_size;
 
     int type_id = uw_add_type(type);
     if (type_id != -1) {

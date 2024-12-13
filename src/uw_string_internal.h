@@ -14,48 +14,81 @@ extern "C" {
 #define _likely_(x)    __builtin_expect(!!(x), 1)
 #define _unlikely_(x)  __builtin_expect(!!(x), 0)
 
-// internal string structure
-
-struct _UwString {
-    // variable length structure
-    uint8_t cap_size:3,      // length and capacity size in bytes minus one
-            char_size:2,     // character size in bytes minus one
-            block_count:3;   // number of 64-bit blocks for fast comparison
+struct _UwStringExtraData {
+    /*
+     * variable-size structure because of struct _UwString
+     */
+    _UwExtraData     value_data;
+    struct _UwString string_data;
 };
 
-#define _uw_get_string_pptr(value)  \
+#define _uw_str_is_embedded(value)  \
+    ((value)->str_header.is_embedded)
+
+#define _uw_get_string_ptr(value)  \
     (  \
-        (struct _UwString**) (  \
-            ((uint8_t*) (value)) + sizeof(_UwValueBase) \
-        )  \
+        _uw_str_is_embedded(value)?  \
+            &(value)->str_header  \
+        :  \
+            &((struct _UwStringExtraData*) ((value)->extra_data))->string_data \
     )
+
+/****************************************************************
+ * Safety helpers.
+ *
+ * cap_size and char_size are stored as 0-based whereas all
+ * functions use 1-based values.
+ *
+ * The following functions should be used to make the code
+ * less error-prone, instead of accessing fields directly
+ * and forgetting +/- 1.
+ */
+
+static inline uint8_t _uw_string_cap_size(struct _UwString* s)
+{
+    return s->cap_size + 1;
+}
+
+static inline void _uw_string_set_cap_size(struct _UwString* s, uint8_t cap_size)
+{
+    s->cap_size = cap_size - 1;
+}
+
+static inline uint8_t _uw_string_char_size(struct _UwString* s)
+{
+    return s->char_size + 1;
+}
+
+static inline void _uw_string_set_char_size(struct _UwString* s, uint8_t char_size)
+{
+    s->char_size = char_size - 1;
+}
 
 /****************************************************************
  * Basic interface methods
  */
 
-bool       _uw_init_string          (UwValuePtr self);
-void       _uw_fini_string          (UwValuePtr self);
-void       _uw_hash_string          (UwValuePtr self, UwHashContext* ctx);
-UwValuePtr _uw_copy_string          (UwValuePtr self);
-void       _uw_dump_string          (UwValuePtr self, int indent, struct _UwValueChain* prev_compound);
-bool       _uw_string_is_true       (UwValuePtr self);
-bool       _uw_string_equal_sametype(UwValuePtr self, UwValuePtr other);
-bool       _uw_string_equal         (UwValuePtr self, UwValuePtr other);
-bool       _uw_string_equal_ctype   (UwValuePtr self, UwCType ctype, ...);
+UwResult _uw_string_create        (UwTypeId type_id, va_list ap);
+void     _uw_string_destroy       (UwValuePtr self);
+UwResult _uw_string_clone         (UwValuePtr self);
+void     _uw_string_hash          (UwValuePtr self, UwHashContext* ctx);
+void     _uw_string_dump          (UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail);
+bool     _uw_string_is_true       (UwValuePtr self);
+bool     _uw_string_equal_sametype(UwValuePtr self, UwValuePtr other);
+bool     _uw_string_equal         (UwValuePtr self, UwValuePtr other);
 
-/****************************************************************
- * The string is allocated in 8-byte blocks.
- * One block can hold up to 5 ASCII characters, an average length of English word.
- * Short strings up to 6 blocks can me compared for equality
- * simply comparing 64-bit integers.
- *
- * The first byte contains bit fields. It is followed by length and capacity
- * fields aligned on cap_size boundary.
- * String data follows capacity field and is aligned if char size is 2 or 4.
+void _uw_string_dump_data(FILE* fp, UwValuePtr str, int indent);
+/*
+ * Helper function for _uw_string_dump.
  */
 
-#define UWSTRING_BLOCK_SIZE    8
+/****************************************************************
+ * The string is allocated in blocks.
+ * Given that typical allocator's granularity is 16,
+ * there's no point to make block size less than that.
+ */
+
+#define UWSTRING_BLOCK_SIZE    16
 
 /****************************************************************
  * Methods that depend on cap_size field.
@@ -81,19 +114,47 @@ static inline CapMethods* get_cap_methods(struct _UwString* str)
     return &_uws_cap_methods[str->cap_size];
 }
 
-static inline uint8_t string_header_size(uint8_t cap_size, uint8_t char_size)
+static inline uint8_t* cap_data_addr(uint8_t cap_size, struct _UwString* desired_addr)
+/*
+ * Return aligned address of capacity data
+ * that follows 1-byte str header at `desired_addr` which can be unaligned.
+ *
+ * This function does not dereference `desired_addr` and can be used to calculate
+ * address starting from nullptr.
+ */
 {
-    if (_unlikely_((char_size - 1) == 2)) {
-        return 3 * cap_size;
-    } else {
-        return (3 * cap_size + char_size - 1) & ~(char_size - 1);
-    }
+    static_assert(
+        sizeof(struct _UwString) == 1
+    );
+    return uw_align_ptr(
+        ((uint8_t*) desired_addr) + sizeof(struct _UwString),
+        cap_size
+    );
 }
 
-static inline uint8_t* get_char_ptr(struct _UwString* str, unsigned start_pos)
+static inline uint8_t* get_char0_ptr(struct _UwString* desired_addr, uint8_t cap_size, uint8_t char_size)
+/*
+ * Return address of the first character in string.
+ * This function is also used to determine memory size for different cap_size and char_size.
+ *
+ * This function does not dereference `desired_addr` and can be used to calculate
+ * address starting from nullptr.
+ */
 {
-    struct _UwString s = *str;
-    return ((uint8_t*) str) + string_header_size(s.cap_size + 1, s.char_size + 1) + start_pos * (s.char_size + 1);
+    return uw_align_ptr(
+        cap_data_addr(cap_size, desired_addr) + cap_size * 2,  // 2 == length + capacity
+        char_size  // align at char_size boundary
+    );
+}
+
+static inline uint8_t* get_char_ptr(struct _UwString* s, unsigned start_pos)
+/*
+ * Return address of character in string at `start_pos`.
+ */
+{
+    uint8_t cap_size  = _uw_string_cap_size(s);
+    uint8_t char_size = _uw_string_char_size(s);
+    return get_char0_ptr(s, cap_size, char_size) + start_pos * char_size;
 }
 
 /****************************************************************
@@ -137,14 +198,62 @@ static inline StrMethods* get_str_methods(struct _UwString* str)
     return &_uws_str_methods[str->char_size];
 }
 
-static inline uint8_t _uw_string_char_size(struct _UwString* s)
-{
-    return s->char_size + 1;
-}
+/****************************************************************
+ * Misc. functions
+ */
 
-#ifdef DEBUG
-    bool uw_eq_fast(struct _UwString* a, struct _UwString* b);
-#endif
+static inline char32_t read_utf8_char(char8_t** str)
+/*
+ * Decode UTF-8 character from null-terminated string, update `*str`.
+ *
+ * Stop decoding if null character is encountered.
+ *
+ * Return decoded character, null, or 0xFFFFFFFF if UTF-8 sequence is invalid.
+ */
+{
+    char8_t c = **str;
+    if (_unlikely_(c == 0)) {
+        return 0;
+    }
+    (*str)++;
+
+    if (c < 0x80) {
+        return  c;
+    }
+
+    char32_t codepoint = 0;
+    char8_t next;
+
+#   define APPEND_NEXT         \
+        next = **str;          \
+        if (_unlikely_(next == 0)) return 0; \
+        if (_unlikely_((next & 0b1100'0000) != 0b1000'0000)) goto bad_utf8; \
+        (*str)++;              \
+        codepoint <<= 6;       \
+        codepoint |= next & 0x3F;
+
+    codepoint = c & 0b0001'1111;
+    if ((c & 0b1110'0000) == 0b1100'0000) {
+        APPEND_NEXT
+    } else if ((c & 0b1111'0000) == 0b1110'0000) {
+        APPEND_NEXT
+        APPEND_NEXT
+    } else if ((c & 0b1111'1000) == 0b1111'0000) {
+        APPEND_NEXT
+        APPEND_NEXT
+        APPEND_NEXT
+    } else {
+        goto bad_utf8;
+    }
+    if (_unlikely_(codepoint == 0)) {
+        // zero codepoint encoded with 2 or more bytes,
+        // make it invalid to avoid mixing up with 1-byte null character
+bad_utf8:
+        codepoint = 0xFFFFFFFF;
+    }
+    return codepoint;
+#   undef APPEND_NEXT
+}
 
 #ifdef __cplusplus
 }

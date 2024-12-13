@@ -6,15 +6,13 @@
 extern "C" {
 #endif
 
-bool       _uw_init_float          (UwValuePtr self);
-void       _uw_hash_float          (UwValuePtr self, UwHashContext* ctx);
-UwValuePtr _uw_copy_float          (UwValuePtr self);
-void       _uw_dump_float          (UwValuePtr self, int indent, struct _UwValueChain* prev_compound);
-UwValuePtr _uw_float_to_string     (UwValuePtr self);
-bool       _uw_float_is_true       (UwValuePtr self);
-bool       _uw_float_equal_sametype(UwValuePtr self, UwValuePtr other);
-bool       _uw_float_equal         (UwValuePtr self, UwValuePtr other);
-bool       _uw_float_equal_ctype   (UwValuePtr self, UwCType ctype, ...);
+UwResult _uw_float_create        (UwTypeId type_id, va_list ap);
+void     _uw_float_hash          (UwValuePtr self, UwHashContext* ctx);
+void     _uw_float_dump          (UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail);
+UwResult _uw_float_to_string     (UwValuePtr self);
+bool     _uw_float_is_true       (UwValuePtr self);
+bool     _uw_float_equal_sametype(UwValuePtr self, UwValuePtr other);
+bool     _uw_float_equal         (UwValuePtr self, UwValuePtr other);
 
 #ifdef __cplusplus
 }

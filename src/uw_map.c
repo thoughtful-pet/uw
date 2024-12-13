@@ -1,8 +1,8 @@
 #include <limits.h>
-#include <stdarg.h>
 #include <string.h>
 
-#include "include/uw_c.h"
+#include "include/uw.h"
+#include "src/uw_charptr_internal.h"
 #include "src/uw_map_internal.h"
 
 static inline unsigned get_map_length(struct _UwMap* map)
@@ -87,27 +87,30 @@ static void set_ht_item(struct _UwHashTable* ht, unsigned index, unsigned value)
  * kv_index = key_index / 2
  */
 
-static bool init_hash_table(UwAllocId alloc_id, struct _UwHashTable* ht, unsigned capacity)
+static bool init_hash_table(UwTypeId type_id, struct _UwHashTable* ht,
+                            unsigned old_capacity, unsigned new_capacity)
 {
-    unsigned item_size = get_item_size(capacity);
-    unsigned memsize = item_size * capacity;
+    unsigned old_item_size = get_item_size(old_capacity);
+    unsigned old_memsize = old_item_size * old_capacity;
+
+    unsigned new_item_size = get_item_size(new_capacity);
+    unsigned new_memsize = new_item_size * new_capacity;
 
     // reallocate items
     // if map is new, ht is initialized to all zero
     // if map is doubled, this reallocates block
-    uint8_t* new_items = _uw_allocators[alloc_id].realloc(ht->items, memsize);
+    uint8_t*  new_items = _uw_types[type_id]->allocator->realloc(ht->items, old_memsize, new_memsize);
     if (!new_items) {
         return false;
     }
-    ht->items = new_items;
+    memset(new_items, 0, new_memsize);
 
-    memset(ht->items, 0, memsize);
+    ht->items        = new_items;
+    ht->item_size    = new_item_size;
+    ht->capacity     = new_capacity;
+    ht->hash_bitmask = new_capacity - 1;
 
-    ht->item_size    = item_size;
-    ht->capacity     = capacity;
-    ht->hash_bitmask = capacity - 1;
-
-    switch (item_size) {
+    switch (new_item_size) {
         case 1:
             ht->get_item = get_ht_item_uint8_t;
             ht->set_item = set_ht_item_uint8_t;
@@ -134,38 +137,6 @@ static bool init_hash_table(UwAllocId alloc_id, struct _UwHashTable* ht, unsigne
     return true;
 }
 
-static bool init_map(UwAllocId alloc_id, struct _UwMap* map, unsigned ht_capacity, unsigned list_capacity)
-/*
- * Initialize _UwMap structure.
- */
-{
-    struct _UwHashTable* ht = &map->hash_table;
-
-    ht->items_used = 0;
-
-    if (init_hash_table(alloc_id, ht, ht_capacity)) {
-        if (_uw_alloc_list(alloc_id, &map->kv_pairs, list_capacity)) {
-            return true;
-        }
-        _uw_allocators[alloc_id].free(ht->items);
-        ht->items = nullptr;
-    }
-    return false;
-}
-
-static void delete_map(UwAllocId alloc_id, struct _UwMap* map)
-/*
- * Call destructor for all items and free allocated data.
- */
-{
-    _uw_delete_list(alloc_id, &map->kv_pairs);
-
-    if (map->hash_table.items) {
-        _uw_allocators[alloc_id].free(map->hash_table.items);
-        map->hash_table.items = nullptr;
-    }
-}
-
 static unsigned lookup(struct _UwMap* map, UwValuePtr key, unsigned* ht_index, unsigned* ht_offset)
 /*
  * Lookup key starting from index = hash(key).
@@ -174,14 +145,11 @@ static unsigned lookup(struct _UwMap* map, UwValuePtr key, unsigned* ht_index, u
  *
  * If `ht_index` is not `nullptr`: write index of hash table item at which lookup has stopped.
  * If `ht_offset` is not `nullptr`: write the difference from final `ht_index` and initial `ht_index` to `ht_offset`;
- *
- * XXX leverage equal_ctype method for C type keys and simplify uw_map_get_* and uw_map_has_key_* functions
  */
 {
     struct _UwHashTable* ht = &map->hash_table;
     UwType_Hash index = uw_hash(key) & ht->hash_bitmask;
     unsigned offset = 0;
-
     do {
         unsigned kv_index = ht->get_item(ht, index);
 
@@ -202,7 +170,7 @@ static unsigned lookup(struct _UwMap* map, UwValuePtr key, unsigned* ht_index, u
         UwValuePtr k = _uw_list_item(&map->kv_pairs, kv_index * 2);
 
         // compare keys
-        if (k->type_id == key->type_id && _uw_equal(k, key)) {
+        if (_uw_equal(k, key)) {
             // found key
             if (ht_index) {
                 *ht_index = index;
@@ -239,27 +207,46 @@ static unsigned set_hash_table_item(struct _UwHashTable* hash_table, unsigned ht
     } while (true);
 }
 
-static inline bool double_hash_table(UwAllocId alloc_id, struct _UwMap* map)
+static bool _uw_map_expand(UwTypeId type_id, struct _UwMap* map, unsigned desired_capacity, unsigned ht_offset)
 /*
- * Helper functtion for uw_map_update.
+ * Expand map if necessary.
  *
- * Double the capacity of map's hash table and rebuild it.
- * The hash table is embedded into map structure, so re-allocate entire map.
+ * ht_offset is a hint, can be 0. If greater or equal 1/4 of capacity, hash table size will be doubled.
  */
 {
+    // expand list if necessary
+    unsigned list_cap = desired_capacity << 1;
+    if (list_cap > _uw_list_capacity(&map->kv_pairs)) {
+        if (!_uw_list_resize(type_id, &map->kv_pairs, list_cap)) {
+            return false;
+        }
+    }
+
     struct _UwHashTable* ht = &map->hash_table;
 
-    if (!init_hash_table(alloc_id, ht, ht->capacity * 2)) {
+    // check if hash table needs expansion
+    unsigned quarter_cap = ht->capacity >> 2;
+    if ((ht->capacity >= desired_capacity + quarter_cap) && (ht_offset < quarter_cap)) {
+        return true;
+    }
+
+    unsigned new_capacity = ht->capacity << 1;
+    quarter_cap = desired_capacity >> 2;
+    while (new_capacity < desired_capacity + quarter_cap) {
+        new_capacity <<= 1;
+    }
+
+    if (!init_hash_table(type_id, ht, ht->capacity, new_capacity)) {
         return false;
     }
 
     // rebuild hash table
-    UwValuePtr* key_ptr = map->kv_pairs.items;
+    UwValuePtr key_ptr = _uw_list_item(&map->kv_pairs, 0);
     unsigned kv_index = 1;  // index is 1-based, zero means unused item in hash table
     unsigned n = _uw_list_length(&map->kv_pairs);
     uw_assert((n & 1) == 0);
     while (n) {
-        set_hash_table_item(ht, uw_hash(*key_ptr), kv_index);
+        set_hash_table_item(ht, uw_hash(key_ptr), kv_index);
         key_ptr += 2;
         n -= 2;
         kv_index++;
@@ -267,109 +254,102 @@ static inline bool double_hash_table(UwAllocId alloc_id, struct _UwMap* map)
     return true;
 }
 
-static bool update_map(UwValuePtr self, UwValuePtr key, UwValuePtr value)
+static bool update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value)
 /*
- * This function increments refcount for key but does not do that for value!
- * That's because key may be added to the map or may not.
- * When adder, refcount is incremented.
- * The caller should always call uw_delete for key when this function succedes.
+ * key and value are moved to the internal list
  */
 {
-    UwAllocId alloc_id = self->alloc_id;
-    struct _UwMap* map = _uw_get_map_ptr(self);
-    struct _UwHashTable* ht = &map->hash_table;
+    UwTypeId type_id = map->type_id;
+    struct _UwMap* __map = _uw_get_map_ptr(map);
 
     // lookup key in the map
 
     unsigned ht_offset;
-    unsigned key_index = lookup(map, key, nullptr, &ht_offset);
+    unsigned key_index = lookup(__map, key, nullptr, &ht_offset);
 
     if (key_index != UINT_MAX) {
         // found key, update value
-
         unsigned value_index = key_index + 1;
-        UwValuePtr* v_ptr = _uw_list_item_ptr(&map->kv_pairs, value_index);
-
-        // update only if value is different
-        if (*v_ptr != value) {
-            if ((*v_ptr)->compound) {
-                _uw_unbrace(v_ptr);
-            } else {
-                uw_delete(v_ptr);
-            }
-            *v_ptr = value;
-        }
+        UwValuePtr v_ptr = _uw_list_item(&__map->kv_pairs, value_index);
+        uw_destroy(v_ptr);
+        *v_ptr = uw_move(value);
         return true;
     }
 
     // key not found, insert
 
-    unsigned quarter_cap = ht->capacity / 4;
-    unsigned remaining_cap = ht->capacity - ht->items_used;
-    if (ht_offset > quarter_cap || remaining_cap <= quarter_cap) {
-
-        // too long lookup and too few space left --> resize!
-
-        if (!double_hash_table(alloc_id, map)) {
-            return false;
-        }
+    if (!_uw_map_expand(type_id, __map, get_map_length(__map) + 1, ht_offset)) {
+        return false;
     }
+    // append key and value
+    unsigned kv_index = _uw_list_length(&__map->kv_pairs) >> 1;
+    set_hash_table_item(&__map->hash_table, uw_hash(key), kv_index + 1);
 
-    unsigned kv_index = _uw_list_length(&map->kv_pairs) / 2;
-
-    unsigned ht_index = set_hash_table_item(ht, uw_hash(key), kv_index + 1);
-
-    UwValuePtr key_ref = uw_makeref(key);
-    if (!_uw_list_append(alloc_id, &map->kv_pairs, key_ref)) {
-        uw_delete(&key_ref);
-        goto error;
+    if (!_uw_list_append_item(type_id, &__map->kv_pairs, key, map)) {
+        goto panic;
     }
-    if (!_uw_list_append(alloc_id, &map->kv_pairs, value)) {
-        unsigned len = _uw_list_length(&map->kv_pairs);
-        _uw_list_del(&map->kv_pairs, len - 1, len);
-        goto error;
+    if (!_uw_list_append_item(type_id, &__map->kv_pairs, value, map)) {
+        goto panic;
     }
-
-    ht->items_used++;
     return true;
 
-error:
-    // append to list failed, reset hast table item
-    ht->set_item(ht, ht_index, 0);
-    return false;
+panic:
+    uw_panic("Failed append to preallocated list");
 }
 
 /****************************************************************
  * Basic interface methods
  */
 
-bool _uw_init_map(UwValuePtr self)
+UwResult _uw_map_init(UwValuePtr self, va_list ap)
 {
-    return init_map(
-        self->alloc_id,
-        _uw_get_map_ptr(self),
-        UWMAP_INITIAL_CAPACITY, UWMAP_INITIAL_CAPACITY * 2);
-}
+    _uw_init_compound_data((_UwCompoundData*) (self->extra_data));
 
-void _uw_fini_map(UwValuePtr self)
-{
-    delete_map(self->alloc_id, _uw_get_map_ptr(self));
-}
-
-void _uw_map_unbrace(UwValuePtr self)
-{
-    // unbrace values only
-    // XXX when value is destroyed, do we neeed to re-create hash table?
     struct _UwMap* map = _uw_get_map_ptr(self);
-    unsigned n = map->kv_pairs.length / 2;
-    UwValuePtr* item_ref = map->kv_pairs.items + 1;
-    while (n--) {
-        _uw_unbrace(item_ref);
-        item_ref += 2;
+    struct _UwHashTable* ht = &map->hash_table;
+    UwTypeId type_id = self->type_id;
+
+    ht->items_used = 0;
+
+    UwValue error = UwOOM();  // default error is OOM unless some arg is a status
+
+    if (init_hash_table(type_id, ht, 0, UWMAP_INITIAL_CAPACITY)) {
+        if (_uw_alloc_list(type_id, &map->kv_pairs, UWMAP_INITIAL_CAPACITY * 2)) {
+            UwValue status = uw_map_update_ap(self, ap);
+            if (uw_ok(&status)) {
+                return uw_move(&status);
+            }
+            uw_destroy(&error);
+            error = uw_move(&status);
+        }
+        _uw_map_fini(self);
     }
+    return uw_move(&error);;
 }
 
-void _uw_hash_map(UwValuePtr self, UwHashContext* ctx)
+void _uw_map_fini(UwValuePtr self)
+{
+    struct _UwMap* map = _uw_get_map_ptr(self);
+    struct _UwHashTable* ht = &map->hash_table;
+    _UwCompoundData* cdata = (_UwCompoundData*) self->extra_data;
+    UwTypeId type_id = self->type_id;
+
+    _uw_destroy_list(type_id, &map->kv_pairs, cdata);
+    if (ht->items) {
+        unsigned ht_memsize = get_item_size(ht->capacity) * ht->capacity;
+        _uw_types[type_id]->allocator->free(ht->items, ht_memsize);
+        ht->items = nullptr;
+    }
+    _uw_fini_compound_data(cdata);
+}
+
+UwResult _uw_map_clone(UwValuePtr self)
+{
+    self->extra_data->refcount++;
+    return *self;
+}
+
+void _uw_map_hash(UwValuePtr self, UwHashContext* ctx)
 {
     _uw_hash_uint64(ctx, self->type_id);
     struct _UwMap* map = _uw_get_map_ptr(self);
@@ -379,120 +359,120 @@ void _uw_hash_map(UwValuePtr self, UwHashContext* ctx)
     }
 }
 
-UwValuePtr _uw_copy_map(UwValuePtr self)
+UwResult _uw_map_deepcopy(UwValuePtr self)
 {
-    struct _UwMap* map = _uw_get_map_ptr(self);
-    unsigned length = get_map_length(map);
-
-    // find nearest power of two for hash table capacity
-    unsigned ht_capacity = UWMAP_INITIAL_CAPACITY;
-    while (ht_capacity < length) {
-        ht_capacity <<= 1;
+    UwValue dest = _uw_create(self->type_id, UwVaEnd());
+    if (uw_error(&dest)) {
+        return uw_move(&dest);
     }
 
-    length <<= 1;  // list length from now on
+    struct _UwMap* src_map = _uw_get_map_ptr(self);
+    unsigned map_length    = get_map_length(src_map);
 
-    UwValuePtr result = _uw_alloc_value(UwTypeId_Map);
-    if (!result) {
-        return nullptr;
-    }
-    struct _UwMap* result_map = _uw_get_map_ptr(result);
-
-    if (!init_map(result->alloc_id, result_map, ht_capacity, length)) {
-        _uw_free_value(result);
-        return nullptr;
+    if (!_uw_map_expand(dest.type_id, _uw_get_map_ptr(&dest), map_length, 0)) {
+        return UwOOM();
     }
 
-    // deep copy
-    for (unsigned i = 0; i < length;) {
-        // not using autocleaned variables here
-        UwValuePtr key = uw_copy(map->kv_pairs.items[i++]);
-        UwValuePtr value = uw_copy(map->kv_pairs.items[i++]);
-        if (key && value) {
-            if (value->compound) {
-                _uw_embrace(value);
-                value->refcount--;
-            }
-            if (update_map(result, key, value)) {
-                // value is successfully added to the map
-                // uw_delete should always be called for key
-                uw_delete(&key);
-                continue;
-            }
+    UwValuePtr kv = _uw_list_item(&src_map->kv_pairs, 0);
+    for (unsigned i = 0; i < map_length; i++) {
+        UwValue key = uw_clone(kv++);  // okay to clone because keys are already deeply copied
+        if (uw_error(&key)) {
+            return uw_move(&key);
         }
-        // uh oh
-        uw_delete(&key);
-        _uw_unbrace(&value);
-        uw_delete(&result);
-        return nullptr;
+        UwValue value = uw_clone(kv++);
+        if (uw_error(&value)) {
+            return uw_move(&key);
+        }
+        if (!update_map(&dest, &key, &value)) {
+            // XXX should not happen because the map already resized
+            uw_destroy(&key);
+            uw_destroy(&value);
+            return UwOOM();
+        }
     }
-    return result;
+    return uw_move(&dest);
 }
 
-void _uw_dump_map(UwValuePtr self, int indent, struct _UwValueChain* prev_compound)
+void _uw_map_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
-    _uw_dump_start(self, indent);
+    _uw_dump_start(fp, self, first_indent);
+    _uw_dump_base_extra_data(fp, self->extra_data);
+    _uw_dump_compound_data(fp, (_UwCompoundData*) self->extra_data, next_indent);
+    _uw_print_indent(fp, next_indent);
 
-    if (_uw_compound_value_seen(self, prev_compound))
-    {
-        puts(" already dumped, see above");
+    UwValuePtr value_seen = _uw_on_chain(self, tail);
+    if (value_seen) {
+        fprintf(fp, "already dumped: %p, extra data %p\n", value_seen, value_seen->extra_data);
         return;
     }
 
+    _UwCompoundChain this_link = {
+        .prev = tail,
+        .value = self
+    };
+
     struct _UwMap* map = _uw_get_map_ptr(self);
-    printf("%u items, capacity=%u\n", map->kv_pairs.length >> 1, map->kv_pairs.capacity >> 1);
+    fprintf(fp, "%u items, list items/capacity=%u/%u\n",
+            get_map_length(map), _uw_list_length(&map->kv_pairs), _uw_list_capacity(&map->kv_pairs));
 
-    indent += 4;
-    for (unsigned i = 0; i < map->kv_pairs.length; i++) {
+    next_indent += 4;
+    UwValuePtr item_ptr = _uw_list_item(&map->kv_pairs, 0);
+    for (unsigned n = _uw_list_length(&map->kv_pairs); n; n -= 2) {
 
-        struct _UwValueChain* prevc;
-        struct _UwValueChain this_compound;
+        UwValuePtr key   = item_ptr++;
+        UwValuePtr value = item_ptr++;
 
-        _uw_print_indent(indent);
-        printf("Key:\n");
-        UwValuePtr key = map->kv_pairs.items[i];
+        _uw_print_indent(fp, next_indent);
+        fputs("Key:   ", fp);
+        _uw_call_dump(fp, key, 0, next_indent + 7, &this_link);
 
-        if (key->compound) {
-            prevc = &this_compound;
-            this_compound.prev = prev_compound;
-            this_compound.value = self;
-        } else {
-            prevc = prev_compound;
-        }
-        _uw_call_dump(key, indent, prevc);
-        i++;
-
-        _uw_print_indent(indent);
-        printf("Value:\n");
-        UwValuePtr value = map->kv_pairs.items[i];
-
-        if (value->compound) {
-            prevc = &this_compound;
-            this_compound.prev = prev_compound;
-            this_compound.value = self;
-        } else {
-            prevc = prev_compound;
-        }
-        _uw_call_dump(value, indent, prevc);
+        _uw_print_indent(fp, next_indent);
+        fputs("Value: ", fp);
+        _uw_call_dump(fp, value, 0, next_indent + 7, &this_link);
     }
 
-    _uw_print_indent(indent);
+    _uw_print_indent(fp, next_indent);
 
     struct _UwHashTable* ht = &map->hash_table;
-    printf("hash table item size %u, items_used=%u, capacity=%u (bitmask %llx)\n",
-           ht->item_size, ht->items_used, ht->capacity, (unsigned long long) ht->hash_bitmask);
+    fprintf(fp, "hash table item size %u, capacity=%u (bitmask %llx)\n",
+            ht->item_size, ht->capacity, (unsigned long long) ht->hash_bitmask);
 
+    unsigned hex_width = ht->item_size;
+    unsigned dec_width;
+    switch (ht->item_size) {
+        case 1: dec_width = 3; break;
+        case 2: dec_width = 5; break;
+        case 3: dec_width = 8; break;
+        case 4: dec_width = 10; break;
+        case 5: dec_width = 13; break;
+        case 6: dec_width = 15; break;
+        case 7: dec_width = 17; break;
+        default: dec_width = 20; break;
+    }
+    char fmt[32];
+    sprintf(fmt, "%%%ux: %%-%uu", hex_width, dec_width);
+    unsigned line_len = 0;
+    _uw_print_indent(fp, next_indent);
     for (unsigned i = 0; i < ht->capacity; i++ ) {
         unsigned kv_index = ht->get_item(ht, i);
-        _uw_print_indent(indent);
-        printf("%x: %u\n", i, kv_index);
+        fprintf(fp, fmt, i, kv_index);
+        line_len += dec_width + hex_width + 4;
+        if (line_len < 80) {
+            fputs("  ", fp);
+        } else {
+            fputc('\n', fp);
+            line_len = 0;
+            _uw_print_indent(fp, next_indent);
+        }
+    }
+    if (line_len) {
+        fputc('\n', fp);
     }
 }
 
-UwValuePtr _uw_map_to_string(UwValuePtr self)
+UwResult _uw_map_to_string(UwValuePtr self)
 {
-    // XXX not implemented yet
-    return nullptr;
+    return UwError(UW_ERROR_NOT_IMPLEMENTED);
 }
 
 bool _uw_map_is_true(UwValuePtr self)
@@ -526,214 +506,100 @@ bool _uw_map_equal(UwValuePtr self, UwValuePtr other)
     }
 }
 
-bool _uw_map_equal_ctype(UwValuePtr self, UwCType ctype, ...)
-{
-    bool result = false;
-    va_list ap;
-    va_start(ap);
-    switch (ctype) {
-        case uwc_value_ptr:
-        case uwc_value_makeref: {
-            UwValuePtr other = va_arg(ap, UwValuePtr);
-            result = _uw_map_equal(self, other);
-            break;
-        }
-        default: break;
-    }
-    va_end(ap);
-    return result;
-}
-
 /****************************************************************
- * misc functions
+ * map functions
  */
-
-UwValuePtr uw_create_map_va(...)
-{
-    va_list ap;
-    va_start(ap);
-    UwValuePtr map = uw_create_map_ap(ap);
-    va_end(ap);
-    return map;
-}
-
-UwValuePtr uw_create_map_ap(va_list ap)
-{
-    UwValuePtr map = uw_create_map();
-    if (map) {
-        if (!uw_map_update_ap(map, ap)) {
-            uw_delete(&map);
-        }
-    }
-    return map;
-}
 
 bool uw_map_update(UwValuePtr map, UwValuePtr key, UwValuePtr value)
 {
     uw_assert_map(map);
-    uw_assert(key != map);
-    uw_assert(value != map);
 
-    // use separate variables for proper cleaning on error
-    UwValuePtr key_ref   = uw_copy(key);      // copy key for immutability
-    UwValuePtr value_ref = nullptr;
-    if (value->compound) {
-        value_ref = _uw_embrace(value);
-    } else {
-        value_ref = uw_makeref(value);
+    UwValue map_key = UwNull();
+    map_key = uw_deepcopy(key);  // deep copy key for immutability
+    if (uw_error(&map_key)) {
+        uw_destroy(&map_key);  // make error checker happy
+        return false;
     }
-
-    if (update_map(map, key_ref, value_ref)) {
-        // value is successfully added to the map
-        // uw_delete should always be called for key
-        uw_delete(&key_ref);
-        return true;
+    UwValue map_value = uw_clone(value);
+    if (uw_error(&map_value)) {
+        uw_destroy(&map_value);  // make error checker happy
+        return false;
     }
-    // update failed
-    uw_delete(&key_ref);
-    if (value_ref->compound) {
-        _uw_unbrace(&value_ref);
-    } else {
-        uw_delete(&value_ref);
-    }
-    return false;
+    return update_map(map, &map_key, &map_value);
 }
 
-bool uw_map_update_va(UwValuePtr map, ...)
+UwResult _uw_map_update_va(UwValuePtr map, ...)
 {
     va_list ap;
     va_start(ap);
-    bool result = uw_map_update_ap(map, ap);
+    UwValue result = uw_map_update_ap(map, ap);
     va_end(ap);
-    return result;
+    return uw_move(&result);
 }
 
-bool uw_map_update_ap(UwValuePtr map, va_list ap)
+UwResult uw_map_update_ap(UwValuePtr map, va_list ap)
 {
     uw_assert_map(map);
-
-    for (;;) {
-        int ctype = va_arg(ap, int);
-        if (ctype == -1) {
-            break;
+    UwValue error = UwOOM();  // default error is OOM unless some arg is a status
+    bool done = false;  // for special case when value is missing
+    while (!done) {
+        {
+            UwValue key = va_arg(ap, _UwValue);
+            if (uw_is_status(&key)) {
+                if (key.status_class == UWSC_DEFAULT && key.status_code == UW_STATUS_VA_END) {
+                    return UwOK();
+                }
+                uw_destroy(&error);
+                error = uw_move(&key);
+                goto failure;
+            }
+            if (!uw_charptr_to_string(&key)) {
+                goto failure;
+            }
+            UwValue value = va_arg(ap, _UwValue);
+            if (uw_is_status(&value)) {
+                if (value.status_class == UWSC_DEFAULT && value.status_code == UW_STATUS_VA_END) {
+                    uw_destroy(&value);
+                    value = UwNull();
+                    done = true;
+                } else {
+                    uw_destroy(&error);
+                    error = uw_move(&value);
+                    goto failure;
+                }
+            }
+            if (!uw_charptr_to_string(&value)) {
+                goto failure;
+            }
+            if (!update_map(map, &key, &value)) {
+                goto failure;
+            }
         }
-        UwValuePtr key = uw_create_from_ctype(ctype, ap);
-        if (!key) {
-            return false;
-        }
-        ctype = va_arg(ap, int);
-        UwValuePtr value = uw_create_from_ctype(ctype, ap);
-        if (!value) {
-            uw_delete(&key);
-            return false;
-        }
-        if (value->compound) {
-            _uw_embrace(value);
-            value->refcount--;
-        }
-        if (!update_map(map, key, value)) {
-            uw_delete(&key);
-            _uw_unbrace(&value);  // no need to check for compound value
-                                  // refcount is zero and it will be deleted anyway
-            return false;
-        }
-        uw_delete(&key);
     }
-    return true;
+
+failure:
+    // consume args
+    if (!done) { for (;;) {
+        {
+            UwValue arg = va_arg(ap, _UwValue);
+            if (uw_is_status(&arg)) {
+                if (arg.status_class == UWSC_DEFAULT && arg.status_code == UW_STATUS_VA_END) {
+                    break;
+                }
+            }
+        }
+    }}
+    return uw_move(&error);
 }
 
-bool _uw_map_has_key_null(UwValuePtr map, UwType_Null key)
-{
-    UwValue k = uw_create_null();
-    uw_assert(k != nullptr);
-    return _uw_map_has_key_uw(map, k);
-}
-
-bool _uw_map_has_key_bool(UwValuePtr map, UwType_Bool key)
-{
-    UwValue k = _uwc_create_bool(key);
-    uw_assert(k != nullptr);
-    return _uw_map_has_key_uw(map, k);
-}
-
-bool _uw_map_has_key_int(UwValuePtr map, UwType_Int key)
-{
-    UwValue k = _uwc_create_int(key);
-    uw_assert(k != nullptr);
-    return _uw_map_has_key_uw(map, k);
-}
-
-bool _uw_map_has_key_float(UwValuePtr map, UwType_Float key)
-{
-    UwValue k = _uwc_create_float(key);
-    uw_assert(k != nullptr);
-    return _uw_map_has_key_uw(map, k);
-}
-
-bool _uw_map_has_key_u8(UwValuePtr map, char8_t* key)
-{
-    UwValue k = _uw_create_string_u8(key);
-    uw_assert(k != nullptr);
-    return _uw_map_has_key_uw(map, k);
-}
-
-bool _uw_map_has_key_u32(UwValuePtr map, char32_t* key)
-{
-    UwValue k = _uw_create_string_u32(key);
-    uw_assert(k != nullptr);
-    return _uw_map_has_key_uw(map, k);
-}
-
-bool _uw_map_has_key_uw(UwValuePtr self, UwValuePtr key)
+bool _uw_map_has_key(UwValuePtr self, UwValuePtr key)
 {
     uw_assert_map(self);
     struct _UwMap* map = _uw_get_map_ptr(self);
     return lookup(map, key, nullptr, nullptr) != UINT_MAX;
 }
 
-UwValuePtr _uw_map_get_null(UwValuePtr map, UwType_Null key)
-{
-    UwValue k = uw_create_null();
-    uw_assert(k != nullptr);
-    return _uw_map_get_uw(map, k);
-}
-
-UwValuePtr _uw_map_get_bool(UwValuePtr map, UwType_Bool key)
-{
-    UwValue k = _uwc_create_bool(key);
-    uw_assert(k != nullptr);
-    return _uw_map_get_uw(map, k);
-}
-
-UwValuePtr _uw_map_get_int(UwValuePtr map, UwType_Int key)
-{
-    UwValue k = _uwc_create_int(key);
-    uw_assert(k != nullptr);
-    return _uw_map_get_uw(map, k);
-}
-
-UwValuePtr _uw_map_get_float(UwValuePtr map, UwType_Float key)
-{
-    UwValue k = _uwc_create_float(key);
-    uw_assert(k != nullptr);
-    return _uw_map_get_uw(map, k);
-}
-
-UwValuePtr _uw_map_get_u8(UwValuePtr map, char8_t* key)
-{
-    UwValue k = _uw_create_string_u8(key);
-    uw_assert(k != nullptr);
-    return _uw_map_get_uw(map, k);
-}
-
-UwValuePtr _uw_map_get_u32(UwValuePtr map, char32_t* key)
-{
-    UwValue k = _uw_create_string_u32(key);
-    uw_assert(k != nullptr);
-    return _uw_map_get_uw(map, k);
-}
-
-UwValuePtr _uw_map_get_uw(UwValuePtr self, UwValuePtr key)
+UwResult _uw_map_get(UwValuePtr self, UwValuePtr key)
 {
     uw_assert_map(self);
     struct _UwMap* map = _uw_get_map_ptr(self);
@@ -743,57 +609,15 @@ UwValuePtr _uw_map_get_uw(UwValuePtr self, UwValuePtr key)
 
     if (key_index == UINT_MAX) {
         // key not found
-        return nullptr;
+        return UwError(UW_ERROR_KEY_NOT_FOUND);
     }
 
     // return value
     unsigned value_index = key_index + 1;
-    return uw_makeref(_uw_list_item(&map->kv_pairs, value_index));
+    return uw_clone(_uw_list_item(&map->kv_pairs, value_index));
 }
 
-void _uw_map_del_null(UwValuePtr map, UwType_Null key)
-{
-    UwValue k = uw_create_null();
-    uw_assert(k != nullptr);
-    _uw_map_del_uw(map, k);
-}
-
-void _uw_map_del_bool(UwValuePtr map, UwType_Bool key)
-{
-    UwValue k = _uwc_create_bool(key);
-    uw_assert(k != nullptr);
-    _uw_map_del_uw(map, k);
-}
-
-void _uw_map_del_int(UwValuePtr map, UwType_Int key)
-{
-    UwValue k = _uwc_create_int(key);
-    uw_assert(k != nullptr);
-    _uw_map_del_uw(map, k);
-}
-
-void _uw_map_del_float(UwValuePtr map, UwType_Float key)
-{
-    UwValue k = _uwc_create_float(key);
-    uw_assert(k != nullptr);
-    _uw_map_del_uw(map, k);
-}
-
-void _uw_map_del_u8(UwValuePtr map, char8_t* key)
-{
-    UwValue k = _uw_create_string_u8(key);
-    uw_assert(k != nullptr);
-    _uw_map_del_uw(map, k);
-}
-
-void _uw_map_del_u32(UwValuePtr map, char32_t* key)
-{
-    UwValue k = _uw_create_string_u32(key);
-    uw_assert(k != nullptr);
-    _uw_map_del_uw(map, k);
-}
-
-void _uw_map_del_uw(UwValuePtr self, UwValuePtr key)
+bool _uw_map_del(UwValuePtr self, UwValuePtr key)
 {
     uw_assert_map(self);
 
@@ -805,7 +629,7 @@ void _uw_map_del_uw(UwValuePtr self, UwValuePtr key)
     unsigned key_index = lookup(map, key, &ht_index, nullptr);
     if (key_index == UINT_MAX) {
         // key not found
-        return;
+        return false;
     }
 
     struct _UwHashTable* ht = &map->hash_table;
@@ -829,6 +653,7 @@ void _uw_map_del_uw(UwValuePtr self, UwValuePtr key)
             }
         }
     }
+    return true;
 }
 
 unsigned uw_map_length(UwValuePtr self)
@@ -837,7 +662,7 @@ unsigned uw_map_length(UwValuePtr self)
     return get_map_length(_uw_get_map_ptr(self));
 }
 
-bool uw_map_item(UwValuePtr self, unsigned index, UwValuePtr* key, UwValuePtr* value)
+bool uw_map_item(UwValuePtr self, unsigned index, UwValuePtr key, UwValuePtr value)
 {
     uw_assert_map(self);
 
@@ -846,13 +671,13 @@ bool uw_map_item(UwValuePtr self, unsigned index, UwValuePtr* key, UwValuePtr* v
     index <<= 1;
 
     if (index < _uw_list_length(&map->kv_pairs)) {
-        *key   = uw_makeref(_uw_list_item(&map->kv_pairs, index));
-        *value = uw_makeref(_uw_list_item(&map->kv_pairs, index + 1));
+        uw_destroy(key);
+        uw_destroy(value);
+        *key   = uw_clone(_uw_list_item(&map->kv_pairs, index));
+        *value = uw_clone(_uw_list_item(&map->kv_pairs, index + 1));
         return true;
 
     } else {
-        *key = nullptr;
-        *value = nullptr;
         return false;
     }
 }

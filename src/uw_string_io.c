@@ -1,138 +1,202 @@
-#include "include/uw_c.h"
+#include "include/uw.h"
+#include "src/uw_charptr_internal.h"
+#include "src/uw_string_internal.h"
 #include "src/uw_string_io_internal.h"
 
 /****************************************************************
  * Basic interface methods
  */
 
-bool _uw_init_stringio(UwValuePtr self)
+UwResult _uw_stringio_init(UwValuePtr self, va_list ap)
 {
-    return true;
+    UwValuePtr v = va_arg(ap, UwValuePtr);
+    UwValue str = uw_clone(v);  // this converts CharPtr to string
+    if (!uw_is_string(&str)) {
+        return UwError(UW_ERROR_INCOMPATIBLE_TYPE);
+    }
+    struct _UwStringIO* sio = _uw_get_stringio_ptr(self);
+    sio->line = uw_move(&str);
+    sio->pushback = UwNull();
+    return UwOK();
 }
 
-void _uw_fini_stringio(UwValuePtr self)
+void _uw_stringio_fini(UwValuePtr self)
 {
-    struct _UwStringIO* sio = _uw_get_data_ptr(self, UwTypeId_StringIO, struct _UwStringIO*);
-    sio->line_position = 0;
-    uw_delete(&sio->pushback);
+    struct _UwStringIO* sio = _uw_get_stringio_ptr(self);
+    uw_destroy(&sio->line);
+    uw_destroy(&sio->pushback);
 }
 
-UwValuePtr _uw_copy_stringio(UwValuePtr self)
+UwResult _uw_stringio_deepcopy(UwValuePtr self)
 {
-    // XXX not implemented yet
-    return nullptr;
+    return UwError(UW_ERROR_NOT_IMPLEMENTED);
+}
+
+void _uw_stringio_hash(UwValuePtr self, UwHashContext* ctx)
+{
+    _uw_hash_uint64(ctx, self->type_id);
+
+    struct _UwStringIO* sio = _uw_get_stringio_ptr(self);
+    struct _UwString* s = _uw_get_string_ptr(&sio->line);
+    unsigned length = get_cap_methods(s)->get_length(s);
+    if (length) {
+        get_str_methods(s)->hash(get_char_ptr(s, 0), length, ctx);
+    }
+}
+
+void _uw_stringio_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+{
+    struct _UwStringIO* sio = _uw_get_stringio_ptr(self);
+
+    _uw_dump_start(fp, self, first_indent);
+    _uw_string_dump_data(fp, &sio->line, next_indent);
+
+    _uw_print_indent(fp, next_indent);
+    fprintf(fp, "Current position: %u\n", sio->line_position);
+    if (uw_is_null(&sio->pushback)) {
+        fputs("Pushback: none\n", fp);
+    }
+    else if (!uw_is_string(&sio->pushback)) {
+        fputs("WARNING: bad pushback:\n", fp);
+        uw_dump(fp, &sio->pushback);
+    } else {
+        fputs("Pushback:\n", fp);
+        _uw_string_dump_data(fp, &sio->pushback, next_indent);
+    }
+}
+
+UwResult _uw_stringio_to_string(UwValuePtr self)
+{
+    struct _UwStringIO* sio = _uw_get_stringio_ptr(self);
+    return uw_clone(&sio->line);
+}
+
+bool _uw_stringio_is_true(UwValuePtr self)
+{
+    struct _UwStringIO* sio = _uw_get_stringio_ptr(self);
+    return uw_is_true(&sio->line);
+}
+
+bool _uw_stringio_equal_sametype(UwValuePtr self, UwValuePtr other)
+{
+    struct _UwStringIO* sio_self  = _uw_get_stringio_ptr(self);
+    struct _UwStringIO* sio_other = _uw_get_stringio_ptr(other);
+
+    UwMethodEqual fn_cmp = _uw_types[sio_self->line.type_id]->equal_sametype;
+    return fn_cmp(&sio_self->line, &sio_other->line);
+}
+
+bool _uw_stringio_equal(UwValuePtr self, UwValuePtr other)
+{
+    struct _UwStringIO* sio_self  = _uw_get_stringio_ptr(self);
+
+    UwMethodEqual fn_cmp = _uw_types[sio_self->line.type_id]->equal;
+    return fn_cmp(&sio_self->line, other);
 }
 
 /****************************************************************
  * LineReader interface methods
  */
 
-bool _uw_stringio_start_read_lines(UwValuePtr self)
+UwResult _uwi_stringio_start_read_lines(UwValuePtr self)
 {
-    struct _UwStringIO* sio = _uw_get_data_ptr(self, UwTypeId_StringIO, struct _UwStringIO*);
+    struct _UwStringIO* sio = _uw_get_stringio_ptr(self);
     sio->line_position = 0;
-    uw_delete(&sio->pushback);
-    return true;
+    sio->line_number = 0;
+    uw_destroy(&sio->pushback);
+    return UwOK();
 }
 
-UwValuePtr _uw_stringio_read_line(UwValuePtr self)
+UwResult _uwi_stringio_read_line(UwValuePtr self)
 {
-    UwValue result = uw_create("");
-    if (!result) {
-        return nullptr;
-    }
-    if (!_uw_stringio_read_line_inplace(self, result)) {
-        return nullptr;
+    UwValue result = UwString();
+    UwValue status = _uwi_stringio_read_line_inplace(self, &result);
+    if (uw_error(&status)) {
+        return uw_move(&status);
     }
     return uw_move(&result);
 }
 
-bool _uw_stringio_read_line_inplace(UwValuePtr self, UwValuePtr line)
+UwResult _uwi_stringio_read_line_inplace(UwValuePtr self, UwValuePtr line)
 {
-    struct _UwStringIO* sio = _uw_get_data_ptr(self, UwTypeId_StringIO, struct _UwStringIO*);
+    struct _UwStringIO* sio = _uw_get_stringio_ptr(self);
 
     uw_string_truncate(line, 0);
 
-    if (sio->pushback) {
-        if (!uw_string_append(line, sio->pushback)) {
-            return false;
+    if (uw_is_string(&sio->pushback)) {
+        if (!uw_string_append(line, &sio->pushback)) {
+            return UwOOM();
         }
-        uw_delete(&sio->pushback);
-        return true;
+        uw_destroy(&sio->pushback);
+        sio->line_number++;
+        return UwOK();
     }
 
-    if (!uw_string_index_valid(self, sio->line_position)) {
-        return false;
+    if (!uw_string_index_valid(&sio->line, sio->line_position)) {
+        return UwError(UW_ERROR_EOF);
     }
 
     unsigned lf_pos;
-    if (!uw_string_indexof(self, '\n', sio->line_position, &lf_pos)) {
-        lf_pos = uw_strlen(self) - 1;
+    if (!uw_string_indexof(&sio->line, '\n', sio->line_position, &lf_pos)) {
+        lf_pos = uw_strlen(&sio->line) - 1;
     }
-    uw_string_append_substring(line, self, sio->line_position, lf_pos + 1);
+    uw_string_append_substring(line, &sio->line, sio->line_position, lf_pos + 1);
     sio->line_position = lf_pos + 1;
-    return true;
+    sio->line_number++;
+    return UwOK();
 }
 
-bool _uw_stringio_unread_line(UwValuePtr self, UwValuePtr line)
+bool _uwi_stringio_unread_line(UwValuePtr self, UwValuePtr line)
 {
-    struct _UwStringIO* sio = _uw_get_data_ptr(self, UwTypeId_StringIO, struct _UwStringIO*);
+    struct _UwStringIO* sio = _uw_get_stringio_ptr(self);
 
-    if (sio->pushback) {
+    if (uw_is_null(&sio->pushback)) {
+        sio->pushback = uw_clone(line);
+        sio->line_number--;
+        return true;
+    } else {
         return false;
     }
-    sio->pushback = uw_makeref(line);
-    return true;
 }
 
-void _uw_stringio_stop_read_lines(UwValuePtr self)
+unsigned _uwi_stringio_get_line_number(UwValuePtr self)
 {
-    struct _UwStringIO* sio = _uw_get_data_ptr(self, UwTypeId_StringIO, struct _UwStringIO*);
-    uw_delete(&sio->pushback);
+    return _uw_get_stringio_ptr(self)->line_number;
+}
+
+void _uwi_stringio_stop_read_lines(UwValuePtr self)
+{
+    struct _UwStringIO* sio = _uw_get_stringio_ptr(self);
+    uw_destroy(&sio->pushback);
 }
 
 /****************************************************************
  * Shorthand functions
  */
 
-#define CREATE_STRING_IO_IMPL {  \
-    UwValuePtr result = _uw_create(UwTypeId_StringIO);  \
-    if (result) {  \
-        if (!uw_string_append(result, str)) {  \
-            uw_delete(&result);  \
-        }  \
-    }  \
-    return result;  \
-}
-
-UwValuePtr _uw_create_string_io_u8_wrapper(char* str) CREATE_STRING_IO_IMPL
-UwValuePtr _uw_create_string_io_u8(char8_t* str)      CREATE_STRING_IO_IMPL
-UwValuePtr _uw_create_string_io_u32(char32_t* str)    CREATE_STRING_IO_IMPL
-UwValuePtr _uw_create_string_io_uw(UwValuePtr str)    CREATE_STRING_IO_IMPL
-
-bool uw_start_read_lines(UwValuePtr reader)
+UwResult uw_start_read_lines(UwValuePtr reader)
 {
     UwInterface_LineReader* iface = uw_get_interface(reader, LineReader);
     if (!iface) {
-        return false;
+        return UwErrorNoInterface(reader, LineReader);
     }
     return iface->start(reader);
 }
 
-UwValuePtr uw_read_line(UwValuePtr reader)
+UwResult uw_read_line(UwValuePtr reader)
 {
     UwInterface_LineReader* iface = uw_get_interface(reader, LineReader);
     if (!iface) {
-        return nullptr;
+        return UwErrorNoInterface(reader, LineReader);
     }
     return iface->read_line(reader);
 }
 
-bool uw_read_line_inplace(UwValuePtr reader, UwValuePtr line)
+UwResult uw_read_line_inplace(UwValuePtr reader, UwValuePtr line)
 {
     UwInterface_LineReader* iface = uw_get_interface(reader, LineReader);
     if (!iface) {
-        return false;
+        return UwErrorNoInterface(reader, LineReader);
     }
     return iface->read_line_inplace(reader, line);
 }
@@ -144,6 +208,15 @@ bool uw_unread_line(UwValuePtr reader, UwValuePtr line)
         return false;
     }
     return iface->unread_line(reader, line);
+}
+
+unsigned uw_get_line_number(UwValuePtr reader)
+{
+    UwInterface_LineReader* iface = uw_get_interface(reader, LineReader);
+    if (!iface) {
+        return false;
+    }
+    return iface->get_line_number(reader);
 }
 
 void uw_stop_read_lines(UwValuePtr reader)

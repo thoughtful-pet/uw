@@ -8,7 +8,7 @@ extern "C" {
  * LineReader interface
  */
 
-typedef bool (*UwMethodStartReadLines)(UwValuePtr self);
+typedef UwResult (*UwMethodStartReadLines)(UwValuePtr self);
 /*
  * Prepare to read lines.
  *
@@ -18,12 +18,12 @@ typedef bool (*UwMethodStartReadLines)(UwValuePtr self);
  * Calling this method again should reset line reader.
  */
 
-typedef UwValuePtr (*UwMethodReadLine)(UwValuePtr self);
+typedef UwResult (*UwMethodReadLine)(UwValuePtr self);
 /*
  * Read next line.
  */
 
-typedef bool (*UwMethodReadLineInPlace)(UwValuePtr self, UwValuePtr line);
+typedef UwResult (*UwMethodReadLineInPlace)(UwValuePtr self, UwValuePtr line);
 /*
  * Truncate line and read next line into it.
  * Return true if read some data, false if error or eof.
@@ -37,11 +37,12 @@ typedef bool (*UwMethodUnreadLine)(UwValuePtr self, UwValuePtr line);
 /*
  * Push line back to the reader.
  * Only one pushback is guaranteed.
- *
- * WARNING: when using in conjunction with read_line, do not forget to create
- * new line for the result!
- * That's because unread simply increments refcount and if the same string
- * is used for read_line, its content will be overwritten!
+ * Return false if pushback buffer is full.
+ */
+
+typedef unsigned (*UwMethodGetLineNumber)(UwValuePtr self);
+/*
+ * Return current line number, 1-based.
  */
 
 typedef void (*UwMethodStopReadLines)(UwValuePtr self);
@@ -54,25 +55,43 @@ typedef struct {
     UwMethodReadLine        read_line;
     UwMethodReadLineInPlace read_line_inplace;
     UwMethodUnreadLine      unread_line;
+    UwMethodGetLineNumber   get_line_number;
     UwMethodStopReadLines   stop;
 
 } UwInterface_LineReader;
 
 
 /****************************************************************
- * Shorthand functions
+ * Shorthand constructors
  */
 
-UwValuePtr _uw_create_string_io_u8_wrapper(char* str);
-UwValuePtr _uw_create_string_io_u8(char8_t* str);
-UwValuePtr _uw_create_string_io_u32(char32_t* str);
-UwValuePtr _uw_create_string_io_uw(UwValuePtr str);
+#define uw_create_string_io(str) _Generic((str), \
+             char*: _uw_create_string_io_u8_wrapper,  \
+          char8_t*: _uw_create_string_io_u8,          \
+         char32_t*: _uw_create_string_io_u32,         \
+        UwValuePtr: _uw_create_string_io              \
+    )((str))
 
-bool       uw_start_read_lines (UwValuePtr reader);
-UwValuePtr uw_read_line        (UwValuePtr reader);
-bool       uw_read_line_inplace(UwValuePtr reader, UwValuePtr line);
-bool       uw_unread_line      (UwValuePtr reader, UwValuePtr line);
-void       uw_stop_read_lines  (UwValuePtr reader);
+static inline UwResult  uw_create_string_io_cstr(char* str)      { __UWDECL_CharPtr  (v, str); return _uw_create(UwTypeId_StringIO, &v); }
+static inline UwResult _uw_create_string_io_u8  (char8_t* str)   { __UWDECL_Char8Ptr (v, str); return _uw_create(UwTypeId_StringIO, &v); }
+static inline UwResult _uw_create_string_io_u32 (char32_t* str)  { __UWDECL_Char32Ptr(v, str); return _uw_create(UwTypeId_StringIO, &v); }
+static inline UwResult _uw_create_string_io     (UwValuePtr str) { return _uw_create(UwTypeId_StringIO, str); }
+
+static inline UwResult _uw_create_string_io_u8_wrapper(char* str)
+{
+    return _uw_create_string_io_u8((char8_t*) str);
+}
+
+/****************************************************************
+ * Interface shorthand methods
+ */
+
+UwResult uw_start_read_lines (UwValuePtr reader);
+UwResult uw_read_line        (UwValuePtr reader);
+UwResult uw_read_line_inplace(UwValuePtr reader, UwValuePtr line);
+bool     uw_unread_line      (UwValuePtr reader, UwValuePtr line);
+unsigned uw_get_line_number  (UwValuePtr reader);
+void     uw_stop_read_lines  (UwValuePtr reader);
 
 #ifdef __cplusplus
 }

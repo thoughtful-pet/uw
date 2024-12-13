@@ -42,6 +42,66 @@ void _uw_hash_uint64(UwHashContext* ctx, uint64_t data)
     ctx->buffer[ctx->buf_size++] = data;
 }
 
+void _uw_hash_buffer(UwHashContext* ctx, void* buffer, size_t length)
+{
+    if ( ! (((ptrdiff_t) buffer) & 7)) {
+        // aligned
+        uint64_t* data_ptr = (uint64_t*) buffer;
+        while (length >= 8) {
+            _uw_hash_uint64(ctx, *data_ptr++);
+            length -= 8;
+        }
+        buffer = (void*) data_ptr;
+    }
+    // remainder or not aligned buffer
+    uint8_t* data_ptr = (uint8_t*) buffer;
+    while (length) {
+        uint64_t v = 0;
+        for (size_t i = 0; i < 8; i++) {
+            v <<= 8;
+            v += *data_ptr++;
+            if (0 == --length) {
+                break;
+            }
+        }
+        _uw_hash_uint64(ctx, v);
+    }
+}
+
+void _uw_hash_string(UwHashContext* ctx, char* str)
+{
+    for(;;) {
+        uint64_t v = 0;
+        for (size_t i = 0; i < 8; i++) {
+            uint8_t c = *str++;
+            if (c == 0) {
+                _uw_hash_uint64(ctx, v);
+                return;
+            }
+            v <<= 8;
+            v += c;
+        }
+        _uw_hash_uint64(ctx, v);
+    }
+}
+
+void _uw_hash_string32(UwHashContext* ctx, char32_t* str)
+{
+    for(;;) {
+        uint64_t v = 0;
+        for (size_t i = 0; i < 2; i++) {
+            uint32_t c = *str++;
+            if (c == 0) {
+                _uw_hash_uint64(ctx, v);
+                return;
+            }
+            v <<= 32;
+            v += c;
+        }
+        _uw_hash_uint64(ctx, v);
+    }
+}
+
 UwType_Hash _uw_hash_finish(UwHashContext* ctx)
 {
     ctx->seed ^= ctx->see1 ^ ctx->see2;

@@ -1,12 +1,16 @@
 #include "include/uw_base.h"
 #include "src/uw_class_internal.h"
 
-bool _uw_init_class(UwValuePtr self)
+UwResult _uw_class_create(UwTypeId type_id, va_list ap)
 {
-    return true;
+    _UwValue result = {
+        .type_id = UwTypeId_Class,
+        .extra_data = nullptr
+    };
+    return result;
 }
 
-void _uw_hash_class(UwValuePtr self, UwHashContext* ctx)
+void _uw_class_hash(UwValuePtr self, UwHashContext* ctx)
 /*
  * Basic hashing.
  */
@@ -14,24 +18,23 @@ void _uw_hash_class(UwValuePtr self, UwHashContext* ctx)
     _uw_hash_uint64(ctx, self->type_id);
 }
 
-UwValuePtr _uw_copy_class(UwValuePtr self)
+UwResult _uw_class_deepcopy(UwValuePtr self)
 /*
  * Bare class cannot be copied, this method must be defined in a subclass.
  */
 {
-    return nullptr;
+    return UwError(UW_ERROR_NOT_IMPLEMENTED);
 }
 
-void _uw_dump_class(UwValuePtr self, int indent, struct _UwValueChain* prev_compound)
+void _uw_class_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
-    _uw_dump_start(self, indent);
-    putchar('\n');
+    _uw_dump_start(fp, self, first_indent);
+    fputc('\n', fp);
 }
 
-UwValuePtr _uw_class_to_string(UwValuePtr self)
+UwResult _uw_class_to_string(UwValuePtr self)
 {
-    // XXX not implemented yet
-    return nullptr;
+    return UwError(UW_ERROR_NOT_IMPLEMENTED);
 }
 
 bool _uw_class_is_true(UwValuePtr self)
@@ -51,14 +54,6 @@ bool _uw_class_equal_sametype(UwValuePtr self, UwValuePtr other)
 }
 
 bool _uw_class_equal(UwValuePtr self, UwValuePtr other)
-/*
- * Bare class is not equal to anything.
- */
-{
-    return false;
-}
-
-bool _uw_class_equal_ctype(UwValuePtr self, UwCType ctype, ...)
 /*
  * Bare class is not equal to anything.
  */
