@@ -29,6 +29,7 @@ UwResult _uw_class_deepcopy(UwValuePtr self)
 void _uw_class_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
     _uw_dump_start(fp, self, first_indent);
+    _uw_dump_base_extra_data(fp, self->extra_data);
     fputc('\n', fp);
 }
 
