@@ -82,7 +82,7 @@ bool _uw_stringio_equal_sametype(UwValuePtr self, UwValuePtr other)
     struct _UwStringIO* sio_self  = _uw_get_stringio_ptr(self);
     struct _UwStringIO* sio_other = _uw_get_stringio_ptr(other);
 
-    UwMethodEqual fn_cmp = _uw_types[sio_self->line.type_id]->equal_sametype;
+    UwMethodEqual fn_cmp = _uw_types[sio_self->line.type_id]->_equal_sametype;
     return fn_cmp(&sio_self->line, &sio_other->line);
 }
 
@@ -90,7 +90,7 @@ bool _uw_stringio_equal(UwValuePtr self, UwValuePtr other)
 {
     struct _UwStringIO* sio_self  = _uw_get_stringio_ptr(self);
 
-    UwMethodEqual fn_cmp = _uw_types[sio_self->line.type_id]->equal;
+    UwMethodEqual fn_cmp = _uw_types[sio_self->line.type_id]->_equal;
     return fn_cmp(&sio_self->line, other);
 }
 
@@ -146,83 +146,27 @@ UwResult _uwi_stringio_read_line_inplace(UwValuePtr self, UwValuePtr line)
     return UwOK();
 }
 
-bool _uwi_stringio_unread_line(UwValuePtr self, UwValuePtr line)
+UwResult _uwi_stringio_unread_line(UwValuePtr self, UwValuePtr line)
 {
     struct _UwStringIO* sio = _uw_get_stringio_ptr(self);
 
     if (uw_is_null(&sio->pushback)) {
         sio->pushback = uw_clone(line);
         sio->line_number--;
-        return true;
+        return UwOK();
     } else {
-        return false;
+        return UwError(UW_ERROR_PUSHBACK_FAILED);
     }
 }
 
-unsigned _uwi_stringio_get_line_number(UwValuePtr self)
+UwResult _uwi_stringio_get_line_number(UwValuePtr self)
 {
-    return _uw_get_stringio_ptr(self)->line_number;
+    return UwUnsigned(_uw_get_stringio_ptr(self)->line_number);
 }
 
-void _uwi_stringio_stop_read_lines(UwValuePtr self)
+UwResult _uwi_stringio_stop_read_lines(UwValuePtr self)
 {
     struct _UwStringIO* sio = _uw_get_stringio_ptr(self);
     uw_destroy(&sio->pushback);
-}
-
-/****************************************************************
- * Shorthand functions
- */
-
-UwResult uw_start_read_lines(UwValuePtr reader)
-{
-    UwInterface_LineReader* iface = uw_get_interface(reader, LineReader);
-    if (!iface) {
-        return UwErrorNoInterface(reader, LineReader);
-    }
-    return iface->start(reader);
-}
-
-UwResult uw_read_line(UwValuePtr reader)
-{
-    UwInterface_LineReader* iface = uw_get_interface(reader, LineReader);
-    if (!iface) {
-        return UwErrorNoInterface(reader, LineReader);
-    }
-    return iface->read_line(reader);
-}
-
-UwResult uw_read_line_inplace(UwValuePtr reader, UwValuePtr line)
-{
-    UwInterface_LineReader* iface = uw_get_interface(reader, LineReader);
-    if (!iface) {
-        return UwErrorNoInterface(reader, LineReader);
-    }
-    return iface->read_line_inplace(reader, line);
-}
-
-bool uw_unread_line(UwValuePtr reader, UwValuePtr line)
-{
-    UwInterface_LineReader* iface = uw_get_interface(reader, LineReader);
-    if (!iface) {
-        return false;
-    }
-    return iface->unread_line(reader, line);
-}
-
-unsigned uw_get_line_number(UwValuePtr reader)
-{
-    UwInterface_LineReader* iface = uw_get_interface(reader, LineReader);
-    if (!iface) {
-        return false;
-    }
-    return iface->get_line_number(reader);
-}
-
-void uw_stop_read_lines(UwValuePtr reader)
-{
-    UwInterface_LineReader* iface = uw_get_interface(reader, LineReader);
-    if (iface) {
-        iface->stop(reader);
-    }
+    return UwOK();
 }

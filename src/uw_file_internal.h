@@ -56,10 +56,10 @@ bool     _uw_file_equal         (UwValuePtr self, UwValuePtr other);
  */
 
 UwResult _uwi_file_open    (UwValuePtr self, UwValuePtr file_name, int flags, mode_t mode);
-void     _uwi_file_close   (UwValuePtr self);
-bool     _uwi_file_set_fd  (UwValuePtr self, int fd);
+UwResult _uwi_file_close   (UwValuePtr self);
+UwResult _uwi_file_set_fd  (UwValuePtr self, int fd);
 UwResult _uwi_file_get_name(UwValuePtr self);
-bool     _uwi_file_set_name(UwValuePtr self, UwValuePtr file_name);
+UwResult _uwi_file_set_name(UwValuePtr self, UwValuePtr file_name);
 
 /****************************************************************
  * FileReader interface methods
@@ -80,9 +80,9 @@ UwResult _uwi_file_write(UwValuePtr self, void* data, unsigned size, unsigned* b
 UwResult _uwi_file_start_read_lines (UwValuePtr self);
 UwResult _uwi_file_read_line        (UwValuePtr self);
 UwResult _uwi_file_read_line_inplace(UwValuePtr self, UwValuePtr line);
-bool     _uwi_file_unread_line      (UwValuePtr self, UwValuePtr line);
-unsigned _uwi_file_get_line_number  (UwValuePtr self);
-void     _uwi_file_stop_read_lines  (UwValuePtr self);
+UwResult _uwi_file_unread_line      (UwValuePtr self, UwValuePtr line);
+UwResult _uwi_file_get_line_number  (UwValuePtr self);
+UwResult _uwi_file_stop_read_lines  (UwValuePtr self);
 
 #ifdef __cplusplus
 }

@@ -1004,7 +1004,10 @@ void test_string_io()
         TEST(uw_equal(&line, "two\n"));
 
         // push back
-        TEST(uw_unread_line(&sio, &line));
+        {
+            UwValue status = uw_unread_line(&sio, &line);
+            TEST(uw_ok(&status));
+        }
     }
     {
         // read pushed back

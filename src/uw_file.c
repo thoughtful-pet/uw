@@ -122,7 +122,7 @@ UwResult _uwi_file_open(UwValuePtr self, UwValuePtr file_name, int flags, mode_t
     return UwOK();
 }
 
-void _uwi_file_close(UwValuePtr self)
+UwResult _uwi_file_close(UwValuePtr self)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
@@ -138,21 +138,22 @@ void _uwi_file_close(UwValuePtr self)
         f->buffer = nullptr;
     }
     uw_destroy(&f->pushback);
+    return UwOK();
 }
 
-bool _uwi_file_set_fd(UwValuePtr self, int fd)
+UwResult _uwi_file_set_fd(UwValuePtr self, int fd)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
     if (f->fd != -1) {
         // fd already set
-        return false;
+        return UwError(UW_ERROR_FD_ALREADY_SET);
     }
     f->fd = fd;
     f->is_external_fd = true;
     f->line_number = 0;
     uw_destroy(&f->pushback);
-    return true;
+    return UwOK();
 }
 
 UwResult _uwi_file_get_name(UwValuePtr self)
@@ -161,20 +162,20 @@ UwResult _uwi_file_get_name(UwValuePtr self)
     return uw_clone(&f->name);
 }
 
-bool _uwi_file_set_name(UwValuePtr self, UwValuePtr file_name)
+UwResult _uwi_file_set_name(UwValuePtr self, UwValuePtr file_name)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
     if (f->fd != -1 && !f->is_external_fd) {
         // not an externally set fd
-        return false;
+        return UwError(UW_ERROR_CANNOT_SET_FILENAME);
     }
 
     // set file name
     uw_destroy(&f->name);
     f->name = uw_clone(file_name);
 
-    return true;
+    return UwOK();
 }
 
 /****************************************************************
@@ -365,31 +366,32 @@ UwResult _uwi_file_read_line_inplace(UwValuePtr self, UwValuePtr line)
     } while(true);
 }
 
-bool _uwi_file_unread_line(UwValuePtr self, UwValuePtr line)
+UwResult _uwi_file_unread_line(UwValuePtr self, UwValuePtr line)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
     if (uw_is_null(&f->pushback)) {
         f->pushback = uw_clone(line);
         f->line_number--;
-        return true;
+        return UwOK();
     } else {
-        return false;
+        return UwError(UW_ERROR_PUSHBACK_FAILED);
     }
 }
 
-unsigned _uwi_file_get_line_number(UwValuePtr self)
+UwResult _uwi_file_get_line_number(UwValuePtr self)
 {
-    return _uw_get_file_ptr(self)->line_number;
+    return UwUnsigned(_uw_get_file_ptr(self)->line_number);
 }
 
-void _uwi_file_stop_read_lines(UwValuePtr self)
+UwResult _uwi_file_stop_read_lines(UwValuePtr self)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
     free(f->buffer);
     f->buffer = nullptr;
     uw_destroy(&f->pushback);
+    return UwOK();
 }
 
 /****************************************************************
@@ -406,67 +408,9 @@ UwResult _uw_file_open(UwValuePtr file_name, int flags, mode_t mode)
     if (uw_error(&file)) {
         return uw_move(&file);
     }
-    UwInterface_File* iface = uw_get_interface(&file, File);
-    if (!iface) {
-        return UwErrorNoInterface(&file, File);
-    }
-    UwValue status = iface->open(&file, &normalized_filename, flags, mode);
+    UwValue status = uw_ifcall(&file, File, open, &normalized_filename, flags, mode);
     if (uw_error(&status)) {
         return uw_move(&status);
     }
     return uw_move(&file);
-}
-
-void uw_file_close(UwValuePtr file)
-{
-    UwInterface_File* iface = uw_get_interface(file, File);
-    if (iface) {
-        iface->close(file);
-    }
-    // XXX errors are possible
-}
-
-bool uw_file_set_fd(UwValuePtr file, int fd)
-{
-    UwInterface_File* iface = uw_get_interface(file, File);
-    if (!iface) {
-        return false;
-    }
-    return iface->set_fd(file, fd);
-}
-
-UwResult uw_file_get_name(UwValuePtr file)
-{
-    UwInterface_File* iface = uw_get_interface(file, File);
-    if (!iface) {
-        return UwErrorNoInterface(file, File);
-    }
-    return iface->get_name(file);
-}
-
-bool uw_file_set_name(UwValuePtr file, UwValuePtr file_name)
-{
-    UwInterface_File* iface = uw_get_interface(file, File);
-    if (!iface) {
-        return false;
-    }
-    return iface->set_name(file, file_name);
-}
-
-UwResult uw_file_read(UwValuePtr file, void* buffer, unsigned buffer_size, unsigned* bytes_read)
-{
-    UwInterface_FileReader* iface = uw_get_interface(file, FileReader);
-    if (!iface) {
-        return UwErrorNoInterface(file, File);
-    }
-    return iface->read(file, buffer, buffer_size, bytes_read);
-}
-
-UwResult uw_file_write(UwValuePtr file, void* data, unsigned size, unsigned* bytes_written)
-{
-    UwInterface_FileWriter* iface = uw_get_interface(file, FileWriter);
-    if (!iface) {
-        return UwErrorNoInterface(file, File);
-    }
-    return iface->write(file, data, size, bytes_written);
 }

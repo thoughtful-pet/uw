@@ -35,7 +35,12 @@ static char* uw_status_str(uint16_t status_code)
         "KEY_NOT_FOUND"
     };
     static char* file_statuses[] = {
-        "FILE_ALREADY_OPENED"
+        "FILE_ALREADY_OPENED",
+        "CANNOT_SET_FILENAME",
+        "FD_ALREADY_SET"
+    };
+    static char* stringio_statuses[] = {
+        "PUSHBACK_FAILED"
     };
     static struct Statuses statuses[] = {
         {
@@ -57,6 +62,11 @@ static char* uw_status_str(uint16_t status_code)
             .start_code = 300,
             .num_statuses = _UWC_LENGTH_OF(file_statuses),
             .statuses = file_statuses,
+        },
+        {
+            .start_code = 400,
+            .num_statuses = _UWC_LENGTH_OF(stringio_statuses),
+            .statuses = stringio_statuses,
         }
     };
     static char unknown[] = "(unknown)";

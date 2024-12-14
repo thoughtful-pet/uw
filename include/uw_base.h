@@ -237,6 +237,14 @@ void _uw_hash_string32(UwHashContext* ctx, char32_t* str);
 
 /****************************************************************
  * Interfaces
+ *
+ * IMPORTANT: all method names in interfaces must start with underscore.
+ * That's because of limitations of ## preprocesor operator which
+ * is used in uw_call, uw_super, and other convenience macros.
+ *
+ * Interface methods should always return UwResult.
+ * Simply because if an interface may not exist,
+ * the wrapper have to return UwError.
  */
 
 #ifndef UW_INTERFACE_CAPACITY
@@ -372,18 +380,19 @@ typedef struct {
     UwAllocator* allocator;
 
     // basic interface
-    UwMethodCreate   create;    // mandatory
-    UwMethodDestroy  destroy;   // optional
-    UwMethodInit     init;      // optional, should be called by create() when extra data is allocated
-    UwMethodFini     fini;      // optional
-    UwMethodClone    clone;     // if set, it is called by uw_clone()
-    UwMethodHash     hash;
-    UwMethodDeepCopy deepcopy;  // XXX how it should work with subclasses is not clear yet
-    UwMethodDump     dump;
-    UwMethodToString to_string;
-    UwMethodIsTrue   is_true;
-    UwMethodEqual    equal_sametype;
-    UwMethodEqual    equal;
+    // method names must start with underscore, see note for interfaces
+    UwMethodCreate   _create;    // mandatory
+    UwMethodDestroy  _destroy;   // optional
+    UwMethodInit     _init;      // optional, should be called by create() when extra data is allocated
+    UwMethodFini     _fini;      // optional
+    UwMethodClone    _clone;     // if set, it is called by uw_clone()
+    UwMethodHash     _hash;
+    UwMethodDeepCopy _deepcopy;  // XXX how it should work with subclasses is not clear yet
+    UwMethodDump     _dump;
+    UwMethodToString _to_string;
+    UwMethodIsTrue   _is_true;
+    UwMethodEqual    _equal_sametype;
+    UwMethodEqual    _equal;
 
     // extra interfaces
     void* interfaces[UW_INTERFACE_CAPACITY];
@@ -892,7 +901,80 @@ static inline UwResult _uwc_create_string_u8_wrapper(char* initializer)
 }
 
 /****************************************************************
+ * Method invocation macros
+ */
+
+#define uw_void_call(v, method_name, ...)  \
+    /* call basic interface method that returns void */  \
+    {  \
+        typeof(_uw_types[(v)->type_id]->_##method_name) meth = _uw_types[(v)->type_id]->_##method_name;  \
+        if (meth) {  \
+            meth((v) __VA_OPT__(,) __VA_ARGS__);  \
+        }  \
+    }
+
+#define uw_call(default_result, v, method_name, ...)  \
+    /* call basic interface method; if method is nullptr, return default_result */  \
+    ({  \
+        typeof(_uw_types[(v)->type_id]->_##method_name) meth = _uw_types[(v)->type_id]->_##method_name;  \
+        (meth)?  \
+            meth((v) __VA_OPT__(,) __VA_ARGS__)  \
+        :  \
+            (default_result);  \
+    })
+
+#define uw_void_super(self, method_name, ...)  \
+    /* call super method of the basic interface that returns void */  \
+    {  \
+        UwTypeId ancestor_id = _uw_types[(self)->type_id]->ancestor_id;  \
+        typeof(_uw_types[ancestor_id]->_##method_name) super_meth = _uw_types[ancestor_id]->_##method_name;  \
+        if (super_meth) {  \
+            super_meth((self) __VA_OPT__(,) __VA_ARGS__);  \
+        }  \
+    }
+
+#define uw_super(default_result, self, method_name, ...)  \
+    /* call super method of the basic interface; if method is nullptr, return default_result */  \
+    ({  \
+        UwTypeId ancestor_id = _uw_types[(self)->type_id]->ancestor_id;  \
+        typeof(_uw_types[ancestor_id]->_##method_name) super_meth = _uw_types[ancestor_id]->_##method_name;  \
+        (super_meth)?  \
+            super_meth((self) __VA_OPT__(,) __VA_ARGS__)  \
+        :  \
+            (default_result)  \
+    })
+
+#define uw_ifcall(v, interface_name, method_name, ...)  \
+    /* call interface method */  \
+    ({  \
+        UwInterface_##interface_name* iface =  \
+            _uw_types[(v)->type_id]->interfaces[UwInterfaceId_##interface_name];  \
+        iface?  \
+            iface->_##method_name((v) __VA_OPT__(,) __VA_ARGS__)  \
+        :  \
+            UwErrorNoInterface((v), interface_name);  \
+    })
+
+#define uw_ifsuper(self, iface, method_name, ...)  \
+    /* call super method of interface */  \
+    ({  \
+        UwTypeId ancestor_id = _uw_types[(self)->type_id]->ancestor_id;  \
+        UwInterface_##interface_name* iface =  \
+            _uw_types[ancestor_id->type_id]->interfaces[UwInterfaceId_##interface_name];  \
+        iface?  \
+            iface->_##method_name((self) __VA_OPT__(,) __VA_ARGS__)  \
+        :  \
+            UwErrorNoInterface((self), interface_name);  \
+    })
+
+/****************************************************************
  * Basic methods
+ *
+ * Most of them are inline wrappers around method invocation
+ * macros.
+ *
+ * Using inline functions to avoid duplicate evaluation of args
+ * when, say, uw_destroy(vptr++) is called.
  */
 
 static inline void uw_destroy(UwValuePtr v)
@@ -900,10 +982,7 @@ static inline void uw_destroy(UwValuePtr v)
  * Destroy value: call destructor and make `v` Null.
  */
 {
-    UwMethodDestroy fn_destroy = _uw_types[v->type_id]->destroy;
-    if (fn_destroy) {
-        fn_destroy(v);
-    }
+    uw_void_call(v, destroy);
     v->type_id = UwTypeId_Null;
 }
 
@@ -912,12 +991,7 @@ static inline UwResult uw_clone(UwValuePtr v)
  * Clone value.
  */
 {
-    UwMethodClone fn_clone = _uw_types[v->type_id]->clone;
-    if (fn_clone) {
-        return fn_clone(v);
-    } else {
-        return *v;
-    }
+    return uw_call(*v, v, clone);
 }
 
 static inline UwResult uw_move(UwValuePtr v)
@@ -938,22 +1012,12 @@ UwType_Hash uw_hash(UwValuePtr value);
 
 static inline UwResult uw_deepcopy(UwValuePtr v)
 {
-    UwMethodDeepCopy fn_deepcopy = _uw_types[v->type_id]->deepcopy;
-    if (fn_deepcopy) {
-        return fn_deepcopy(v);
-    } else {
-        return *v;
-    }
+    return uw_call(*v, v, deepcopy);
 }
 
 static inline bool uw_is_true(UwValuePtr v)
 {
-    UwMethodIsTrue fn_is_true = _uw_types[v->type_id]->is_true;
-    if (fn_is_true) {
-        return fn_is_true(v);
-    } else {
-        return false;
-    }
+    return uw_call(false, v, is_true);
 }
 
 static inline bool uw_is_compound(UwValuePtr value)
@@ -963,13 +1027,7 @@ static inline bool uw_is_compound(UwValuePtr value)
 
 static inline UwResult uw_to_string(UwValuePtr v)
 {
-    UwMethodToString fn_to_string = _uw_types[v->type_id]->to_string;
-    if (fn_to_string) {
-        return fn_to_string(v);
-    } else {
-        // XXX return empty string
-        return UwString();
-    }
+    return uw_call(UwString(), v, to_string);
 }
 
 /****************************************************************
@@ -989,9 +1047,9 @@ static inline bool _uw_equal(UwValuePtr a, UwValuePtr b)
     UwType* t = _uw_types[a->type_id];
     UwMethodEqual cmp;
     if (a->type_id == b->type_id) {
-        cmp = t->equal_sametype;
+        cmp = t->_equal_sametype;
     } else {
-        cmp = t->equal;
+        cmp = t->_equal;
     }
     return cmp(a, b);
 }
@@ -1089,15 +1147,12 @@ static inline uint8_t* uw_align_ptr(void* p, unsigned boundary)
 
 static inline void _uw_call_fini(UwValuePtr value)
 {
-    UwMethodFini fn_fini = _uw_types[value->type_id]->fini;
-    if (fn_fini) {
-        fn_fini(value);
-    }
+    uw_void_call(value, fini);
 }
 
 static inline void _uw_call_hash(UwValuePtr value, UwHashContext* ctx)
 {
-    UwMethodHash fn_hash = _uw_types[value->type_id]->hash;
+    UwMethodHash fn_hash = _uw_types[value->type_id]->_hash;
     fn_hash(value, ctx);
 }
 
@@ -1189,7 +1244,7 @@ void uw_dump(FILE* fp, UwValuePtr value);
 
 static inline void _uw_call_dump(FILE* fp, UwValuePtr value, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
-    UwMethodDump fn_dump = _uw_types[value->type_id]->dump;
+    UwMethodDump fn_dump = _uw_types[value->type_id]->_dump;
     fn_dump(value, fp, first_indent, next_indent, tail);
 }
 

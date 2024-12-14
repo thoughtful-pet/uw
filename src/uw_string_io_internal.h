@@ -46,9 +46,9 @@ bool     _uw_stringio_equal         (UwValuePtr self, UwValuePtr other);
 UwResult _uwi_stringio_start_read_lines (UwValuePtr self);
 UwResult _uwi_stringio_read_line        (UwValuePtr self);
 UwResult _uwi_stringio_read_line_inplace(UwValuePtr self, UwValuePtr line);
-bool     _uwi_stringio_unread_line      (UwValuePtr self, UwValuePtr line);
-unsigned _uwi_stringio_get_line_number  (UwValuePtr self);
-void     _uwi_stringio_stop_read_lines  (UwValuePtr self);
+UwResult _uwi_stringio_unread_line      (UwValuePtr self, UwValuePtr line);
+UwResult _uwi_stringio_get_line_number  (UwValuePtr self);
+UwResult _uwi_stringio_stop_read_lines  (UwValuePtr self);
 
 #ifdef __cplusplus
 }
