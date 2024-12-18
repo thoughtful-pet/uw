@@ -148,7 +148,10 @@ union __UwValue {
                     uint8_t status_class;    // see UWSC_* constants
                     uint8_t carry;           // for integer arithmetic
                 };
-                uint16_t status_code;  // for UWSC_DEFAULT status class
+                union {
+                    uint16_t status_code;  // for UWSC_DEFAULT status class
+                    int16_t  uw_errno;     // errno for UWSC_ERRNO status class
+                };
             };
         };
         union {
@@ -162,9 +165,6 @@ union __UwValue {
 
             // External data
             _UwExtraData* extra_data;
-
-            // errno for UWSC_ERRNO status class
-            int uw_errno;
 
             // C string pointers for UwType_CharPtr
             char*     charptr;
