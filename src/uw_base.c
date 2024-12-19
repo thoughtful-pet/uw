@@ -738,6 +738,9 @@ int uw_add_type(UwType* type)
 
 int uw_subclass(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_size)
 {
+    // don't allow subclassing Null, this probably indicates an error
+    uw_assert(ancestor_id != UwTypeId_Null);
+
     UwType* ancestor = _uw_types[ancestor_id];
     uw_assert(ancestor != nullptr);
 
