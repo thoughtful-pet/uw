@@ -982,8 +982,10 @@ static inline void uw_destroy(UwValuePtr v)
  * Destroy value: call destructor and make `v` Null.
  */
 {
-    uw_void_call(v, destroy);
-    v->type_id = UwTypeId_Null;
+    if (v->type_id != UwTypeId_Null) {
+        uw_void_call(v, destroy);
+        v->type_id = UwTypeId_Null;
+    }
 }
 
 static inline UwResult uw_clone(UwValuePtr v)
