@@ -194,7 +194,7 @@ UwResult uw_strcat_ap(va_list ap);
               char8_t*: _uw_create_string_u8,         \
              char32_t*: _uw_create_string_u32,        \
             UwValuePtr: _uw_create_string             \
-    )((dest), (src))
+    )((initializer))
 
 UwResult  uw_create_string_cstr(char*      initializer);
 UwResult _uw_create_string_u8  (char8_t*   initializer);
@@ -205,7 +205,7 @@ static inline UwResult _uw_create_string(UwValuePtr initializer)
     return _uw_create(UwTypeId_String, initializer);
 }
 
-static inline UwResult _uw_create_string_u8_wrapper(char8_t* initializer)
+static inline UwResult _uw_create_string_u8_wrapper(char* initializer)
 {
     return _uw_create_string_u8((char8_t*) initializer);
 }
