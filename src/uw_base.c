@@ -5,7 +5,7 @@
 #include "include/uw_string_io.h"
 #include "src/uw_bool_internal.h"
 #include "src/uw_charptr_internal.h"
-#include "src/uw_class_internal.h"
+#include "src/uw_struct_internal.h"
 #include "src/uw_file_internal.h"
 #include "src/uw_float_internal.h"
 #include "src/uw_hash_internal.h"
@@ -588,12 +588,12 @@ static UwType status_type = {
     .interfaces = {}
 };
 
-static UwType class_type = {
-    .id              = UwTypeId_Class,
+static UwType struct_type = {
+    .id              = UwTypeId_Struct,
     .ancestor_id     = UwTypeId_Null,  // no ancestor
     .compound        = false,
     .data_optional   = false,
-    .name            = "Class",
+    .name            = "Struct",
     .data_offset     = 0,
     .data_size       = 0,
     .allocator       = &_uw_default_allocator,
@@ -602,13 +602,13 @@ static UwType class_type = {
     ._init           = nullptr,
     ._fini           = nullptr,
     ._clone          = default_clone,
-    ._hash           = _uw_class_hash,
-    ._deepcopy       = _uw_class_deepcopy,
-    ._dump           = _uw_class_dump,
-    ._to_string      = _uw_class_to_string,
-    ._is_true        = _uw_class_is_true,
-    ._equal_sametype = _uw_class_equal_sametype,
-    ._equal          = _uw_class_equal,
+    ._hash           = _uw_struct_hash,
+    ._deepcopy       = _uw_struct_deepcopy,
+    ._dump           = _uw_struct_dump,
+    ._to_string      = _uw_struct_to_string,
+    ._is_true        = _uw_struct_is_true,
+    ._equal_sametype = _uw_struct_equal_sametype,
+    ._equal          = _uw_struct_equal,
 
     .interfaces = {}
 };
@@ -719,7 +719,7 @@ UwType* _uw_types[UW_TYPE_CAPACITY] = {
     [UwTypeId_List]     = &list_type,
     [UwTypeId_Map]      = &map_type,
     [UwTypeId_Status]   = &status_type,
-    [UwTypeId_Class]    = &class_type,
+    [UwTypeId_Struct]   = &struct_type,
     [UwTypeId_File]     = &file_type,
     [UwTypeId_StringIO] = &stringio_type
 };

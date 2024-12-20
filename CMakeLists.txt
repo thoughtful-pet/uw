@@ -14,7 +14,7 @@ add_library(uw STATIC
     src/uw_base.c
     src/uw_bool.c
     src/uw_charptr.c
-    src/uw_class.c
+    src/uw_struct.c
     src/uw_compound.c
     src/uw_file.c
     src/uw_float.c

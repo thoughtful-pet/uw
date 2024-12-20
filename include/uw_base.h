@@ -213,7 +213,7 @@ typedef _UwValue  UwResult;  // alias for return values
 #define UwTypeId_List         8  // always has extra data
 #define UwTypeId_Map          9  // always has extra data
 #define UwTypeId_Status      10  // extra_data is optional
-#define UwTypeId_Class       11  // Struct ???
+#define UwTypeId_Struct      11
 #define UwTypeId_File        12
 #define UwTypeId_StringIO    13
 
@@ -412,7 +412,7 @@ typedef struct {
 #define uw_is_list(value)      uw_is_subtype((value), UwTypeId_List)
 #define uw_is_map(value)       uw_is_subtype((value), UwTypeId_Map)
 #define uw_is_status(value)    uw_is_subtype((value), UwTypeId_Status)
-#define uw_is_class(value)     uw_is_subtype((value), UwTypeId_Class)
+#define uw_is_struct(value)    uw_is_subtype((value), UwTypeId_Struct)
 #define uw_is_file(value)      uw_is_subtype((value), UwTypeId_File)
 #define uw_is_stringio(value)  uw_is_subtype((value), UwTypeId_StringIO)
 
@@ -427,7 +427,7 @@ typedef struct {
 #define uw_assert_list(value)      uw_assert(uw_is_list    (value))
 #define uw_assert_map(value)       uw_assert(uw_is_map     (value))
 #define uw_assert_status(value)    uw_assert(uw_is_status  (value))
-#define uw_assert_class(value)     uw_assert(uw_is_class   (value))
+#define uw_assert_struct(value)    uw_assert(uw_is_struct  (value))
 #define uw_assert_file(value)      uw_assert(uw_is_file    (value))
 #define uw_assert_stringio(value)  uw_assert(uw_is_stringio(value))
 
