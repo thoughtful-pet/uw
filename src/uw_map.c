@@ -497,7 +497,7 @@ bool _uw_map_equal(UwValuePtr self, UwValuePtr other)
         if (t == UwTypeId_Map) {
             return map_eq(_uw_get_map_ptr(self), _uw_get_map_ptr(other));
         } else {
-            // check base class
+            // check base type
             t = _uw_types[t]->ancestor_id;
             if (t == UwTypeId_Null) {
                 return false;

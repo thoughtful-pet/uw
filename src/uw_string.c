@@ -453,7 +453,7 @@ UwResult _uw_string_clone(UwValuePtr self)
 
 void _uw_string_hash(UwValuePtr self, UwHashContext* ctx)
 {
-    // mind maps: the hash should be the same for subclasses, that's why not using self->type_id here
+    // mind maps: the hash should be the same for subtypes, that's why not using self->type_id here
     _uw_hash_uint64(ctx, UwTypeId_String);
 
     struct _UwString* s = _uw_get_string_ptr(self);
@@ -543,7 +543,7 @@ bool _uw_string_equal(UwValuePtr self, UwValuePtr other)
                 return _uw_charptr_equal_string(other, self);
 
             default: {
-                // check base class
+                // check base type
                 t = _uw_types[t]->ancestor_id;
                 if (t == UwTypeId_Null) {
                     return false;

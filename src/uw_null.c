@@ -42,7 +42,7 @@ bool _uw_null_equal(UwValuePtr self, UwValuePtr other)
                 return true;
 
             default: {
-                // check base class
+                // check base type
                 t = _uw_types[t]->ancestor_id;
                 if (t == UwTypeId_Null) {
                     return false;

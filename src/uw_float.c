@@ -8,7 +8,7 @@ UwResult _uw_float_create(UwTypeId type_id, va_list ap)
 
 void _uw_float_hash(UwValuePtr self, UwHashContext* ctx)
 {
-    // mind maps: the hash should be the same for subclasses, that's why not using self->type_id here
+    // mind maps: the hash should be the same for subtypes, that's why not using self->type_id here
     _uw_hash_uint64(ctx, UwTypeId_Float);
     _uw_hash_buffer(ctx, &self->float_value, sizeof(self->float_value));
 }
@@ -43,7 +43,7 @@ bool _uw_float_equal(UwValuePtr self, UwValuePtr other)
             case UwTypeId_Unsigned: return self->float_value == (UwType_Float) other->unsigned_value;
             case UwTypeId_Float:    return self->float_value == other->float_value;
             default: {
-                // check base class
+                // check base type
                 t = _uw_types[t]->ancestor_id;
                 if (t == UwTypeId_Null) {
                     return false;

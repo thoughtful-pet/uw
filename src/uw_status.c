@@ -251,7 +251,7 @@ bool _uw_status_equal(UwValuePtr self, UwValuePtr other)
         if (t == UwTypeId_Status) {
             return _uw_status_equal_sametype(self, other);
         } else {
-            // check base class
+            // check base type
             t = _uw_types[t]->ancestor_id;
             if (t == UwTypeId_Null) {
                 return false;

@@ -699,7 +699,7 @@ static UwType stringio_type = {
     ._equal_sametype = _uw_stringio_equal_sametype,
     ._equal          = _uw_stringio_equal,
 
-    // in a subclass all interfaces of base classes must be in place:
+    // in a subtype all interfaces of base types must be in place:
     .interfaces = {
         // [UwInterfaceId_RandomAccess] = &string_type_random_access_interface
         [UwInterfaceId_LineReader] = &stringio_type_line_reader_interface
@@ -742,9 +742,8 @@ UwTypeId uw_add_type(UwType* type)
     return UwTypeId_Null;
 }
 
-UwTypeId uw_subclass(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_size)
+UwTypeId uw_subtype(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_size)
 {
-    // don't allow subclassing Null, this probably indicates an error
     uw_assert(ancestor_id != UwTypeId_Null);
 
     UwType* ancestor = _uw_types[ancestor_id];

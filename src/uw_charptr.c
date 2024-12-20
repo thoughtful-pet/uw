@@ -282,7 +282,7 @@ bool _uw_charptr_equal(UwValuePtr self, UwValuePtr other)
                 return _uw_charptr_equal_string(self, other);
 
             default: {
-                // check base class
+                // check base type
                 t = _uw_types[t]->ancestor_id;
                 if (t == UwTypeId_Null) {
                     return false;

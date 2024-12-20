@@ -205,8 +205,8 @@ typedef _UwValue  UwResult;  // alias for return values
 #define UwTypeId_Null         0
 #define UwTypeId_Bool         1
 #define UwTypeId_Int          2  // abstract integer
-#define UwTypeId_Signed       3  // subclass of int, signed integer
-#define UwTypeId_Unsigned     4  // subclass of int, unsigned integer
+#define UwTypeId_Signed       3  // subtype of int, signed integer
+#define UwTypeId_Unsigned     4  // subtype of int, unsigned integer
 #define UwTypeId_Float        5
 #define UwTypeId_String       6
 #define UwTypeId_CharPtr      7  // container for static C strings
@@ -388,7 +388,7 @@ typedef struct {
     UwMethodFini     _fini;      // optional
     UwMethodClone    _clone;     // if set, it is called by uw_clone()
     UwMethodHash     _hash;
-    UwMethodDeepCopy _deepcopy;  // XXX how it should work with subclasses is not clear yet
+    UwMethodDeepCopy _deepcopy;  // XXX how it should work with subtypes is not clear yet
     UwMethodDump     _dump;
     UwMethodToString _to_string;
     UwMethodIsTrue   _is_true;
@@ -401,20 +401,20 @@ typedef struct {
 } UwType;
 
 // type checking
-#define uw_is_null(value)      uw_is_subclass((value), UwTypeId_Null)
-#define uw_is_bool(value)      uw_is_subclass((value), UwTypeId_Bool)
-#define uw_is_int(value)       uw_is_subclass((value), UwTypeId_Int)
-#define uw_is_signed(value)    uw_is_subclass((value), UwTypeId_Signed)
-#define uw_is_unsigned(value)  uw_is_subclass((value), UwTypeId_Unsigned)
-#define uw_is_float(value)     uw_is_subclass((value), UwTypeId_Float)
-#define uw_is_string(value)    uw_is_subclass((value), UwTypeId_String)
-#define uw_is_charptr(value)   uw_is_subclass((value), UwTypeId_CharPtr)
-#define uw_is_list(value)      uw_is_subclass((value), UwTypeId_List)
-#define uw_is_map(value)       uw_is_subclass((value), UwTypeId_Map)
-#define uw_is_status(value)    uw_is_subclass((value), UwTypeId_Status)
-#define uw_is_class(value)     uw_is_subclass((value), UwTypeId_Class)
-#define uw_is_file(value)      uw_is_subclass((value), UwTypeId_File)
-#define uw_is_stringio(value)  uw_is_subclass((value), UwTypeId_StringIO)
+#define uw_is_null(value)      uw_is_subtype((value), UwTypeId_Null)
+#define uw_is_bool(value)      uw_is_subtype((value), UwTypeId_Bool)
+#define uw_is_int(value)       uw_is_subtype((value), UwTypeId_Int)
+#define uw_is_signed(value)    uw_is_subtype((value), UwTypeId_Signed)
+#define uw_is_unsigned(value)  uw_is_subtype((value), UwTypeId_Unsigned)
+#define uw_is_float(value)     uw_is_subtype((value), UwTypeId_Float)
+#define uw_is_string(value)    uw_is_subtype((value), UwTypeId_String)
+#define uw_is_charptr(value)   uw_is_subtype((value), UwTypeId_CharPtr)
+#define uw_is_list(value)      uw_is_subtype((value), UwTypeId_List)
+#define uw_is_map(value)       uw_is_subtype((value), UwTypeId_Map)
+#define uw_is_status(value)    uw_is_subtype((value), UwTypeId_Status)
+#define uw_is_class(value)     uw_is_subtype((value), UwTypeId_Class)
+#define uw_is_file(value)      uw_is_subtype((value), UwTypeId_File)
+#define uw_is_stringio(value)  uw_is_subtype((value), UwTypeId_StringIO)
 
 #define uw_assert_null(value)      uw_assert(uw_is_null    (value))
 #define uw_assert_bool(value)      uw_assert(uw_is_bool    (value))
@@ -444,10 +444,11 @@ UwTypeId uw_add_type(UwType* type);
  *
  * Return new type id or 0 (UwTypeId_Null) if the list is full.
  *
- * Null type cannot be subclassed, so it's okay to use UwTypeId_Null as error indicator.
+ * Null type cannot be an ancestor for new type,
+ * so it's okay to use UwTypeId_Null as error indicator.
  */
 
-UwTypeId uw_subclass(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_size);
+UwTypeId uw_subtype(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_size);
 /*
  * `type` and `name` should point to a static storage.
  *
@@ -457,12 +458,12 @@ UwTypeId uw_subclass(UwType* type, char* name, UwTypeId ancestor_id, unsigned da
  * The caller should alter basic methods and set supported interfaces after
  * calling this function.
  *
- * Null type cannot be subclassed.
+ * Null type cannot be an ancestor for new type.
  *
- * Return subclassed type id or 0 (UwTypeId_Null) if the list is full.
+ * Return new type id or 0 (UwTypeId_Null) if the list is full.
  */
 
-static inline bool uw_is_subclass(UwValuePtr value, UwTypeId type_id)
+static inline bool uw_is_subtype(UwValuePtr value, UwTypeId type_id)
 {
     UwTypeId t = value->type_id;
     for (;;) {
@@ -1123,7 +1124,7 @@ void uw_destroy_cstring(CStringPtr* str);
  * Helper functions and macros
  */
 
-// XXX this macro is not suitable for subclasses because the base class data_offset is zero;
+// XXX this macro is not suitable for subtypes because the base data_offset is zero;
 //     need a better way to define structures
 #define _uw_get_data_ptr(value, type_id, type_name_ptr)  \
     (  \

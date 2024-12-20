@@ -20,7 +20,7 @@ void _uw_class_hash(UwValuePtr self, UwHashContext* ctx)
 
 UwResult _uw_class_deepcopy(UwValuePtr self)
 /*
- * Bare class cannot be copied, this method must be defined in a subclass.
+ * Bare class cannot be copied, this method must be defined in a subtype.
  */
 {
     return UwError(UW_ERROR_NOT_IMPLEMENTED);

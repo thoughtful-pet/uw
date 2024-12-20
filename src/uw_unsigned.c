@@ -54,7 +54,7 @@ bool _uw_unsigned_equal(UwValuePtr self, UwValuePtr other)
                 return self->unsigned_value == other->float_value;
 
             default: {
-                // check base class
+                // check base type
                 t = _uw_types[t]->ancestor_id;
                 if (t == UwTypeId_Null) {
                     return false;
