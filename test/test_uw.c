@@ -827,6 +827,29 @@ void test_string()
         //uw_dump(stdout, &v);
     }
 
+    { // test join with CharPtr
+        UwValue list       = UwList();
+        UwValue sawatdee   = UwChar8Ptr(u8"สวัสดี");
+        UwValue thanks     = UwCharPtr("Thanks");
+        UwValue multsumesc = UwChar32Ptr(U"mulțumesc");
+        UwValue wat        = UwChar32Ptr(U"🙏");
+        uw_list_append(&list, "Hello");
+        uw_list_append(&list, &sawatdee);
+        uw_list_append(&list, &thanks);
+        uw_list_append(&list, &multsumesc);
+        UwValue v = uw_string_join(&wat, &list);
+        TEST(uw_equal(&v, U"Hello🙏สวัสดี🙏Thanks🙏mulțumesc"));
+        //uw_dump(stdout, &v);
+    }
+
+    { // test uw_strcat
+        UwValue v = uw_strcat(
+            uw_create_string("Hello! "), UwCharPtr("Thanks"), UwChar32Ptr(U"🙏"), UwChar8Ptr(u8"สวัสดี")
+        );
+        TEST(uw_equal(&v, U"Hello! Thanks🙏สวัสดี"));
+        //uw_dump(stdout, &v);
+    }
+
     { // test split/join
         UwValue str = uw_create(U"สบาย/สบาย/yo/yo");
         UwValue list = uw_string_split_chr(&str, '/');

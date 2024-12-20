@@ -14,6 +14,8 @@ bool     _uw_charptr_is_true       (UwValuePtr self);
 bool     _uw_charptr_equal_sametype(UwValuePtr self, UwValuePtr other);
 bool     _uw_charptr_equal         (UwValuePtr self, UwValuePtr other);
 
+unsigned _uw_charptr_strlen2(UwValuePtr charptr, uint8_t* char_size);
+
 bool _uw_charptr_equal_string(UwValuePtr charptr, UwValuePtr str);
 // comparison helper
 

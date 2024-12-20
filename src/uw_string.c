@@ -1465,7 +1465,7 @@ STR_CP_FROM_U8_IMPL(uint32_t)
 static unsigned _cp_from_u8_uint24_t(uint8_t* self_ptr, uint8_t* src_ptr, unsigned length)
 {
     unsigned chars_copied = 0;
-    while (_likely_((*((uint8_t*) src_ptr) == 0) && length--)) {
+    while (_likely_((*((uint8_t*) src_ptr)) && length--)) {
         char32_t c = read_utf8_char(&src_ptr);
         if (_likely_(c != 0xFFFFFFFF)) {
             put_char_uint24_t((uint24_t**) &self_ptr, c);
@@ -1773,19 +1773,11 @@ bool uw_string_append_substring_cstr(UwValuePtr dest, char* src, unsigned src_st
     return append_cstr(dest, src, src_len);
 }
 
-static bool append_u8(UwValuePtr dest, char8_t* src, unsigned src_len)
+static bool append_u8(UwValuePtr dest, char8_t* src, unsigned src_len, uint8_t src_char_size)
 /*
  * `src_len` contains the number of codepoints, not the number of bytes in `src`
  */
 {
-    uint8_t src_char_size;
-    if (src_len) {
-        // src_len is known, find char size
-        src_char_size = utf8_char_size(src, src_len);
-    } else {
-        // src_len == 0, calculate both in one go
-        src_len = utf8_strlen2(src, &src_char_size);
-    }
     struct _UwString* sd = expand_string(dest, src_len, src_char_size);
     if (!sd) {
         return false;
@@ -1799,12 +1791,15 @@ static bool append_u8(UwValuePtr dest, char8_t* src, unsigned src_len)
 
 bool _uw_string_append_u8(UwValuePtr dest, char8_t* src)
 {
-    return append_u8(dest, src, 0);
+    uint8_t src_char_size;
+    unsigned src_len = utf8_strlen2(src, &src_char_size);
+    return append_u8(dest, src, src_len, src_char_size);
 }
 
 bool _uw_string_append_substring_u8(UwValuePtr dest, char8_t* src, unsigned src_start_pos, unsigned src_end_pos)
 {
-    unsigned src_len = utf8_strlen(src);  // have to find src_len for bounds checking
+    uint8_t src_char_size;
+    unsigned src_len = utf8_strlen2(src, &src_char_size);
     if (src_end_pos > src_len) {
         src_end_pos = src_len;
     }
@@ -1814,19 +1809,11 @@ bool _uw_string_append_substring_u8(UwValuePtr dest, char8_t* src, unsigned src_
     src_len = src_end_pos - src_start_pos;
     src = utf8_skip(src, src_start_pos);
 
-    return append_u8(dest, src, src_len);
+    return append_u8(dest, src, src_len, src_char_size);
 }
 
-static bool append_u32(UwValuePtr dest, char32_t* src, unsigned src_len)
+static bool append_u32(UwValuePtr dest, char32_t* src, unsigned src_len, uint8_t src_char_size)
 {
-    uint8_t src_char_size;
-    if (src_len) {
-        // src_len is known, find char size
-        src_char_size = u32_char_size(src, src_len);
-    } else {
-        // src_len == 0, calculate both in one go
-        src_len = u32_strlen2(src, &src_char_size);
-    }
     struct _UwString* sd = expand_string(dest, src_len, src_char_size);
     if (!sd) {
         return false;
@@ -1840,12 +1827,15 @@ static bool append_u32(UwValuePtr dest, char32_t* src, unsigned src_len)
 
 bool _uw_string_append_u32(UwValuePtr dest, char32_t* src)
 {
-    return append_u32(dest, src, 0);
+    uint8_t src_char_size;
+    unsigned src_len = u32_strlen2(src, &src_char_size);
+    return append_u32(dest, src, src_len, src_char_size);
 }
 
 bool _uw_string_append_substring_u32(UwValuePtr dest, char32_t*  src, unsigned src_start_pos, unsigned src_end_pos)
 {
-    unsigned src_len = u32_strlen(src);  // have to find src_len for bounds checking
+    uint8_t src_char_size;
+    unsigned src_len = u32_strlen2(src, &src_char_size);
     if (src_end_pos > src_len) {
         src_end_pos = src_len;
     }
@@ -1855,7 +1845,7 @@ bool _uw_string_append_substring_u32(UwValuePtr dest, char32_t*  src, unsigned s
     src_len = src_end_pos - src_start_pos;
     src += src_start_pos;
 
-    return append_u32(dest, src, src_len);
+    return append_u32(dest, src, src_len, src_char_size);
 }
 
 static bool append_string(UwValuePtr dest, struct _UwString* src, unsigned src_start_pos, unsigned src_len)
@@ -2225,48 +2215,74 @@ UwResult uw_string_split_chr(UwValuePtr str, char32_t splitter)
 UwResult _uw_string_join_c32(char32_t separator, UwValuePtr list)
 {
     char32_t s[2] = {separator, 0};
-    UwValue sep = uw_create(s);
-    if (uw_error(&sep)) {
-        return uw_move(&sep);
-    }
+    UwValue sep = UwChar32Ptr(s);
     return _uw_string_join(&sep, list);
 }
 
 UwResult _uw_string_join_u8(char8_t* separator, UwValuePtr list)
 {
-    UwValue sep = uw_create(separator);
-    if (uw_error(&sep)) {
-        return uw_move(&sep);
-    }
+    UwValue sep = UwChar8Ptr(separator);
     return _uw_string_join(&sep, list);
 }
 
 UwResult _uw_string_join_u32(char32_t*  separator, UwValuePtr list)
 {
-    UwValue sep = uw_create(separator);
-    if (uw_error(&sep)) {
-        return uw_move(&sep);
-    }
+    UwValue sep = UwChar32Ptr(separator);
     return _uw_string_join(&sep, list);
+}
+
+static bool append_charptr(UwValuePtr dest, UwValuePtr charptr, unsigned len, uint8_t char_size)
+{
+    switch (charptr->charptr_subtype) {
+        case UW_CHARPTR:   return append_cstr(dest, charptr->charptr,   len);
+        case UW_CHAR8PTR:  return append_u8  (dest, charptr->char8ptr,  len, char_size);
+        case UW_CHAR32PTR: return append_u32 (dest, charptr->char32ptr, len, char_size);
+        default: return true;  // XXX the caller must ensure charptr_subtype is correct
+    }
 }
 
 UwResult _uw_string_join(UwValuePtr separator, UwValuePtr list)
 {
-    // XXX skipping non-string values
-
     unsigned num_items = uw_list_length(list);
-    unsigned separator_len = uw_strlen(separator);
-    bool item_added;
+    if (num_items == 0) {
+        return UwString();
+    }
+    if (num_items == 1) {
+        UwValue item = uw_list_item(list, 0);
+        if (uw_is_string(&item)) {
+            return uw_move(&item);
+        } if (uw_is_charptr(&item)) {
+            return _uw_charptr_to_string(&item);
+        } else {
+            // XXX skipping non-string values
+            return UwString();
+        }
+    }
 
-    // calculate total length and max char width
+    uint8_t max_char_size;
+    unsigned separator_len;
+    bool separator_is_string = uw_is_string(separator);
+
+    if (separator_is_string) {
+        max_char_size = uw_string_char_size(separator);
+        separator_len = uw_strlen(separator);
+    } if (uw_is_charptr(separator)) {
+        separator_len = _uw_charptr_strlen2(separator, &max_char_size);
+    } else {
+        UwValue error = UwError(UW_ERROR_INCOMPATIBLE_TYPE);
+        _uw_set_status_desc(&error, "Bad separator type for uw_string_join: %u, %s",
+                            separator->type_id, uw_get_type_name(separator->type_id));
+        return uw_move(&error);
+    }
+
+    // calculate total length and max char width of string items
+    unsigned num_charptrs = 0;
     unsigned result_len = 0;
-    uint8_t max_char_size = uw_string_char_size(separator);
-    item_added = false;
     for (unsigned i = 0; i < num_items; i++) {
         {   // nested scope for autocleaning item
             UwValue item = uw_list_item(list, i);
             if (uw_is_string(&item)) {
-                if (item_added) {
+                if (i) {
                     result_len += separator_len;
                 }
                 uint8_t char_size = uw_string_char_size(&item);
@@ -2274,26 +2290,74 @@ UwResult _uw_string_join(UwValuePtr separator, UwValuePtr list)
                     max_char_size = char_size;
                 }
                 result_len += uw_strlen(&item);
-                item_added = true;
+            } else if (uw_is_charptr(&item)) {
+                if (i) {
+                    result_len += separator_len;
+                }
+                num_charptrs++;
+            }
+            // XXX skipping non-string values
+        }
+    }
+
+    // can allocate array for CharPtr now
+    unsigned charptr_len[num_charptrs + 1];
+
+    if (num_charptrs) {
+        // need one more pass to get lengths and char sizes of CharPtr items
+        unsigned charptr_index = 0;
+        for (unsigned i = 0; i < num_items; i++) {
+            {   // nested scope for autocleaning item
+                UwValue item = uw_list_item(list, i);
+                if (uw_is_charptr(&item)) {
+                    uint8_t char_size;
+                    unsigned len = _uw_charptr_strlen2(&item, &char_size);
+
+                    charptr_len[charptr_index++] = len;
+
+                    result_len += len;
+                    if (max_char_size < char_size) {
+                        max_char_size = char_size;
+                    }
+                }
             }
         }
     }
+
     // join list items
     UwValue result = uw_create_empty_string(result_len, max_char_size);
     if (uw_error(&result)) {
         return uw_move(&result);
     }
-    item_added = false;
+    unsigned charptr_index = 0;
     for (unsigned i = 0; i < num_items; i++) {
         {   // nested scope for autocleaning item
             UwValue item = uw_list_item(list, i);
-            if (uw_is_string(&item)) {
-                if (item_added) {
-                    uw_string_append(&result, separator);
+            bool is_string = uw_is_string(&item);
+            if (is_string || uw_is_charptr(&item)) {
+                if (i) {
+                    if (separator_is_string) {
+                        if (!_uw_string_append(&result, separator)) {
+                            return UwOOM();
+                        }
+                    } else {
+                        if (!append_charptr(&result, separator, separator_len, max_char_size)) {
+                            return UwOOM();
+                        }
+                    }
                 }
-                uw_string_append(&result, &item);
-                item_added = true;
+                if (is_string) {
+                    if (!_uw_string_append(&result, &item)) {
+                        return UwOOM();
+                    }
+                } else {
+                    if (!append_charptr(&result, &item, charptr_len[charptr_index], max_char_size)) {
+                        return UwOOM();
+                    }
+                    charptr_index++;
+                }
             }
+            // XXX skipping non-string values
         }
     }
     return uw_move(&result);
@@ -2308,33 +2372,8 @@ UwResult _uw_strcat_va(...)
     return uw_move(&result);
 }
 
-UwResult uw_strcat_ap(va_list ap)
+static void consume_args(va_list ap)
 {
-    UWDECL_String(str);
-
-    UwValue error = UwOOM();  // default error is OOM unless some arg is a status
-    for(;;) {
-        {
-            UwValue arg = va_arg(ap, _UwValue);
-            if (uw_is_status(&arg)) {
-                if (uw_va_end(&arg)) {
-                    return uw_move(&str);
-                }
-                uw_destroy(&error);
-                error = uw_move(&arg);
-                goto failure;
-            }
-            if (!uw_charptr_to_string(&arg)) {
-                goto failure;
-            }
-            if (!_uw_string_append(&str, &arg)) {
-                goto failure;
-            }
-        }
-    }
-
-failure:
-    // consume args
     for (;;) {
         {
             UwValue arg = va_arg(ap, _UwValue);
@@ -2343,5 +2382,110 @@ failure:
             }
         }
     }
+}
+
+UwResult uw_strcat_ap(va_list ap)
+{
+    // default error is OOM unless some arg is a status
+    UwValue error = UwOOM();
+
+    // count the number of args, check their types,
+    // calculate total length and max char width
+    unsigned result_len = 0;
+    uint8_t max_char_size = 1;
+    unsigned num_charptrs = 0;
+    va_list temp_ap;
+    va_copy(temp_ap, ap);
+    for (unsigned arg_no = 0;;) {
+        // arg is not auto-cleaned here because we don't consume it yet
+        _UwValue arg = va_arg(temp_ap, _UwValue);
+        arg_no++;
+        if (uw_is_status(&arg)) {
+            if (uw_va_end(&arg)) {
+                break;
+            }
+            uw_destroy(&error);
+            error = uw_clone(&arg);
+            va_end(temp_ap);
+            consume_args(ap);
+            return uw_move(&error);
+        }
+        if (uw_is_string(&arg)) {
+            result_len += uw_strlen(&arg);
+            uint8_t char_size = uw_string_char_size(&arg);
+            if (max_char_size < char_size) {
+                max_char_size = char_size;
+            }
+        } else if (uw_is_charptr(&arg)) {
+            num_charptrs++;
+        } else {
+            uw_destroy(&error);
+            error = UwError(UW_ERROR_INCOMPATIBLE_TYPE);
+            _uw_set_status_desc(&error, "Bad argument %u type for uw_strcat: %u, %s",
+                                arg_no, arg.type_id, uw_get_type_name(arg.type_id));
+            va_end(temp_ap);
+            consume_args(ap);
+            return uw_move(&error);
+        }
+    }
+    va_end(temp_ap);
+
+    // can allocate array for CharPtr now
+    unsigned charptr_len[num_charptrs + 1];
+
+    if (num_charptrs) {
+        // need one more pass to get lengths and char sizes of CharPtr items
+        unsigned charptr_index = 0;
+        va_copy(temp_ap, ap);
+        for (;;) {
+            // arg is not auto-cleaned here because we don't consume it yet
+            _UwValue arg = va_arg(temp_ap, _UwValue);
+            if (uw_va_end(&arg)) {
+                break;
+            }
+            if (uw_is_charptr(&arg)) {
+                num_charptrs++;
+                uint8_t char_size;
+                unsigned len = _uw_charptr_strlen2(&arg, &char_size);
+
+                charptr_len[charptr_index++] = len;
+
+                result_len += len;
+                if (max_char_size < char_size) {
+                    max_char_size = char_size;
+                }
+            }
+        }
+        va_end(temp_ap);
+    }
+
+    if (result_len == 0) {
+        return UwString();
+    }
+
+    // allocate resulting string
+    UwValue str = uw_create_empty_string(result_len, max_char_size);
+
+    // concatenate
+    unsigned charptr_index = 0;
+    for (;;) {
+        {
+            UwValue arg = va_arg(ap, _UwValue);
+            if (uw_va_end(&arg)) {
+                return uw_move(&str);
+            }
+            if (uw_is_string(&arg)) {
+                if (!_uw_string_append(&str, &arg)) {
+                    break;
+                }
+            } else if (uw_is_charptr(&arg)) {
+                if (!append_charptr(&str, &arg, charptr_len[charptr_index], max_char_size)) {
+                    break;
+                }
+                charptr_index++;
+            }
+        }
+    }
+    consume_args(ap);
     return uw_move(&error);
 }

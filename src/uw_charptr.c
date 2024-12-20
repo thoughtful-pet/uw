@@ -317,3 +317,14 @@ bool _uw_charptr_equal_string(UwValuePtr charptr, UwValuePtr str)
             panic_bad_charptr_subtype(charptr);
     }
 }
+
+unsigned _uw_charptr_strlen2(UwValuePtr charptr, uint8_t* char_size)
+{
+    switch (charptr->charptr_subtype) {
+        case UW_CHARPTR:   *char_size = 1; return strlen(charptr->charptr);
+        case UW_CHAR8PTR:  return utf8_strlen2(charptr->char8ptr, char_size);
+        case UW_CHAR32PTR: return u32_strlen2(charptr->char32ptr, char_size);
+        default:
+            panic_bad_charptr_subtype(charptr);
+    }
+}
