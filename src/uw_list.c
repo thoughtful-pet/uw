@@ -279,7 +279,7 @@ UwResult uw_list_append_ap(UwValuePtr list, va_list ap)
         {
             UwValue arg = va_arg(ap, _UwValue);
             if (uw_is_status(&arg)) {
-                if (arg.status_class == UWSC_DEFAULT && arg.status_code == UW_STATUS_VA_END) {
+                if (uw_va_end(&arg)) {
                     return UwOK();
                 }
                 uw_destroy(&error);
@@ -306,10 +306,8 @@ failure:
     for (;;) {
         {
             UwValue arg = va_arg(ap, _UwValue);
-            if (uw_is_status(&arg)) {
-                if (arg.status_class == UWSC_DEFAULT && arg.status_code == UW_STATUS_VA_END) {
-                    break;
-                }
+            if (uw_va_end(&arg)) {
+                break;
             }
         }
     }

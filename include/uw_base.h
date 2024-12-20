@@ -544,6 +544,17 @@ static inline bool uw_eof(UwValuePtr status)
     return status->status_class == UWSC_DEFAULT && status->status_code == UW_ERROR_EOF;
 }
 
+static inline bool uw_va_end(UwValuePtr status)
+{
+    if (!status) {
+        return false;
+    }
+    if (!uw_is_status(status)) {
+        return false;
+    }
+    return status->status_class == UWSC_DEFAULT && status->status_code == UW_STATUS_VA_END;
+}
+
 char* uw_status_desc(UwValuePtr status);
 /*
  * Get status description.

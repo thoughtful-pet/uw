@@ -546,7 +546,7 @@ UwResult uw_map_update_ap(UwValuePtr map, va_list ap)
         {
             UwValue key = va_arg(ap, _UwValue);
             if (uw_is_status(&key)) {
-                if (key.status_class == UWSC_DEFAULT && key.status_code == UW_STATUS_VA_END) {
+                if (uw_va_end(&key)) {
                     return UwOK();
                 }
                 uw_destroy(&error);
@@ -558,7 +558,7 @@ UwResult uw_map_update_ap(UwValuePtr map, va_list ap)
             }
             UwValue value = va_arg(ap, _UwValue);
             if (uw_is_status(&value)) {
-                if (value.status_class == UWSC_DEFAULT && value.status_code == UW_STATUS_VA_END) {
+                if (uw_va_end(&value)) {
                     uw_destroy(&value);
                     value = UwNull();
                     done = true;
@@ -582,10 +582,8 @@ failure:
     if (!done) { for (;;) {
         {
             UwValue arg = va_arg(ap, _UwValue);
-            if (uw_is_status(&arg)) {
-                if (arg.status_class == UWSC_DEFAULT && arg.status_code == UW_STATUS_VA_END) {
-                    break;
-                }
+            if (uw_va_end(&arg)) {
+                break;
             }
         }
     }}
