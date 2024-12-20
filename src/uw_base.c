@@ -725,18 +725,24 @@ UwType* _uw_types[UW_TYPE_CAPACITY] = {
 };
 
 
-int uw_add_type(UwType* type)
+UwTypeId uw_add_type(UwType* type)
 {
-    for (int i = 0; i < UW_TYPE_CAPACITY; i++) {
+    UwTypeId i = 0;
+    do {
         if (_uw_types[i] == nullptr) {
             _uw_types[i] = type;
             return i;
         }
-    }
-    return -1;
+        i++;
+#if UW_TYPE_CAPACITY <= _UW_TYPE_MAX
+    } while (i < UW_TYPE_CAPACITY);
+#else
+    } while (i != 0);
+#endif
+    return UwTypeId_Null;
 }
 
-int uw_subclass(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_size)
+UwTypeId uw_subclass(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_size)
 {
     // don't allow subclassing Null, this probably indicates an error
     uw_assert(ancestor_id != UwTypeId_Null);
@@ -751,8 +757,8 @@ int uw_subclass(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_si
     type->data_offset = ancestor->data_offset + ancestor->data_size;
     type->data_size = data_size;
 
-    int type_id = uw_add_type(type);
-    if (type_id != -1) {
+    UwTypeId type_id = uw_add_type(type);
+    if (type_id != UwTypeId_Null) {
         type->id = (UwTypeId) type_id;
     }
     return type_id;

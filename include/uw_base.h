@@ -45,13 +45,14 @@ void uw_panic(char* fmt, ...);
 
 // Type for type id.
 typedef uint8_t UwTypeId;
+#define _UW_TYPE_MAX  255
 
 #ifndef UW_TYPE_CAPACITY
-#    define UW_TYPE_CAPACITY  (1 << (sizeof(UwTypeId) * 8))
+#    define UW_TYPE_CAPACITY  (_UW_TYPE_MAX + 1)
 #else
-#    if (UW_TYPE_CAPACITY == 0) || (UW_TYPE_CAPACITY > (1 << (sizeof(UwTypeId) * 8)))
+#    if (UW_TYPE_CAPACITY == 0) || (UW_TYPE_CAPACITY > (_UW_TYPE_MAX + 1))
 #        undef UW_TYPE_CAPACITY
-#        define UW_TYPE_CAPACITY  (1 << (sizeof(UwTypeId) * 8))
+#        define UW_TYPE_CAPACITY  (_UW_TYPE_MAX + 1)
 #    endif
 #endif
 
@@ -435,16 +436,18 @@ extern UwType* _uw_types[UW_TYPE_CAPACITY];
  * Global list of types initialized with built-in types.
  */
 
-int uw_add_type(UwType* type);
+UwTypeId uw_add_type(UwType* type);
 /*
  * Add type to the first available position in the global list.
  *
  * All fields of `type` must be initialized.
  *
- * Return type id or -1 if the list is full.
+ * Return new type id or 0 (UwTypeId_Null) if the list is full.
+ *
+ * Null type cannot be subclassed, so it's okay to use UwTypeId_Null as error indicator.
  */
 
-int uw_subclass(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_size);
+UwTypeId uw_subclass(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_size);
 /*
  * `type` and `name` should point to a static storage.
  *
@@ -454,7 +457,9 @@ int uw_subclass(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_si
  * The caller should alter basic methods and set supported interfaces after
  * calling this function.
  *
- * Return subclassed type id or -1 if the list is full.
+ * Null type cannot be subclassed.
+ *
+ * Return subclassed type id or 0 (UwTypeId_Null) if the list is full.
  */
 
 static inline bool uw_is_subclass(UwValuePtr value, UwTypeId type_id)
