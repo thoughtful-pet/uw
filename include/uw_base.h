@@ -921,7 +921,7 @@ static inline UwResult _uwc_create_string_u8_wrapper(char* initializer)
  * Method invocation macros
  */
 
-#define uw_void_call(v, method_name, ...)  \
+#define uw_call_void(v, method_name, ...)  \
     /* call basic interface method that returns void */  \
     {  \
         typeof(_uw_types[(v)->type_id]->_##method_name) meth = _uw_types[(v)->type_id]->_##method_name;  \
@@ -940,7 +940,7 @@ static inline UwResult _uwc_create_string_u8_wrapper(char* initializer)
             (default_result);  \
     })
 
-#define uw_void_super(self, method_name, ...)  \
+#define uw_super_void(self, method_name, ...)  \
     /* call super method of the basic interface that returns void */  \
     {  \
         UwTypeId ancestor_id = _uw_types[(self)->type_id]->ancestor_id;  \
@@ -1000,7 +1000,7 @@ static inline void uw_destroy(UwValuePtr v)
  */
 {
     if (v->type_id != UwTypeId_Null) {
-        uw_void_call(v, destroy);
+        uw_call_void(v, destroy);
         v->type_id = UwTypeId_Null;
     }
 }
@@ -1166,7 +1166,7 @@ static inline uint8_t* uw_align_ptr(void* p, unsigned boundary)
 
 static inline void _uw_call_fini(UwValuePtr value)
 {
-    uw_void_call(value, fini);
+    uw_call_void(value, fini);
 }
 
 static inline void _uw_call_hash(UwValuePtr value, UwHashContext* ctx)
