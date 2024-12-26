@@ -9,10 +9,13 @@
  * Basic functions
  */
 
-void* uw_string_data_ptr(UwValuePtr str)
+void* uw_string_get_bytes(UwValuePtr str, unsigned* length)
 {
     uw_assert_string(str);
     struct _UwString* s = _uw_get_string_ptr(str);
+    uint8_t char_size = _uw_string_char_size(s);
+    CapMethods* capmeth = get_cap_methods(s);
+    *length = char_size * capmeth->get_length(s);
     return (void*) get_char_ptr(s, 0);
 }
 

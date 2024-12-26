@@ -87,7 +87,7 @@ char* uw_char32_to_utf8(char32_t codepoint, char* buffer);
  * Return pointer to the next position in buffer.
  */
 
-void* uw_string_data_ptr(UwValuePtr str);
+void* uw_string_get_bytes(UwValuePtr str, unsigned* length);
 /*
  * Return pointer to internal string data.
  * The function is intended for file I/O operations.
