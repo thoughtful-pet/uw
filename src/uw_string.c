@@ -5,6 +5,22 @@
 #include "src/uw_charptr_internal.h"
 #include "src/uw_string_internal.h"
 
+// lookup table to validate capacity
+
+#define _header_size  \
+    (offsetof(struct _UwStringExtraData, string_data) + 8 /* slightly longer than string header */)
+
+static unsigned _max_capacity[8] = {
+    UINT_MAX - _header_size,
+    (UINT_MAX - _header_size) / 2,
+    (UINT_MAX - _header_size) / 3,
+    (UINT_MAX - _header_size) / 4,
+    0,  // unused
+    0,  // unused
+    0,  // unused
+    (UINT_MAX - _header_size) / 8
+};
+
 /****************************************************************
  * Basic functions
  */
@@ -111,6 +127,9 @@ static unsigned _calc_string_memsize_helper(struct _UwString* desired_addr,
  * size starting from nullptr.
  */
 {
+    // final test, if previous ones failed to return OOM error
+    uw_assert(desired_capacity <= _max_capacity[char_size]);
+
     // get address of the first character in string
     uint8_t* char0_addr = get_char0_ptr(desired_addr, cap_size, char_size);
 
@@ -245,6 +264,10 @@ static bool make_empty_string(UwValuePtr result, uint8_t cap_size, unsigned capa
         }
     }
 
+    if(capacity > _max_capacity[char_size]) {
+        return false;
+    }
+
     result->str_header.is_embedded = 0;
 
     // allocate string
@@ -295,6 +318,9 @@ static struct _UwString* expand_string(UwValuePtr str, unsigned increment, uint8
             }
             new_char_size = _uw_string_char_size(s);
         }
+        if (increment > _max_capacity[new_char_size] - str->str_length) {
+            return nullptr;
+        }
         unsigned new_length = str->str_length + increment;
         if (new_length <= get_embedded_capacity(new_char_size)) {
             // no need to expand
@@ -316,20 +342,26 @@ static struct _UwString* expand_string(UwValuePtr str, unsigned increment, uint8
         goto copy_string;
 
     } else {
+        uw_assert(str->extra_data->refcount == 1);
+
         // refcount is 1, check if string needs expanding
 
         struct _UwString* s = _uw_get_string_ptr(str);
         uint8_t char_size = _uw_string_char_size(s);
         if (new_char_size > char_size) {
             // copy string if char size needs to increase
-            // decrement refcount to free original data after copy
-            uw_assert(str->extra_data->refcount == 1);
-            str->extra_data->refcount--;
+            // make refcount zero to free original data after copy
+            str->extra_data->refcount = 0;
             goto copy_string;
         }
 
         CapMethods* capmeth = get_cap_methods(s);
         unsigned length = capmeth->get_length(s);
+
+        if (increment > _max_capacity[new_char_size] - length) {
+            return nullptr;
+        }
+
         unsigned new_length = length + increment;
         unsigned capacity = capmeth->get_capacity(s);
 
@@ -384,6 +416,15 @@ copy_string: {
 
         uint8_t src_char_size = _uw_string_char_size(s_src);
         unsigned length = get_cap_methods(s_src)->get_length(s_src);
+
+        if (increment > _max_capacity[new_char_size] - length) {
+            // restore refcount of the original string
+            if (!_uw_str_is_embedded(str)) {
+                str->extra_data->refcount++;
+            }
+            return nullptr;
+        }
+
         unsigned new_length = length + increment;
 
         if (new_char_size < src_char_size) {
@@ -392,6 +433,10 @@ copy_string: {
 
         // allocate string
         if (!make_empty_string(str, calc_cap_size(new_length), new_length, new_char_size)) {
+            // restore refcount of the original string
+            if (!_uw_str_is_embedded(str)) {
+                str->extra_data->refcount++;
+            }
             return nullptr;
         }
         struct _UwString* s_dest  = _uw_get_string_ptr(str);

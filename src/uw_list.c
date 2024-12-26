@@ -146,6 +146,10 @@ static unsigned round_capacity(unsigned capacity)
 
 bool _uw_alloc_list(UwTypeId type_id, struct _UwList* list, unsigned capacity)
 {
+    if (capacity >= (UINT_MAX - UWLIST_CAPACITY_INCREMENT)) {
+        return false;
+    }
+
     list->length = 0;
     list->capacity = round_capacity(capacity);
 
@@ -176,6 +180,8 @@ bool _uw_list_resize(UwTypeId type_id, struct _UwList* list, unsigned desired_ca
 {
     if (desired_capacity < list->length) {
         desired_capacity = list->length;
+    } else if (desired_capacity >= (UINT_MAX - UWLIST_CAPACITY_INCREMENT)) {
+        return false;
     }
     unsigned new_capacity = round_capacity(desired_capacity);
 
