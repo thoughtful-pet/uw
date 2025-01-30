@@ -340,13 +340,13 @@ typedef struct {
     UwFree    free;
 } UwAllocator;
 
-extern UwAllocator _uw_std_allocator;      // uses stdlib malloc/realloc/free
-extern UwAllocator _uw_nofail_allocator;   // same as std, panic when malloc/realloc return nullptr
-extern UwAllocator _uw_debug_allocator;    // detects memory damage
-extern UwAllocator _uw_default_allocator;  // initialized with std allocator, all built-in types
-                                           // point to this allocator;
-                                           // can be replaced if necessary with user's allocator
-extern UwAllocator _uw_pchunks_allocator;  // for parents chunks to track cyclic references; uses std_allocator by default
+extern UwAllocator _uw_std_allocator;         // uses stdlib malloc/realloc/free
+extern UwAllocator _uw_stdnofail_allocator;   // same as std, panic when malloc/realloc return nullptr
+extern UwAllocator _uw_debug_allocator;       // detects memory damage
+extern UwAllocator _uw_default_allocator;     // initialized with std allocator, all built-in types
+                                              // point to this allocator;
+                                              // can be replaced if necessary with user's allocator
+extern UwAllocator _uw_pchunks_allocator;     // for parents chunks to track cyclic references; uses std_allocator by default
 
 extern bool     _uw_allocator_verbose;     // for debug allocator
 extern unsigned _uw_blocks_allocated;      // for debug allocator

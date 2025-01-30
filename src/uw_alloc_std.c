@@ -28,7 +28,7 @@ UwAllocator _uw_std_allocator = {
 };
 
 
-static void* nofail_alloc(unsigned nbytes)
+static void* stdnofail_alloc(unsigned nbytes)
 {
     void* block = std_alloc(nbytes);
     if (!block) {
@@ -37,7 +37,7 @@ static void* nofail_alloc(unsigned nbytes)
     return block;
 }
 
-static void* nofail_realloc(void* block, unsigned old_nbytes, unsigned new_nbytes)
+static void* stdnofail_realloc(void* block, unsigned old_nbytes, unsigned new_nbytes)
 {
     void* new_block = std_realloc(block, old_nbytes, new_nbytes);
     if (!new_block) {
@@ -46,15 +46,15 @@ static void* nofail_realloc(void* block, unsigned old_nbytes, unsigned new_nbyte
     return new_block;
 }
 
-static void nofail_free(void* block, unsigned nbytes)
+static void stdnofail_free(void* block, unsigned nbytes)
 {
     free(block);
 }
 
-UwAllocator _uw_nofail_allocator = {
-    .alloc   = nofail_alloc,
-    .realloc = nofail_realloc,
-    .free    = nofail_free
+UwAllocator _uw_stdnofail_allocator = {
+    .alloc   = stdnofail_alloc,
+    .realloc = stdnofail_realloc,
+    .free    = stdnofail_free
 };
 
 
