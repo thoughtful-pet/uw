@@ -15,6 +15,8 @@
 #include <stdlib.h>
 #include <uchar.h>
 
+#include <libpussy/allocator.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -330,27 +332,6 @@ struct __UwCompoundChain {
 
 typedef struct __UwCompoundChain _UwCompoundChain;
 
-typedef void* (*UwAlloc)  (unsigned nbytes);
-typedef void* (*UwRealloc)(void* block, unsigned old_nbytes, unsigned new_nbytes);
-typedef void  (*UwFree)   (void* block, unsigned nbytes);
-
-typedef struct {
-    UwAlloc   alloc;    // always cleans allocated block
-    UwRealloc realloc;  // cleans extra space when block is extended
-    UwFree    free;
-} UwAllocator;
-
-extern UwAllocator _uw_std_allocator;         // uses stdlib malloc/realloc/free
-extern UwAllocator _uw_stdnofail_allocator;   // same as std, panic when malloc/realloc return nullptr
-extern UwAllocator _uw_debug_allocator;       // detects memory damage
-extern UwAllocator _uw_default_allocator;     // initialized with std allocator, all built-in types
-                                              // point to this allocator;
-                                              // can be replaced if necessary with user's allocator
-extern UwAllocator _uw_pchunks_allocator;     // for parents chunks to track cyclic references; uses std_allocator by default
-
-extern bool     _uw_allocator_verbose;     // for debug allocator
-extern unsigned _uw_blocks_allocated;      // for debug allocator
-
 // Function types for the basic interface.
 // The basic interface is embedded into UwType structure.
 typedef UwResult (*UwMethodCreate)  (UwTypeId type_id, va_list ap);
@@ -378,7 +359,7 @@ typedef struct {
 
     unsigned data_offset;
     unsigned data_size;
-    UwAllocator* allocator;
+    Allocator* allocator;
 
     // basic interface
     // method names must start with underscore, see note for interfaces
@@ -510,7 +491,32 @@ static inline char* _uw_get_type_name_from_value(UwValuePtr value) { return _uw_
 #define UW_ERROR_INCOMPATIBLE_TYPE 4
 #define UW_ERROR_NO_INTERFACE      5
 #define UW_ERROR_EOF               6
-#define UW_ERROR_GONE              7
+
+// list errors
+#define UW_ERROR_POP_FROM_EMPTY_LIST  7
+
+// map errors
+#define UW_ERROR_KEY_NOT_FOUND        8
+
+// File errors
+#define UW_ERROR_FILE_ALREADY_OPENED  9
+#define UW_ERROR_CANNOT_SET_FILENAME  10
+#define UW_ERROR_FD_ALREADY_SET       11
+
+// StringIO errors
+#define UW_ERROR_PUSHBACK_FAILED      12
+
+uint16_t uw_define_status(char* status);
+/*
+ * Define status in the global table.
+ * This function should be called from the very beginning of main() function
+ * or from constructors that are called before main().
+ */
+
+char* uw_status_str(uint16_t status_code);
+/*
+ * Get status string by status code.
+ */
 
 static inline bool uw_ok(UwValuePtr status)
 {
@@ -1143,26 +1149,6 @@ void uw_destroy_cstring(CStringPtr* str);
             ((uint8_t*) ((value)->extra_data)) + _uw_types[type_id]->data_offset \
         )  \
     )
-
-static inline unsigned uw_align(unsigned n, unsigned boundary)
-/*
- * boundary must be power of two
- */
-{
-    boundary--;
-    return (n + boundary) & ~boundary;
-}
-
-static inline uint8_t* uw_align_ptr(void* p, unsigned boundary)
-/*
- * boundary must be power of two
- */
-{
-    boundary--;
-    return (uint8_t*) (
-        (((ptrdiff_t) p) + boundary) & ~(ptrdiff_t) boundary
-    );
-}
 
 static inline void _uw_call_fini(UwValuePtr value)
 {

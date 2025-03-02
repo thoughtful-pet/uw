@@ -7,10 +7,6 @@
 extern "C" {
 #endif
 
-// list errors
-#define UW_ERROR_POP_FROM_EMPTY_LIST  100
-
-
 /****************************************************************
  * Append functions
  */

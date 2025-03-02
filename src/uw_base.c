@@ -60,7 +60,7 @@ bool _uw_mandatory_alloc_extra_data(UwValuePtr v)
     UwType* t = _uw_types[v->type_id];
     unsigned memsize = t->data_offset + t->data_size;
     if (memsize) {
-        _UwExtraData* extra_data = t->allocator->alloc(memsize);
+        _UwExtraData* extra_data = t->allocator->allocate(memsize, true);
         if (!extra_data) {
             return false;
         }
@@ -78,12 +78,11 @@ void _uw_free_extra_data(UwValuePtr v)
         UwType* t = _uw_types[v->type_id];
         unsigned memsize = t->data_offset + t->data_size;
         if (memsize) {
-            t->allocator->free(v->extra_data, memsize);
+            t->allocator->release((void**) &v->extra_data, memsize);
         } else {
             uw_dump(stderr, v);
             uw_panic("Extra data is allocated, but memsize evaluates to zero");
         }
-        v->extra_data = nullptr;
     }
 }
 
@@ -464,7 +463,7 @@ static UwType string_type = {
     .name            = "String",
     .data_offset     = offsetof(struct _UwStringExtraData, string_data),
     .data_size       = 0,
-    .allocator       = &_uw_default_allocator,
+    .allocator       = &default_allocator,
     ._create         = _uw_string_create,
     ._destroy        = _uw_string_destroy,
     ._init           = nullptr,           // custom constructor performs all the initialization
@@ -516,7 +515,7 @@ static UwType list_type = {
     .name            = "List",
     .data_offset     = offsetof(struct _UwListExtraData, list_data),
     .data_size       = sizeof(struct _UwList),
-    .allocator       = &_uw_default_allocator,
+    .allocator       = &default_allocator,
     ._create         = default_create,
     ._destroy        = default_destroy,
     ._init           = _uw_list_init,
@@ -544,7 +543,7 @@ static UwType map_type = {
     .name            = "Map",
     .data_offset     = offsetof(struct _UwMapExtraData, map_data),
     .data_size       = sizeof(struct _UwMap),
-    .allocator       = &_uw_default_allocator,
+    .allocator       = &default_allocator,
     ._create         = default_create,
     ._destroy        = default_destroy,
     ._init           = _uw_map_init,
@@ -571,7 +570,7 @@ static UwType status_type = {
     .name            = "Status",
     .data_offset     = offsetof(struct _UwStatusExtraData, status_desc),  // extra_data is optional and not allocated by default
     .data_size       = sizeof(char*),
-    .allocator       = &_uw_default_allocator,
+    .allocator       = &default_allocator,
     ._create         = default_create,
     ._destroy        = default_destroy,
     ._init           = nullptr,
@@ -596,7 +595,7 @@ static UwType struct_type = {
     .name            = "Struct",
     .data_offset     = 0,
     .data_size       = 0,
-    .allocator       = &_uw_default_allocator,
+    .allocator       = &default_allocator,
     ._create         = default_create,
     ._destroy        = default_destroy,
     ._init           = nullptr,
@@ -646,7 +645,7 @@ static UwType file_type = {
     .name            = "File",
     .data_offset     = offsetof(struct _UwFileExtraData, file_data),
     .data_size       = sizeof(struct _UwFile),
-    .allocator       = &_uw_default_allocator,
+    .allocator       = &default_allocator,
     ._create         = default_create,
     ._destroy        = default_destroy,
     ._init           = _uw_file_init,
@@ -685,7 +684,7 @@ static UwType stringio_type = {
     .name            = "StringIO",
     .data_offset     = offsetof(struct _UwStringIOExtraData, stringio_data),
     .data_size       = sizeof(struct _UwStringIO),
-    .allocator       = &_uw_default_allocator,
+    .allocator       = &default_allocator,
     ._create         = default_create,
     ._destroy        = default_destroy,
     ._init           = _uw_stringio_init,

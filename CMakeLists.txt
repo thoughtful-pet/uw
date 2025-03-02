@@ -6,11 +6,15 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_compile_options(-Wall -Wextra -pedantic -Werror -Wno-gnu -Wno-unused-parameter -Wno-format-pedantic)
 
+if(DEFINED ENV{DEBUG})
+    add_compile_options(-g)
+else()
+    add_compile_options(-O2)
+endif()
+
 find_package(ICU COMPONENTS uc)
 
 add_library(uw STATIC
-    src/uw_alloc_debug.c
-    src/uw_alloc_std.c
     src/uw_base.c
     src/uw_bool.c
     src/uw_charptr.c
@@ -30,7 +34,8 @@ add_library(uw STATIC
     src/uw_unsigned.c
 )
 
-target_include_directories(uw PUBLIC . include)
+target_include_directories(uw PUBLIC . include libpussy)
+target_link_libraries(uw ${CMAKE_SOURCE_DIR}/libpussy/libpussy.a)
 
 # test
 

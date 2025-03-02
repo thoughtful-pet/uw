@@ -137,10 +137,10 @@ bool _uw_list_equal(UwValuePtr self, UwValuePtr other)
 
 static unsigned round_capacity(unsigned capacity)
 {
-    if (capacity <= UWLIST_INITIAL_CAPACITY) {
-        return uw_align(capacity, UWLIST_INITIAL_CAPACITY);
+    if (capacity <= UWLIST_CAPACITY_INCREMENT) {
+        return align_unsigned(capacity, UWLIST_INITIAL_CAPACITY);
     } else {
-        return uw_align(capacity, UWLIST_CAPACITY_INCREMENT);
+        return align_unsigned(capacity, UWLIST_CAPACITY_INCREMENT);
     }
 }
 
@@ -154,7 +154,7 @@ bool _uw_alloc_list(UwTypeId type_id, struct _UwList* list, unsigned capacity)
     list->capacity = round_capacity(capacity);
 
     unsigned memsize = list->capacity * sizeof(_UwValue);
-    list->items = _uw_types[type_id]->allocator->alloc(memsize);
+    list->items = _uw_types[type_id]->allocator->allocate(memsize, true);
 
     return list->items != nullptr;
 }
@@ -171,8 +171,7 @@ void _uw_destroy_list(UwTypeId type_id, struct _UwList* list, _UwCompoundData* p
             uw_destroy(item_ptr);
         }
         unsigned memsize = list->capacity * sizeof(_UwValue);
-        _uw_types[type_id]->allocator->free(list->items, memsize);
-        list->items = nullptr;
+        _uw_types[type_id]->allocator->release((void**) &list->items, memsize);
     }
 }
 
@@ -185,16 +184,14 @@ bool _uw_list_resize(UwTypeId type_id, struct _UwList* list, unsigned desired_ca
     }
     unsigned new_capacity = round_capacity(desired_capacity);
 
-    UwAllocator* allocator = _uw_types[type_id]->allocator;
+    Allocator* allocator = _uw_types[type_id]->allocator;
 
     unsigned old_memsize = list->capacity * sizeof(_UwValue);
     unsigned new_memsize = new_capacity * sizeof(_UwValue);
 
-    UwValuePtr new_items = allocator->realloc(list->items, old_memsize, new_memsize);
-    if (!new_items) {
+    if (!allocator->reallocate((void**) &list->items, old_memsize, new_memsize, true, nullptr)) {
         return false;
     }
-    list->items = new_items;
     list->capacity = new_capacity;
     return true;
 }
@@ -254,7 +251,13 @@ bool _uw_list_append_item(UwTypeId type_id, struct _UwList* list, UwValuePtr ite
     uw_assert(list->length <= list->capacity);
 
     if (list->length == list->capacity) {
-        if (!_uw_list_resize(type_id, list, list->capacity + UWLIST_CAPACITY_INCREMENT)) {
+        unsigned new_capacity;
+        if (list->capacity <= UWLIST_CAPACITY_INCREMENT) {
+            new_capacity = list->capacity + UWLIST_INITIAL_CAPACITY;
+        } else {
+            new_capacity = list->capacity + UWLIST_CAPACITY_INCREMENT;
+        }
+        if (!_uw_list_resize(type_id, list, new_capacity)) {
             return false;
         }
     }

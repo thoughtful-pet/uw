@@ -4,9 +4,6 @@
 extern "C" {
 #endif
 
-// StringIO errors
-#define UW_ERROR_PUSHBACK_FAILED  400
-
 /****************************************************************
  * LineReader interface
  */

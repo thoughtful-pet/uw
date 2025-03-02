@@ -9,11 +9,6 @@
 extern "C" {
 #endif
 
-// File errors
-#define UW_ERROR_FILE_ALREADY_OPENED  300
-#define UW_ERROR_CANNOT_SET_FILENAME  301
-#define UW_ERROR_FD_ALREADY_SET       302
-
 /****************************************************************
  * File interface
  */

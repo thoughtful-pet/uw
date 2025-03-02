@@ -15,7 +15,8 @@ static inline _UwParentsChunk* get_parents_list(_UwCompoundData* cdata)
 void _uw_fini_compound_data(_UwCompoundData* cdata)
 {
     if (cdata->using_parents_list) {
-        _uw_pchunks_allocator.free(get_parents_list(cdata), cdata->num_parents_chunks * sizeof(_UwParentsChunk));
+        _UwParentsChunk* chunk_ptr = get_parents_list(cdata);
+        default_allocator.release((void**) &chunk_ptr, cdata->num_parents_chunks * sizeof(_UwParentsChunk));
         cdata->parents[0] = nullptr;
         cdata->parents[1] = nullptr;
     }
@@ -73,13 +74,13 @@ success:
         // extend list
         unsigned old_size = child->num_parents_chunks * sizeof(_UwParentsChunk);
         unsigned new_size = old_size + sizeof(_UwParentsChunk);
-        _UwParentsChunk* new_list = _uw_pchunks_allocator.realloc(get_parents_list(child), old_size, new_size);
-        if (!new_list) {
+        _UwParentsChunk* parents_list = get_parents_list(child);
+        if (!default_allocator.reallocate((void**) &parents_list, old_size, new_size, true, nullptr)) {
             return false;
         }
-        child->parents_list = new_list;
+        child->parents_list = parents_list;
         child->using_parents_list = true;
-        _UwParentsChunk* new_chunk = &new_list[child->num_parents_chunks];
+        _UwParentsChunk* new_chunk = &parents_list[child->num_parents_chunks];
         child->num_parents_chunks++;
         new_chunk->parents[0] = parent;
         new_chunk->parents_refcount[0] = 1;
@@ -108,7 +109,7 @@ success:
             goto success;
         }
         // allocate list
-        _UwParentsChunk* chunk_ptr = _uw_pchunks_allocator.alloc(sizeof(_UwParentsChunk));
+        _UwParentsChunk* chunk_ptr = default_allocator.allocate(sizeof(_UwParentsChunk), true);
         if (!chunk_ptr) {
             return false;
         }
@@ -147,17 +148,18 @@ static void shrink_parents_list(_UwCompoundData* child, _UwParentsChunk* chunk_p
                 j++;
             }
         }
-        _uw_pchunks_allocator.free(parents_list, sizeof(_UwParentsChunk));  // see above, num_parents_chunks was 1
+        default_allocator.release((void**) &parents_list, sizeof(_UwParentsChunk));  // see above, num_parents_chunks was 1
         return;
     }
     // delete chunk
     if (chunks_left) {
         memmove(chunk_ptr, chunk_ptr + 1, chunks_left * sizeof(_UwParentsChunk));
     }
+    // shrink
     unsigned old_size = child->num_parents_chunks * sizeof(_UwParentsChunk);
     unsigned new_size = old_size - sizeof(_UwParentsChunk);
-    _UwParentsChunk* reduced_list = _uw_pchunks_allocator.realloc(get_parents_list(child), old_size, new_size);
-    uw_assert(reduced_list == get_parents_list(child));
+    _UwParentsChunk* parents_list = get_parents_list(child);
+    default_allocator.reallocate((void**) &parents_list, old_size, new_size, false, nullptr);
     child->num_parents_chunks--;
 }
 

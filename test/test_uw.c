@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include "include/uw.h"
 #include "src/uw_string_internal.h"
@@ -15,13 +16,26 @@ bool print_ok = false;
     do {  \
         if (condition) {  \
             num_ok++;  \
-            if (print_ok) printf("OK: " #condition "\n");  \
+            if (print_ok) fprintf(stderr, "OK: " #condition "\n");  \
         } else {  \
             num_fail++;  \
             fprintf(stderr, "FAILED at line %d: " #condition "\n", __LINE__);  \
         }  \
         num_tests++;  \
     } while (false)
+
+void print_timediff(FILE* fp, char* caption, struct timespec* start_time, struct timespec* end_time)
+{
+    struct timespec diff;
+
+    diff.tv_sec = end_time->tv_sec - start_time->tv_sec;
+    if (end_time->tv_nsec < start_time->tv_nsec) {
+        diff.tv_sec--;
+        end_time->tv_nsec += 1000'000'000UL;
+    }
+    diff.tv_nsec = end_time->tv_nsec - start_time->tv_nsec;
+    fprintf(fp, "%s %zu.%09zu\n", caption, diff.tv_sec, diff.tv_nsec);
+}
 
 void test_icu()
 {
@@ -393,7 +407,7 @@ void test_string()
 
     { // testing max allocation with 1-byte capacity
         unsigned capacity_1_byte = 256 - offsetof(struct _UwStringExtraData, string_data)
-                                   - 3 /* header, length, and capacity */;
+                                   - 3; // header, length, and capacity;
         UwValue v = uw_create_empty_string(capacity_1_byte, 1);
         s = _uw_get_string_ptr(&v);
         capmeth = get_cap_methods(s);
@@ -405,7 +419,10 @@ void test_string()
     }
     { // testing min allocation with 2-bytes capacity
         unsigned capacity_2_bytes = 272 - offsetof(struct _UwStringExtraData, string_data)
-                                    - 1 /* header */ - 1 /* padding */ - 2 /* length */ - 2 /* capacity */;
+                                    - 1  // header
+                                    - 1  // padding
+                                    - 2  // length
+                                    - 2; // capacity
         UwValue v = uw_create_empty_string(capacity_2_bytes, 1);
         s = _uw_get_string_ptr(&v);
         capmeth = get_cap_methods(s);
@@ -542,7 +559,7 @@ void test_string()
         //uw_dump(stdout, &v);
     }
 
-#   ifdef DEBUG
+#   if 0 //def DEBUG
     { // testing cap_size=2 char_size=1
         UwValue v = uw_create_empty_string2(2, 1);
         s = _uw_get_string_ptr(&v);
@@ -672,7 +689,7 @@ void test_string()
         //uw_dump(stdout, &v);
     }
 
-#   ifdef DEBUG
+#   if 0 //def DEBUG
     { // testing cap_size=2 char_size=2
         UwValue v = uw_create_empty_string2(2, 2);
         s = _uw_get_string_ptr(&v);
@@ -721,7 +738,7 @@ void test_string()
         //uw_dump(stdout, &v);
     }
 
-#   ifdef DEBUG
+#   if 0 //def DEBUG
     { // testing cap_size=2 char_size=3
         UwValue v = uw_create_empty_string2(2, 3);
         s = _uw_get_string_ptr(&v);
@@ -769,7 +786,7 @@ void test_string()
         //uw_dump(stdout, &v);
     }
 
-#   ifdef DEBUG
+#   if 0 //def DEBUG
     { // testing cap_size=2 char_size=4
         UwValue v = uw_create_empty_string2(2, 4);
         s = _uw_get_string_ptr(&v);
@@ -1062,10 +1079,19 @@ void test_string_io()
 
 int main(int argc, char* argv[])
 {
-    _uw_default_allocator = _uw_debug_allocator;
-    //_uw_allocator_verbose = true;
+    //debug_allocator.verbose = true;
+    //init_allocator(&debug_allocator);
 
-    printf("Types capacity: %d; interfaces capacity: %d\n", UW_TYPE_CAPACITY, UW_INTERFACE_CAPACITY);
+    //init_allocator(&stdlib_allocator);
+
+    //pet_allocator.trace = true;
+    //pet_allocator.verbose = true;
+    init_allocator(&pet_allocator);
+
+    fprintf(stderr, "Types capacity: %d; interfaces capacity: %d\n", UW_TYPE_CAPACITY, UW_INTERFACE_CAPACITY);
+
+    struct timespec start_time, end_time;
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
 
     test_icu();
     test_integral_types();
@@ -1075,9 +1101,12 @@ int main(int argc, char* argv[])
     test_file();
     test_string_io();
 
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
+    print_timediff(stderr, "time elapsed:", &start_time, &end_time);
+
     if (num_fail == 0) {
-        printf("%d test%s OK\n", num_tests, (num_tests == 1)? "" : "s");
+        fprintf(stderr, "%d test%s OK\n", num_tests, (num_tests == 1)? "" : "s");
     }
 
-    printf("leaked blocks: %u\n", _uw_blocks_allocated);
+    fprintf(stderr, "leaked blocks: %zu\n", default_allocator.stats->blocks_allocated);
 }

@@ -134,7 +134,7 @@ static unsigned _calc_string_memsize_helper(struct _UwString* desired_addr,
     uint8_t* char0_addr = get_char0_ptr(desired_addr, cap_size, char_size);
 
     // calculate end address
-    uint8_t* end_addr = uw_align_ptr(
+    uint8_t* end_addr = align_pointer(
         char0_addr + char_size * desired_capacity,
         UWSTRING_BLOCK_SIZE
     );
@@ -203,7 +203,7 @@ static inline unsigned get_string_memsize(struct _UwString* s)
  * Get memory size occupied by string.
  */
 {
-    uint8_t* end_addr = uw_align_ptr(
+    uint8_t* end_addr = align_pointer(
         get_char_ptr(s, get_cap_methods(s)->get_capacity(s)),
         UWSTRING_BLOCK_SIZE
     );
@@ -282,7 +282,7 @@ static bool make_empty_string(UwValuePtr result, uint8_t cap_size, unsigned capa
 
     UwType* t = _uw_types[result->type_id];
 
-    result->extra_data = t->allocator->alloc(memsize);
+    result->extra_data = t->allocator->allocate(memsize, true);
     if (!result->extra_data) {
         return false;
     }
@@ -379,13 +379,12 @@ static struct _UwString* expand_string(UwValuePtr str, unsigned increment, uint8
         unsigned new_capacity;
         unsigned new_memsize = calc_extra_data_size(char_size, new_length, &new_capacity);
 
-        _UwExtraData* new_data = _uw_types[str->type_id]->allocator->realloc(str->extra_data, orig_memsize, new_memsize);
-        if (!new_data) {
+        bool addr_changed;
+        if (!_uw_types[str->type_id]->allocator->reallocate((void**) &str->extra_data,
+                                                            orig_memsize, new_memsize, true, &addr_changed)) {
             return nullptr;
         }
-        if (new_data != str->extra_data) {
-            // memory block was moved
-            str->extra_data = new_data;
+        if (addr_changed) {
             s = _uw_get_string_ptr(str);
         }
 
@@ -454,7 +453,7 @@ copy_string: {
             unsigned cleck_capacity;
             unsigned memsize = calc_extra_data_size(src_char_size, capacity, &cleck_capacity);
             uw_assert(capacity == cleck_capacity);
-            _uw_types[saved_str.type_id]->allocator->free(saved_str.extra_data, memsize);
+            _uw_types[saved_str.type_id]->allocator->release((void**) &saved_str.extra_data, memsize);
         }
         return s_dest;
     }
@@ -483,8 +482,7 @@ void _uw_string_destroy(UwValuePtr self)
     if (0 == --self->extra_data->refcount) {
 
         UwType* t = _uw_types[self->type_id];
-        t->allocator->free(self->extra_data, get_extra_data_size(self));
-        self->extra_data = nullptr;
+        t->allocator->release((void**) &self->extra_data, get_extra_data_size(self));
     }
 }
 
@@ -1570,7 +1568,7 @@ UwResult uw_create_empty_string(unsigned capacity, uint8_t char_size)
 UwResult uw_create_empty_string2(uint8_t cap_size, uint8_t char_size)
 {
     // using not autocleaned variable here, no uw_move necessary on exit
-    _UWDECL_String(result);
+    __UWDECL_String(result);
 
     if (!make_empty_string(&result, cap_size, 0, char_size)) {
         return UwOOM();

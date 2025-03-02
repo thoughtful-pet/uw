@@ -98,14 +98,12 @@ static bool init_hash_table(UwTypeId type_id, struct _UwHashTable* ht,
 
     // reallocate items
     // if map is new, ht is initialized to all zero
-    // if map is doubled, this reallocates block
-    uint8_t*  new_items = _uw_types[type_id]->allocator->realloc(ht->items, old_memsize, new_memsize);
-    if (!new_items) {
+    // if map is doubled, this reallocates the block
+    if (!_uw_types[type_id]->allocator->reallocate((void**) &ht->items, old_memsize, new_memsize, true, nullptr)) {
         return false;
     }
-    memset(new_items, 0, new_memsize);
+    memset(ht->items, 0, new_memsize);
 
-    ht->items        = new_items;
     ht->item_size    = new_item_size;
     ht->capacity     = new_capacity;
     ht->hash_bitmask = new_capacity - 1;
@@ -337,8 +335,7 @@ void _uw_map_fini(UwValuePtr self)
     _uw_destroy_list(type_id, &map->kv_pairs, cdata);
     if (ht->items) {
         unsigned ht_memsize = get_item_size(ht->capacity) * ht->capacity;
-        _uw_types[type_id]->allocator->free(ht->items, ht_memsize);
-        ht->items = nullptr;
+        _uw_types[type_id]->allocator->release((void**) &ht->items, ht_memsize);
     }
     _uw_fini_compound_data(cdata);
 }

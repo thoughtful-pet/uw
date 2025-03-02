@@ -126,7 +126,7 @@ static inline uint8_t* cap_data_addr(uint8_t cap_size, struct _UwString* desired
     static_assert(
         sizeof(struct _UwString) == 1
     );
-    return uw_align_ptr(
+    return align_pointer(
         ((uint8_t*) desired_addr) + sizeof(struct _UwString),
         cap_size
     );
@@ -141,7 +141,7 @@ static inline uint8_t* get_char0_ptr(struct _UwString* desired_addr, uint8_t cap
  * address starting from nullptr.
  */
 {
-    return uw_align_ptr(
+    return align_pointer(
         cap_data_addr(cap_size, desired_addr) + cap_size * 2,  // 2 == length + capacity
         char_size  // align at char_size boundary
     );

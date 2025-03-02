@@ -6,9 +6,6 @@
 extern "C" {
 #endif
 
-// map errors
-#define UW_ERROR_KEY_NOT_FOUND        200
-
 /****************************************************************
  * Update map: insert key-value pair or replace existing value.
  */

@@ -1,83 +1,97 @@
-#define _GNU_SOURCE
+#ifndef _GNU_SOURCE
+#   define _GNU_SOURCE
+#endif
 
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/mman.h>
 
 #include "include/uw_base.h"
 #include "src/uw_status_internal.h"
 
-
-/****************************************************************
- * Helper functions.
- */
-
-struct Statuses {
-    uint16_t start_code;
-    uint16_t num_statuses;
-    char** statuses;
+static char* basic_statuses[] = {
+    [UW_SUCCESS]                   = "SUCCESS",
+    [UW_STATUS_VA_END]             = "VA_END",
+    [UW_ERROR_OOM]                 = "OOM",
+    [UW_ERROR_NOT_IMPLEMENTED]     = "NOT IMPLEMENTED",
+    [UW_ERROR_INCOMPATIBLE_TYPE]   = "INCOMPATIBLE_TYPE",
+    [UW_ERROR_NO_INTERFACE]        = "NO_INTERFACE",
+    [UW_ERROR_EOF]                 = "EOF",
+    [UW_ERROR_POP_FROM_EMPTY_LIST] = "POP_FROM_EMPTY_LIST",
+    [UW_ERROR_KEY_NOT_FOUND]       = "KEY_NOT_FOUND",
+    [UW_ERROR_FILE_ALREADY_OPENED] = "FILE_ALREADY_OPENED",
+    [UW_ERROR_CANNOT_SET_FILENAME] = "CANNOT_SET_FILENAME",
+    [UW_ERROR_FD_ALREADY_SET]      = "FD_ALREADY_SET",
+    [UW_ERROR_PUSHBACK_FAILED]     = "PUSHBACK_FAILED"
 };
 
-static char* uw_status_str(uint16_t status_code)
-{
-    static char* basic_statuses[] = {
-        "SUCCESS",
-        "VA_END",
-        "OOM",
-        "NOT IMPLEMENTED",
-        "INCOMPATIBLE_TYPE",
-        "NO_INTERFACE",
-        "EOF",
-        "GONE"
-    };
-    static char* list_statuses[] = {
-        "POP_FROM_EMPTY_LIST"
-    };
-    static char* map_statuses[] = {
-        "KEY_NOT_FOUND"
-    };
-    static char* file_statuses[] = {
-        "FILE_ALREADY_OPENED",
-        "CANNOT_SET_FILENAME",
-        "FD_ALREADY_SET"
-    };
-    static char* stringio_statuses[] = {
-        "PUSHBACK_FAILED"
-    };
-    static struct Statuses statuses[] = {
-        {
-            .start_code = 0,
-            .num_statuses = _UWC_LENGTH_OF(basic_statuses),
-            .statuses = basic_statuses,
-        },
-        {
-            .start_code = 100,
-            .num_statuses = _UWC_LENGTH_OF(list_statuses),
-            .statuses = list_statuses,
-        },
-        {
-            .start_code = 200,
-            .num_statuses = _UWC_LENGTH_OF(map_statuses),
-            .statuses = map_statuses,
-        },
-        {
-            .start_code = 300,
-            .num_statuses = _UWC_LENGTH_OF(file_statuses),
-            .statuses = file_statuses,
-        },
-        {
-            .start_code = 400,
-            .num_statuses = _UWC_LENGTH_OF(stringio_statuses),
-            .statuses = stringio_statuses,
-        }
-    };
-    static char unknown[] = "(unknown)";
+static char** statuses = nullptr;
+static size_t statuses_capacity = 0;
+static uint16_t num_statuses = 0;
 
-    for (size_t i = 0;  i < _UWC_LENGTH_OF(statuses); i++) {
-        struct Statuses* s = &statuses[i];
-        if (status_code >= s->start_code && status_code < s->start_code + s->num_statuses) {
-            return s->statuses[status_code - s->start_code];
+[[ gnu::constructor ]]
+static void init_statuses()
+{
+    if (statuses) {
+        return;
+    }
+
+    size_t page_size = sysconf(_SC_PAGE_SIZE);
+    size_t memsize = (sizeof(basic_statuses) + page_size - 1) & ~(page_size - 1);
+    statuses_capacity = memsize / sizeof(char*);
+
+    statuses = mmap(NULL, memsize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (statuses == MAP_FAILED) {
+        perror("mmap");
+        abort();
+    }
+
+    num_statuses = sizeof(basic_statuses) / sizeof(basic_statuses[0]);
+    for(uint16_t i = 0; i < num_statuses; i++) {
+        char* status = basic_statuses[i];
+        if (!status) {
+            fprintf(stderr, "Status %u is not defined\n", i);
+            abort();
+        }
+        statuses[i] = status;
+    }
+}
+
+uint16_t uw_define_status(char* status)
+{
+    // the order constructor are called is undefined, make sure statuses are initialized
+    init_statuses();
+
+    if (num_statuses == 65535) {
+        fprintf(stderr, "Cannot define more statuses than %u\n", num_statuses);
+        abort();
+    }
+    if (num_statuses == statuses_capacity) {
+        size_t page_size = sysconf(_SC_PAGE_SIZE);
+        size_t old_memsize = (statuses_capacity * sizeof(char*) + page_size - 1) & ~(page_size - 1);
+        size_t new_memsize = ((statuses_capacity + 1) * sizeof(char*) + page_size - 1) & ~(page_size - 1);
+        statuses_capacity = new_memsize / sizeof(char*);
+
+        statuses = mremap(statuses, old_memsize, new_memsize, MREMAP_MAYMOVE);
+        if (statuses == MAP_FAILED) {
+            perror("mremap");
+            abort();
         }
     }
-    return unknown;
+    uint16_t status_code = num_statuses++;
+    statuses[status_code] = status;
+    return status_code;
+}
+
+char* uw_status_str(uint16_t status_code)
+{
+    if (status_code < num_statuses) {
+        return statuses[status_code];
+    } else {
+        static char unknown[] = "(unknown)";
+        return unknown;
+    }
 }
 
 char* uw_status_desc(UwValuePtr status)
