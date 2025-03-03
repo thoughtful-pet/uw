@@ -292,7 +292,7 @@ copy_string: {
  * Basic interface methods
  */
 
-UwResult _uw_string_create(UwTypeId type_id, va_list ap)
+static UwResult string_create(UwTypeId type_id, va_list ap)
 {
     UwValuePtr v = va_arg(ap, UwValuePtr);
     UwValue result = uw_clone(v);  // this converts CharPtr to string
@@ -303,7 +303,7 @@ UwResult _uw_string_create(UwTypeId type_id, va_list ap)
     }
 }
 
-void _uw_string_destroy(UwValuePtr self)
+static void string_destroy(UwValuePtr self)
 {
     if (self->str_embedded) {
         return;
@@ -315,7 +315,7 @@ void _uw_string_destroy(UwValuePtr self)
     }
 }
 
-UwResult _uw_string_clone(UwValuePtr self)
+static UwResult string_clone(UwValuePtr self)
 {
     UwValue result = *self;
     if (!result.str_embedded) {
@@ -326,7 +326,7 @@ UwResult _uw_string_clone(UwValuePtr self)
     return uw_move(&result);
 }
 
-void _uw_string_hash(UwValuePtr self, UwHashContext* ctx)
+static void string_hash(UwValuePtr self, UwHashContext* ctx)
 {
     // mind maps: the hash should be the same for subtypes, that's why not using self->type_id here
     _uw_hash_uint64(ctx, UwTypeId_String);
@@ -337,7 +337,7 @@ void _uw_string_hash(UwValuePtr self, UwHashContext* ctx)
     }
 }
 
-void _uw_string_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+static void string_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
     _uw_dump_start(fp, self, first_indent);
     _uw_string_dump_data(fp, self, next_indent);
@@ -372,7 +372,7 @@ void _uw_string_dump_data(FILE* fp, UwValuePtr str, int indent)
     }
 }
 
-bool _uw_string_is_true(UwValuePtr self)
+static bool string_is_true(UwValuePtr self)
 {
     return _uw_string_length(self);
 }
@@ -393,12 +393,12 @@ static inline bool _uw_string_eq(UwValuePtr a, UwValuePtr b)
     return get_str_methods(a)->equal(_uw_string_char_ptr(a, 0), b, 0, a_length);
 }
 
-bool _uw_string_equal_sametype(UwValuePtr self, UwValuePtr other)
+static bool string_equal_sametype(UwValuePtr self, UwValuePtr other)
 {
     return _uw_string_eq(self, other);
 }
 
-bool _uw_string_equal(UwValuePtr self, UwValuePtr other)
+static bool string_equal(UwValuePtr self, UwValuePtr other)
 {
     UwTypeId t = other->type_id;
     for (;;) {
@@ -419,6 +419,33 @@ bool _uw_string_equal(UwValuePtr self, UwValuePtr other)
         }
     }
 }
+
+UwType _uw_string_type = {
+    .id              = UwTypeId_String,
+    .ancestor_id     = UwTypeId_Null,  // no ancestor
+    .compound        = false,
+    .data_optional   = true,
+    .name            = "String",
+    .data_offset     = sizeof(struct _UwStringExtraData),
+    .data_size       = 0,
+    .allocator       = &default_allocator,
+    ._create         = string_create,
+    ._destroy        = string_destroy,
+    ._init           = nullptr,       // custom constructor performs all the initialization
+    ._fini           = nullptr,       // there's nothing to finalize, just run custom destructor
+    ._clone          = string_clone,
+    ._hash           = string_hash,
+    ._deepcopy       = string_clone,  // strings are COW so copy is clone
+    ._dump           = string_dump,
+    ._to_string      = string_clone,  // yes, simply make a copy
+    ._is_true        = string_is_true,
+    ._equal_sametype = string_equal_sametype,
+    ._equal          = string_equal,
+
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
+        // [UwInterfaceId_RandomAccess] = &string_type_random_access_interface
+};
 
 /****************************************************************
  * UTF-8/UTF-32 functions
@@ -1969,7 +1996,7 @@ UwResult _uw_string_join(UwValuePtr separator, UwValuePtr list)
         if (uw_is_string(&item)) {
             return uw_move(&item);
         } if (uw_is_charptr(&item)) {
-            return _uw_charptr_to_string(&item);
+            return uw_charptr_to_string(&item);
         } else {
             // XXX skipping non-string values
             return UwString();

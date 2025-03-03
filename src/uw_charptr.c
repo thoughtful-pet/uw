@@ -10,7 +10,7 @@ static void panic_bad_charptr_subtype(UwValuePtr v)
     uw_panic("Bad charptr subtype %u\n", v->charptr_subtype);
 }
 
-UwResult _uw_charptr_create(UwTypeId type_id, va_list ap)
+static UwResult charptr_create(UwTypeId type_id, va_list ap)
 {
     _UwValue result = {};
     result.type_id = UwTypeId_CharPtr;
@@ -19,7 +19,7 @@ UwResult _uw_charptr_create(UwTypeId type_id, va_list ap)
     return result;
 }
 
-void _uw_charptr_hash(UwValuePtr self, UwHashContext* ctx)
+static void charptr_hash(UwValuePtr self, UwHashContext* ctx)
 {
     /*
      * To be able to use CharPtr as arguments to map functions,
@@ -105,7 +105,7 @@ void _uw_charptr_hash(UwValuePtr self, UwHashContext* ctx)
     }
 }
 
-void _uw_charptr_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+static void charptr_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
     _uw_dump_start(fp, self, first_indent);
     fputc('\n', fp);
@@ -166,7 +166,7 @@ void _uw_charptr_dump(UwValuePtr self, FILE* fp, int first_indent, int next_inde
     fputc('\n', fp);
 }
 
-UwResult _uw_charptr_to_string(UwValuePtr self)
+UwResult uw_charptr_to_string(UwValuePtr self)
 {
     switch (self->charptr_subtype) {
         case UW_CHARPTR:   return  uw_create_string_cstr(self->charptr);
@@ -177,7 +177,7 @@ UwResult _uw_charptr_to_string(UwValuePtr self)
     }
 }
 
-bool _uw_charptr_is_true(UwValuePtr self)
+static bool charptr_is_true(UwValuePtr self)
 {
     switch (self->charptr_subtype) {
         case UW_CHARPTR:   return self->charptr != nullptr && *self->charptr;
@@ -188,7 +188,7 @@ bool _uw_charptr_is_true(UwValuePtr self)
     }
 }
 
-bool _uw_charptr_equal_sametype(UwValuePtr self, UwValuePtr other)
+static bool charptr_equal_sametype(UwValuePtr self, UwValuePtr other)
 {
     switch (self->charptr_subtype) {
         case UW_CHARPTR:
@@ -268,7 +268,7 @@ bool _uw_charptr_equal_sametype(UwValuePtr self, UwValuePtr other)
     }
 }
 
-bool _uw_charptr_equal(UwValuePtr self, UwValuePtr other)
+static bool charptr_equal(UwValuePtr self, UwValuePtr other)
 {
     UwTypeId t = other->type_id;
     for (;;) {
@@ -287,6 +287,47 @@ bool _uw_charptr_equal(UwValuePtr self, UwValuePtr other)
                 }
             }
         }
+    }
+}
+
+UwType _uw_charptr_type = {
+    .id              = UwTypeId_CharPtr,
+    .ancestor_id     = UwTypeId_Null,  // no ancestor
+    .compound        = false,
+    .data_optional   = true,
+    .name            = "CharPtr",
+    .data_offset     = 0,
+    .data_size       = 0,
+    .allocator       = nullptr,
+    ._create         = charptr_create,
+    ._destroy        = nullptr,
+    ._init           = nullptr,
+    ._fini           = nullptr,
+    ._clone          = uw_charptr_to_string,
+    ._hash           = charptr_hash,
+    ._deepcopy       = uw_charptr_to_string,
+    ._dump           = charptr_dump,
+    ._to_string      = uw_charptr_to_string,
+    ._is_true        = charptr_is_true,
+    ._equal_sametype = charptr_equal_sametype,
+    ._equal          = charptr_equal,
+
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
+};
+
+bool uw_charptr_to_string_inplace(UwValuePtr v)
+{
+    if (!uw_is_charptr(v)) {
+        return true;
+    }
+    UwValue result = uw_charptr_to_string(v);
+    if (uw_ok(&result)) {
+        *v = uw_move(&result);
+        return true;
+    } else {
+        uw_destroy(&result);  // make error checker happy
+        return false;
     }
 }
 

@@ -43,22 +43,6 @@ struct _UwMapExtraData {
         &((struct _UwMapExtraData*) ((value)->extra_data))->map_data \
     )
 
-/****************************************************************
- * Basic interface methods
- */
-
-void     _uw_map_destroy       (UwValuePtr self);
-UwResult _uw_map_init          (UwValuePtr self, va_list ap);
-void     _uw_map_fini          (UwValuePtr self);
-UwResult _uw_map_clone         (UwValuePtr self);
-void     _uw_map_hash          (UwValuePtr self, UwHashContext* ctx);
-UwResult _uw_map_deepcopy      (UwValuePtr self);
-void     _uw_map_dump          (UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail);
-UwResult _uw_map_to_string     (UwValuePtr self);
-bool     _uw_map_is_true       (UwValuePtr self);
-bool     _uw_map_equal_sametype(UwValuePtr self, UwValuePtr other);
-bool     _uw_map_equal         (UwValuePtr self, UwValuePtr other);
-
 #ifdef __cplusplus
 }
 #endif

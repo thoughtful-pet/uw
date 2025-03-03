@@ -8,7 +8,7 @@ static void panic_status()
     uw_panic("List cannot contain Status values");
 }
 
-UwResult _uw_list_init(UwValuePtr self, va_list ap)
+static UwResult list_init(UwValuePtr self, va_list ap)
 {
     _UwCompoundData* cdata = (_UwCompoundData*) self->extra_data;
     struct _UwList*  list = _uw_get_list_ptr(self);
@@ -28,7 +28,7 @@ UwResult _uw_list_init(UwValuePtr self, va_list ap)
     return UwOOM();
 }
 
-void _uw_list_fini(UwValuePtr self)
+static void list_fini(UwValuePtr self)
 {
     _UwCompoundData* cdata = (_UwCompoundData*) self->extra_data;
 
@@ -36,7 +36,7 @@ void _uw_list_fini(UwValuePtr self)
     _uw_fini_compound_data(cdata);
 }
 
-void _uw_list_hash(UwValuePtr self, UwHashContext* ctx)
+static void list_hash(UwValuePtr self, UwHashContext* ctx)
 {
     _uw_hash_uint64(ctx, self->type_id);
     struct _UwList* list = _uw_get_list_ptr(self);
@@ -46,7 +46,7 @@ void _uw_list_hash(UwValuePtr self, UwHashContext* ctx)
     }
 }
 
-UwResult _uw_list_deepcopy(UwValuePtr self)
+static UwResult list_deepcopy(UwValuePtr self)
 {
     UwValue dest = _uw_create(self->type_id, UwVaEnd());
     if (uw_error(&dest)) {
@@ -74,7 +74,7 @@ UwResult _uw_list_deepcopy(UwValuePtr self)
     return uw_move(&dest);
 }
 
-void _uw_list_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+static void list_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
     _uw_dump_start(fp, self, first_indent);
     _uw_dump_base_extra_data(fp, self->extra_data);
@@ -102,22 +102,22 @@ void _uw_list_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent,
     }
 }
 
-UwResult _uw_list_to_string(UwValuePtr self)
+static UwResult list_to_string(UwValuePtr self)
 {
     return UwError(UW_ERROR_NOT_IMPLEMENTED);
 }
 
-bool _uw_list_is_true(UwValuePtr self)
+static bool list_is_true(UwValuePtr self)
 {
     return _uw_get_list_ptr(self)->length;
 }
 
-bool _uw_list_equal_sametype(UwValuePtr self, UwValuePtr other)
+static bool list_equal_sametype(UwValuePtr self, UwValuePtr other)
 {
     return _uw_list_eq(_uw_get_list_ptr(self), _uw_get_list_ptr(other));
 }
 
-bool _uw_list_equal(UwValuePtr self, UwValuePtr other)
+static bool list_equal(UwValuePtr self, UwValuePtr other)
 {
     UwTypeId t = other->type_id;
     for (;;) {
@@ -132,6 +132,34 @@ bool _uw_list_equal(UwValuePtr self, UwValuePtr other)
         }
     }
 }
+
+UwType _uw_list_type = {
+    .id              = UwTypeId_List,
+    .ancestor_id     = UwTypeId_Null,  // no ancestor
+    .compound        = true,
+    .data_optional   = false,
+    .name            = "List",
+    .data_offset     = offsetof(struct _UwListExtraData, list_data),
+    .data_size       = sizeof(struct _UwList),
+    .allocator       = &default_allocator,
+    ._create         = _uw_default_create,
+    ._destroy        = _uw_default_destroy,
+    ._init           = list_init,
+    ._fini           = list_fini,
+    ._clone          = _uw_default_clone,
+    ._hash           = list_hash,
+    ._deepcopy       = list_deepcopy,
+    ._dump           = list_dump,
+    ._to_string      = list_to_string,
+    ._is_true        = list_is_true,
+    ._equal_sametype = list_equal_sametype,
+    ._equal          = list_equal,
+
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
+        // [UwInterfaceId_RandomAccess] = &list_type_random_access_interface,
+        // [UwInterfaceId_List]         = &list_type_list_interface
+};
 
 static unsigned round_capacity(unsigned capacity)
 {
@@ -293,7 +321,7 @@ UwResult uw_list_append_ap(UwValuePtr list, va_list ap)
                 error = uw_move(&arg);
                 goto failure;
             }
-            if (!uw_charptr_to_string(&arg)) {
+            if (!uw_charptr_to_string_inplace(&arg)) {
                 goto failure;
             }
             if (!_uw_list_append_item(type_id, __list, &arg, list)) {

@@ -298,7 +298,22 @@ panic:
  * Basic interface methods
  */
 
-UwResult _uw_map_init(UwValuePtr self, va_list ap)
+static void map_fini(UwValuePtr self)
+{
+    struct _UwMap* map = _uw_get_map_ptr(self);
+    struct _UwHashTable* ht = &map->hash_table;
+    _UwCompoundData* cdata = (_UwCompoundData*) self->extra_data;
+    UwTypeId type_id = self->type_id;
+
+    _uw_destroy_list(type_id, &map->kv_pairs, cdata);
+    if (ht->items) {
+        unsigned ht_memsize = get_item_size(ht->capacity) * ht->capacity;
+        _uw_types[type_id]->allocator->release((void**) &ht->items, ht_memsize);
+    }
+    _uw_fini_compound_data(cdata);
+}
+
+static UwResult map_init(UwValuePtr self, va_list ap)
 {
     _uw_init_compound_data((_UwCompoundData*) (self->extra_data));
 
@@ -319,33 +334,12 @@ UwResult _uw_map_init(UwValuePtr self, va_list ap)
             uw_destroy(&error);
             error = uw_move(&status);
         }
-        _uw_map_fini(self);
+        map_fini(self);
     }
     return uw_move(&error);;
 }
 
-void _uw_map_fini(UwValuePtr self)
-{
-    struct _UwMap* map = _uw_get_map_ptr(self);
-    struct _UwHashTable* ht = &map->hash_table;
-    _UwCompoundData* cdata = (_UwCompoundData*) self->extra_data;
-    UwTypeId type_id = self->type_id;
-
-    _uw_destroy_list(type_id, &map->kv_pairs, cdata);
-    if (ht->items) {
-        unsigned ht_memsize = get_item_size(ht->capacity) * ht->capacity;
-        _uw_types[type_id]->allocator->release((void**) &ht->items, ht_memsize);
-    }
-    _uw_fini_compound_data(cdata);
-}
-
-UwResult _uw_map_clone(UwValuePtr self)
-{
-    self->extra_data->refcount++;
-    return *self;
-}
-
-void _uw_map_hash(UwValuePtr self, UwHashContext* ctx)
+static void map_hash(UwValuePtr self, UwHashContext* ctx)
 {
     _uw_hash_uint64(ctx, self->type_id);
     struct _UwMap* map = _uw_get_map_ptr(self);
@@ -355,7 +349,7 @@ void _uw_map_hash(UwValuePtr self, UwHashContext* ctx)
     }
 }
 
-UwResult _uw_map_deepcopy(UwValuePtr self)
+static UwResult map_deepcopy(UwValuePtr self)
 {
     UwValue dest = _uw_create(self->type_id, UwVaEnd());
     if (uw_error(&dest)) {
@@ -389,7 +383,7 @@ UwResult _uw_map_deepcopy(UwValuePtr self)
     return uw_move(&dest);
 }
 
-void _uw_map_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+static void map_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
     _uw_dump_start(fp, self, first_indent);
     _uw_dump_base_extra_data(fp, self->extra_data);
@@ -466,12 +460,12 @@ void _uw_map_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, 
     }
 }
 
-UwResult _uw_map_to_string(UwValuePtr self)
+static UwResult map_to_string(UwValuePtr self)
 {
     return UwError(UW_ERROR_NOT_IMPLEMENTED);
 }
 
-bool _uw_map_is_true(UwValuePtr self)
+static bool map_is_true(UwValuePtr self)
 {
     return get_map_length(_uw_get_map_ptr(self));
 }
@@ -481,12 +475,12 @@ static inline bool map_eq(struct _UwMap* a, struct _UwMap* b)
     return _uw_list_eq(&a->kv_pairs, &b->kv_pairs);
 }
 
-bool _uw_map_equal_sametype(UwValuePtr self, UwValuePtr other)
+static bool map_equal_sametype(UwValuePtr self, UwValuePtr other)
 {
     return map_eq(_uw_get_map_ptr(self), _uw_get_map_ptr(other));
 }
 
-bool _uw_map_equal(UwValuePtr self, UwValuePtr other)
+static bool map_equal(UwValuePtr self, UwValuePtr other)
 {
     UwTypeId t = other->type_id;
     for (;;) {
@@ -501,6 +495,33 @@ bool _uw_map_equal(UwValuePtr self, UwValuePtr other)
         }
     }
 }
+
+UwType _uw_map_type = {
+    .id              = UwTypeId_Map,
+    .ancestor_id     = UwTypeId_Null,  // no ancestor
+    .compound        = true,
+    .data_optional   = false,
+    .name            = "Map",
+    .data_offset     = offsetof(struct _UwMapExtraData, map_data),
+    .data_size       = sizeof(struct _UwMap),
+    .allocator       = &default_allocator,
+    ._create         = _uw_default_create,
+    ._destroy        = _uw_default_destroy,
+    ._init           = map_init,
+    ._fini           = map_fini,
+    ._clone          = _uw_default_clone,
+    ._hash           = map_hash,
+    ._deepcopy       = map_deepcopy,
+    ._dump           = map_dump,
+    ._to_string      = map_to_string,
+    ._is_true        = map_is_true,
+    ._equal_sametype = map_equal_sametype,
+    ._equal          = map_equal,
+
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
+        // [UwInterfaceId_RandomAccess] = &map_type_random_access_interface
+};
 
 /****************************************************************
  * map functions
@@ -549,7 +570,7 @@ UwResult uw_map_update_ap(UwValuePtr map, va_list ap)
                 error = uw_move(&key);
                 goto failure;
             }
-            if (!uw_charptr_to_string(&key)) {
+            if (!uw_charptr_to_string_inplace(&key)) {
                 goto failure;
             }
             UwValue value = va_arg(ap, _UwValue);
@@ -564,7 +585,7 @@ UwResult uw_map_update_ap(UwValuePtr map, va_list ap)
                     goto failure;
                 }
             }
-            if (!uw_charptr_to_string(&value)) {
+            if (!uw_charptr_to_string_inplace(&value)) {
                 goto failure;
             }
             if (!update_map(map, &key, &value)) {

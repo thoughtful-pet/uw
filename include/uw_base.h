@@ -1270,12 +1270,6 @@ UwValuePtr _uw_on_chain(UwValuePtr value, _UwCompoundChain* tail);
  * Check if value extra_data is on the chain.
  */
 
-bool uw_charptr_to_string(UwValuePtr v);
-/*
- * If `v` is CharPtr, convert it to String in place.
- * Return false if OOM.
- */
-
 /****************************************************************
  * Dump functions
  */

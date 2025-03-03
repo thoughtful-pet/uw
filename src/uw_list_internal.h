@@ -31,21 +31,7 @@ struct _UwListExtraData {
         &((struct _UwListExtraData*) ((value)->extra_data))->list_data \
     )
 
-/****************************************************************
- * Basic interface methods
- */
-
-void     _uw_list_destroy       (UwValuePtr self);
-UwResult _uw_list_init          (UwValuePtr self, va_list ap);
-void     _uw_list_fini          (UwValuePtr self);
-UwResult _uw_list_clone         (UwValuePtr self);
-void     _uw_list_hash          (UwValuePtr self, UwHashContext* ctx);
-UwResult _uw_list_deepcopy      (UwValuePtr self);
-void     _uw_list_dump          (UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail);
-UwResult _uw_list_to_string     (UwValuePtr self);
-bool     _uw_list_is_true       (UwValuePtr self);
-bool     _uw_list_equal_sametype(UwValuePtr self, UwValuePtr other);
-bool     _uw_list_equal         (UwValuePtr self, UwValuePtr other);
+extern UwType _uw_list_type;
 
 /****************************************************************
  * Helpers

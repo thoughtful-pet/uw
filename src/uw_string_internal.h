@@ -35,6 +35,15 @@ struct _UwStringExtraData {
      */
 };
 
+#define UWSTRING_BLOCK_SIZE    16
+/*
+ * The string is allocated in blocks.
+ * Given that typical allocator's granularity is 16,
+ * there's no point to make block size less than that.
+ */
+
+extern UwType _uw_string_type;
+
 /****************************************************************
  * Low level helper functions.
  */
@@ -154,33 +163,6 @@ static inline unsigned _uw_string_inc_length(UwValuePtr s, unsigned increment)
 }
 
 /****************************************************************
- * Basic interface methods
- */
-
-UwResult _uw_string_create        (UwTypeId type_id, va_list ap);
-void     _uw_string_destroy       (UwValuePtr self);
-UwResult _uw_string_clone         (UwValuePtr self);
-void     _uw_string_hash          (UwValuePtr self, UwHashContext* ctx);
-void     _uw_string_dump          (UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail);
-bool     _uw_string_is_true       (UwValuePtr self);
-bool     _uw_string_equal_sametype(UwValuePtr self, UwValuePtr other);
-bool     _uw_string_equal         (UwValuePtr self, UwValuePtr other);
-
-void _uw_string_dump_data(FILE* fp, UwValuePtr str, int indent);
-/*
- * Helper function for _uw_string_dump.
- */
-
-/****************************************************************
- * The string is allocated in blocks.
- * Given that typical allocator's granularity is 16,
- * there's no point to make block size less than that.
- */
-
-#define UWSTRING_BLOCK_SIZE    16
-
-
-/****************************************************************
  * Methods that depend on char_size field.
  */
 
@@ -223,6 +205,11 @@ static inline StrMethods* get_str_methods(UwValuePtr str)
 
 /****************************************************************
  * Misc. functions
+ */
+
+void _uw_string_dump_data(FILE* fp, UwValuePtr str, int indent);
+/*
+ * Helper function for _uw_string_dump.
  */
 
 static inline char32_t read_utf8_char(char8_t** str)

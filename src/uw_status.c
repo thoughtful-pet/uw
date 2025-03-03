@@ -8,7 +8,12 @@
 #include <sys/mman.h>
 
 #include "include/uw_base.h"
-#include "src/uw_status_internal.h"
+
+struct _UwStatusExtraData {
+    _UwExtraData value_data;
+    char* status_desc;  // status description
+                        // note: allocated by asprintf
+};
 
 static char* basic_statuses[] = {
     [UW_SUCCESS]                   = "SUCCESS",
@@ -148,7 +153,7 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap)
  * Basic interface methods
  */
 
-UwResult _uw_status_create(UwTypeId type_id, va_list ap)
+static UwResult status_create(UwTypeId type_id, va_list ap)
 /*
  * Status constructor expects status class, status_code,
  * description format string and its arguments.
@@ -168,7 +173,7 @@ UwResult _uw_status_create(UwTypeId type_id, va_list ap)
     return result;
 }
 
-void _uw_status_fini(UwValuePtr self)
+static void status_fini(UwValuePtr self)
 {
     struct _UwStatusExtraData* extra_data = (struct _UwStatusExtraData*) self->extra_data;
     if (extra_data) {
@@ -179,7 +184,7 @@ void _uw_status_fini(UwValuePtr self)
     }
 }
 
-void _uw_status_hash(UwValuePtr self, UwHashContext* ctx)
+static void status_hash(UwValuePtr self, UwHashContext* ctx)
 {
     _uw_hash_uint64(ctx, self->type_id);
     _uw_hash_uint64(ctx, self->status_class);
@@ -191,7 +196,7 @@ void _uw_status_hash(UwValuePtr self, UwHashContext* ctx)
     // XXX do not hash extra data
 }
 
-UwResult _uw_status_deepcopy(UwValuePtr self)
+static UwResult status_deepcopy(UwValuePtr self)
 {
     UwValue result = *self;
     if (self->status_class == UWSC_ERRNO) {
@@ -215,7 +220,7 @@ UwResult _uw_status_deepcopy(UwValuePtr self)
     return uw_move(&result);
 }
 
-void _uw_status_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+static void status_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
     _uw_dump_start(fp, self, first_indent);
     switch (self->status_class) {
@@ -239,18 +244,18 @@ void _uw_status_dump(UwValuePtr self, FILE* fp, int first_indent, int next_inden
     }
 }
 
-UwResult _uw_status_to_string(UwValuePtr self)
+static UwResult status_to_string(UwValuePtr self)
 {
     return UwError(UW_ERROR_NOT_IMPLEMENTED);
 }
 
-bool _uw_status_is_true(UwValuePtr self)
+static bool status_is_true(UwValuePtr self)
 {
     // XXX ???
     return false;
 }
 
-bool _uw_status_equal_sametype(UwValuePtr self, UwValuePtr other)
+static bool status_equal_sametype(UwValuePtr self, UwValuePtr other)
 {
     switch (self->status_class) {
         case UWSC_DEFAULT: return self->status_code == other->status_code;
@@ -259,12 +264,12 @@ bool _uw_status_equal_sametype(UwValuePtr self, UwValuePtr other)
     }
 }
 
-bool _uw_status_equal(UwValuePtr self, UwValuePtr other)
+static bool status_equal(UwValuePtr self, UwValuePtr other)
 {
     UwTypeId t = other->type_id;
     for (;;) {
         if (t == UwTypeId_Status) {
-            return _uw_status_equal_sametype(self, other);
+            return status_equal_sametype(self, other);
         } else {
             // check base type
             t = _uw_types[t]->ancestor_id;
@@ -274,3 +279,29 @@ bool _uw_status_equal(UwValuePtr self, UwValuePtr other)
         }
     }
 }
+
+UwType _uw_status_type = {
+    .id              = UwTypeId_Status,
+    .ancestor_id     = UwTypeId_Null,  // no ancestor
+    .compound        = false,
+    .data_optional   = true,
+    .name            = "Status",
+    .data_offset     = offsetof(struct _UwStatusExtraData, status_desc),  // extra_data is optional and not allocated by default
+    .data_size       = sizeof(char*),
+    .allocator       = &default_allocator,
+    ._create         = status_create,
+    ._destroy        = _uw_default_destroy,
+    ._init           = nullptr,
+    ._fini           = status_fini,
+    ._clone          = _uw_default_clone,
+    ._hash           = status_hash,
+    ._deepcopy       = status_deepcopy,
+    ._dump           = status_dump,
+    ._to_string      = status_to_string,
+    ._is_true        = status_is_true,
+    ._equal_sametype = status_equal_sametype,
+    ._equal          = status_equal,
+
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
+};

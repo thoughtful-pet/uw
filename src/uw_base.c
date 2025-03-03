@@ -7,20 +7,12 @@
 
 #include "include/uw_base.h"
 #include "include/uw_file.h"
-#include "include/uw_string_io.h"
-#include "src/uw_bool_internal.h"
+#include "include/uw_string.h"
 #include "src/uw_charptr_internal.h"
-#include "src/uw_struct_internal.h"
-#include "src/uw_float_internal.h"
 #include "src/uw_hash_internal.h"
-#include "src/uw_int_internal.h"
 #include "src/uw_list_internal.h"
 #include "src/uw_map_internal.h"
-#include "src/uw_null_internal.h"
-#include "src/uw_signed_internal.h"
-#include "src/uw_status_internal.h"
 #include "src/uw_string_internal.h"
-#include "src/uw_unsigned_internal.h"
 
 /****************************************************************
  * Basic functions
@@ -227,25 +219,6 @@ void uw_dump(FILE* fp, UwValuePtr value)
 }
 
 /****************************************************************
- * Miscellaneous helpers
- */
-
-bool uw_charptr_to_string(UwValuePtr v)
-{
-    if (!uw_is_charptr(v)) {
-        return true;
-    }
-    UwValue result = _uw_charptr_to_string(v);
-    if (uw_ok(&result)) {
-        *v = uw_move(&result);
-        return true;
-    } else {
-        uw_destroy(&result);  // make error checker happy
-        return false;
-    }
-}
-
-/****************************************************************
  * Global list of interfaces
  */
 
@@ -267,8 +240,58 @@ unsigned UwInterfaceId_FileWriter;
 unsigned UwInterfaceId_LineReader;
 
 /****************************************************************
- * Global list of types initialized with built-in types.
+ * Null type
  */
+
+static UwResult null_create(UwTypeId type_id, va_list ap)
+{
+    return UwNull();
+}
+
+static void null_hash(UwValuePtr self, UwHashContext* ctx)
+{
+    _uw_hash_uint64(ctx, UwTypeId_Null);
+}
+
+static void null_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+{
+    _uw_dump_start(fp, self, first_indent);
+    fputc('\n', fp);
+}
+
+static UwResult null_to_string(UwValuePtr self)
+{
+    return UwString_1_12(4, 'n', 'u', 'l', 'l', 0, 0, 0, 0, 0, 0, 0, 0);
+}
+
+static bool null_is_true(UwValuePtr self)
+{
+    return false;
+}
+
+static bool null_equal_sametype(UwValuePtr self, UwValuePtr other)
+{
+    return true;
+}
+
+static bool null_equal(UwValuePtr self, UwValuePtr other)
+{
+    UwTypeId t = other->type_id;
+    for (;;) {
+        switch (t) {
+            case UwTypeId_Null:
+                return true;
+
+            default: {
+                // check base type
+                t = _uw_types[t]->ancestor_id;
+                if (t == UwTypeId_Null) {
+                    return false;
+                }
+            }
+        }
+    }
+}
 
 static UwType null_type = {
     .id              = UwTypeId_Null,
@@ -279,22 +302,82 @@ static UwType null_type = {
     .data_offset     = 0,
     .data_size       = 0,
     .allocator       = nullptr,
-    ._create         = _uw_null_create,
+    ._create         = null_create,
     ._destroy        = nullptr,
     ._init           = nullptr,
     ._fini           = nullptr,
     ._clone          = nullptr,
-    ._hash           = _uw_null_hash,
+    ._hash           = null_hash,
     ._deepcopy       = nullptr,
-    ._dump           = _uw_null_dump,
-    ._to_string      = _uw_null_to_string,
-    ._is_true        = _uw_null_is_true,
-    ._equal_sametype = _uw_null_equal_sametype,
-    ._equal          = _uw_null_equal,
+    ._dump           = null_dump,
+    ._to_string      = null_to_string,
+    ._is_true        = null_is_true,
+    ._equal_sametype = null_equal_sametype,
+    ._equal          = null_equal,
 
     .num_interfaces  = 0,
     .interfaces      = nullptr
 };
+
+/****************************************************************
+ * Bool type
+ */
+
+static UwResult bool_create(UwTypeId type_id, va_list ap)
+{
+    return UwBool(false);
+}
+
+static void bool_hash(UwValuePtr self, UwHashContext* ctx)
+{
+    // mind maps: the hash should be the same for subtypes, that's why not using self->type_id here
+    _uw_hash_uint64(ctx, UwTypeId_Bool);
+    _uw_hash_uint64(ctx, self->bool_value);
+}
+
+static void bool_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+{
+    _uw_dump_start(fp, self, first_indent);
+    fprintf(fp, ": %s\n", self->bool_value? "true" : "false");
+}
+
+static UwResult bool_to_string(UwValuePtr self)
+{
+    if (self->bool_value) {
+        return UwString_1_12(4, 't', 'r', 'u', 'e', 0, 0, 0, 0, 0, 0, 0, 0);
+    } else {
+        return UwString_1_12(5, 'f', 'a', 'l', 's', 'e', 0, 0, 0, 0, 0, 0, 0);
+    }
+}
+
+static bool bool_is_true(UwValuePtr self)
+{
+    return self->bool_value;
+}
+
+static bool bool_equal_sametype(UwValuePtr self, UwValuePtr other)
+{
+    return self->bool_value == other->bool_value;
+}
+
+static bool bool_equal(UwValuePtr self, UwValuePtr other)
+{
+    UwTypeId t = other->type_id;
+    for (;;) {
+        switch (t) {
+            case UwTypeId_Bool:
+                return self->bool_value == other->bool_value;
+
+            default: {
+                // check base type
+                t = _uw_types[t]->ancestor_id;
+                if (t == UwTypeId_Null) {
+                    return false;
+                }
+            }
+        }
+    }
+}
 
 static UwType bool_type = {
     .id              = UwTypeId_Bool,
@@ -305,23 +388,63 @@ static UwType bool_type = {
     .data_offset     = 0,
     .data_size       = 0,
     .allocator       = nullptr,
-    ._create         = _uw_bool_create,
+    ._create         = bool_create,
     ._destroy        = nullptr,
     ._init           = nullptr,
     ._fini           = nullptr,
     ._clone          = nullptr,
-    ._hash           = _uw_bool_hash,
+    ._hash           = bool_hash,
     ._deepcopy       = nullptr,
-    ._dump           = _uw_bool_dump,
-    ._to_string      = _uw_bool_to_string,
-    ._is_true        = _uw_bool_is_true,
-    ._equal_sametype = _uw_bool_equal_sametype,
-    ._equal          = _uw_bool_equal,
+    ._dump           = bool_dump,
+    ._to_string      = bool_to_string,
+    ._is_true        = bool_is_true,
+    ._equal_sametype = bool_equal_sametype,
+    ._equal          = bool_equal,
 
     .num_interfaces  = 0,
     .interfaces      = nullptr
         // [UwInterfaceId_Logic] = &bool_type_logic_interface
 };
+
+/****************************************************************
+ * Abstract Integer type
+ */
+
+static UwResult int_create(UwTypeId type_id, va_list ap)
+{
+    return UwError(UW_ERROR_NOT_IMPLEMENTED);
+}
+
+static void int_hash(UwValuePtr self, UwHashContext* ctx)
+{
+    _uw_hash_uint64(ctx, UwTypeId_Int);
+}
+
+static void int_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+{
+    _uw_dump_start(fp, self, first_indent);
+    fputs(": abstract\n", fp);
+}
+
+static UwResult int_to_string(UwValuePtr self)
+{
+    return UwError(UW_ERROR_NOT_IMPLEMENTED);
+}
+
+static bool int_is_true(UwValuePtr self)
+{
+    return self->signed_value;
+}
+
+static bool int_equal_sametype(UwValuePtr self, UwValuePtr other)
+{
+    return true;
+}
+
+static bool int_equal(UwValuePtr self, UwValuePtr other)
+{
+    return false;
+}
 
 static UwType int_type = {
     .id              = UwTypeId_Int,
@@ -332,18 +455,18 @@ static UwType int_type = {
     .data_offset     = 0,
     .data_size       = 0,
     .allocator       = nullptr,
-    ._create         = _uw_int_create,
+    ._create         = int_create,
     ._destroy        = nullptr,
     ._init           = nullptr,
     ._fini           = nullptr,
     ._clone          = nullptr,
-    ._hash           = _uw_int_hash,
+    ._hash           = int_hash,
     ._deepcopy       = nullptr,
-    ._dump           = _uw_int_dump,
-    ._to_string      = _uw_int_to_string,
-    ._is_true        = _uw_int_is_true,
-    ._equal_sametype = _uw_int_equal_sametype,
-    ._equal          = _uw_int_equal,
+    ._dump           = int_dump,
+    ._to_string      = int_to_string,
+    ._is_true        = int_is_true,
+    ._equal_sametype = int_equal_sametype,
+    ._equal          = int_equal,
 
     .num_interfaces  = 0,
     .interfaces      = nullptr
@@ -352,6 +475,76 @@ static UwType int_type = {
         // [UwInterfaceId_Bitwise]    = &int_type_bitwise_interface,
         // [UwInterfaceId_Comparison] = &int_type_comparison_interface
 };
+
+/****************************************************************
+ * Signed type
+ */
+
+static UwResult signed_create(UwTypeId type_id, va_list ap)
+{
+    return UwSigned(0);
+}
+
+static void signed_hash(UwValuePtr self, UwHashContext* ctx)
+{
+    // mind maps: same signed and unsigned integers must have same hash, so
+    if (self->signed_value < 0) {
+        _uw_hash_uint64(ctx, UwTypeId_Signed);
+    } else {
+        _uw_hash_uint64(ctx, UwTypeId_Unsigned);
+    }
+    _uw_hash_uint64(ctx, self->signed_value);
+}
+
+static void signed_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+{
+    _uw_dump_start(fp, self, first_indent);
+    fprintf(fp, ": %lld\n", (long long) self->signed_value);
+}
+
+static UwResult signed_to_string(UwValuePtr self)
+{
+    return UwError(UW_ERROR_NOT_IMPLEMENTED);
+}
+
+static bool signed_is_true(UwValuePtr self)
+{
+    return self->signed_value;
+}
+
+static bool signed_equal_sametype(UwValuePtr self, UwValuePtr other)
+{
+    return self->signed_value == other->signed_value;
+}
+
+static bool signed_equal(UwValuePtr self, UwValuePtr other)
+{
+    UwTypeId t = other->type_id;
+    for (;;) {
+        switch (t) {
+            case UwTypeId_Signed:
+                return self->signed_value == other->signed_value;
+
+            case UwTypeId_Unsigned:
+                if (self->signed_value < 0) {
+                    return false;
+                } else {
+                    return self->signed_value == (UwType_Signed) other->unsigned_value;
+                }
+
+            case UwTypeId_Float:
+                return self->signed_value == other->float_value;
+
+            default: {
+                // check base type
+                t = _uw_types[t]->ancestor_id;
+                if (t == UwTypeId_Null) {
+                    return false;
+                }
+            }
+        }
+    }
+}
 
 static UwType signed_type = {
     .id              = UwTypeId_Signed,
@@ -362,18 +555,18 @@ static UwType signed_type = {
     .data_offset     = 0,
     .data_size       = 0,
     .allocator       = nullptr,
-    ._create         = _uw_signed_create,
+    ._create         = signed_create,
     ._destroy        = nullptr,
     ._init           = nullptr,
     ._fini           = nullptr,
     ._clone          = nullptr,
-    ._hash           = _uw_signed_hash,
+    ._hash           = signed_hash,
     ._deepcopy       = nullptr,
-    ._dump           = _uw_signed_dump,
-    ._to_string      = _uw_signed_to_string,
-    ._is_true        = _uw_signed_is_true,
-    ._equal_sametype = _uw_signed_equal_sametype,
-    ._equal          = _uw_signed_equal,
+    ._dump           = signed_dump,
+    ._to_string      = signed_to_string,
+    ._is_true        = signed_is_true,
+    ._equal_sametype = signed_equal_sametype,
+    ._equal          = signed_equal,
 
     .num_interfaces  = 0,
     .interfaces      = nullptr
@@ -382,6 +575,73 @@ static UwType signed_type = {
         // [UwInterfaceId_Bitwise]    = &int_type_bitwise_interface,
         // [UwInterfaceId_Comparison] = &int_type_comparison_interface
 };
+
+/****************************************************************
+ * Unsigned type
+ */
+
+static UwResult unsigned_create(UwTypeId type_id, va_list ap)
+{
+    return UwUnsigned(0);
+}
+
+static void unsigned_hash(UwValuePtr self, UwHashContext* ctx)
+{
+    // mind maps: same signed and unsigned integers must have same hash,
+    // so using UwTypeId_Unsigned, not self->type_id
+    _uw_hash_uint64(ctx, UwTypeId_Unsigned);
+    _uw_hash_uint64(ctx, self->unsigned_value);
+}
+
+static void unsigned_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+{
+    _uw_dump_start(fp, self, first_indent);
+    fprintf(fp, ": %llu\n", (unsigned long long) self->unsigned_value);
+}
+
+static UwResult unsigned_to_string(UwValuePtr self)
+{
+    return UwError(UW_ERROR_NOT_IMPLEMENTED);
+}
+
+static bool unsigned_is_true(UwValuePtr self)
+{
+    return self->unsigned_value;
+}
+
+static bool unsigned_equal_sametype(UwValuePtr self, UwValuePtr other)
+{
+    return self->unsigned_value == other->unsigned_value;
+}
+
+static bool unsigned_equal(UwValuePtr self, UwValuePtr other)
+{
+    UwTypeId t = other->type_id;
+    for (;;) {
+        switch (t) {
+            case UwTypeId_Signed:
+                if (other->signed_value < 0) {
+                    return false;
+                } else {
+                    return ((UwType_Signed) self->unsigned_value) == other->signed_value;
+                }
+
+            case UwTypeId_Unsigned:
+                return self->unsigned_value == other->unsigned_value;
+
+            case UwTypeId_Float:
+                return self->unsigned_value == other->float_value;
+
+            default: {
+                // check base type
+                t = _uw_types[t]->ancestor_id;
+                if (t == UwTypeId_Null) {
+                    return false;
+                }
+            }
+        }
+    }
+}
 
 static UwType unsigned_type = {
     .id              = UwTypeId_Unsigned,
@@ -392,18 +652,18 @@ static UwType unsigned_type = {
     .data_offset     = 0,
     .data_size       = 0,
     .allocator       = nullptr,
-    ._create         = _uw_unsigned_create,
+    ._create         = unsigned_create,
     ._destroy        = nullptr,
     ._init           = nullptr,
     ._fini           = nullptr,
     ._clone          = nullptr,
-    ._hash           = _uw_unsigned_hash,
+    ._hash           = unsigned_hash,
     ._deepcopy       = nullptr,
-    ._dump           = _uw_unsigned_dump,
-    ._to_string      = _uw_unsigned_to_string,
-    ._is_true        = _uw_unsigned_is_true,
-    ._equal_sametype = _uw_unsigned_equal_sametype,
-    ._equal          = _uw_unsigned_equal,
+    ._dump           = unsigned_dump,
+    ._to_string      = unsigned_to_string,
+    ._is_true        = unsigned_is_true,
+    ._equal_sametype = unsigned_equal_sametype,
+    ._equal          = unsigned_equal,
 
     .num_interfaces  = 0,
     .interfaces      = nullptr
@@ -412,6 +672,62 @@ static UwType unsigned_type = {
         // [UwInterfaceId_Bitwise]    = &int_type_bitwise_interface,
         // [UwInterfaceId_Comparison] = &int_type_comparison_interface
 };
+
+/****************************************************************
+ * Float type
+ */
+
+static UwResult float_create(UwTypeId type_id, va_list ap)
+{
+    return UwFloat(0.0);
+}
+
+static void float_hash(UwValuePtr self, UwHashContext* ctx)
+{
+    // mind maps: the hash should be the same for subtypes, that's why not using self->type_id here
+    _uw_hash_uint64(ctx, UwTypeId_Float);
+    _uw_hash_buffer(ctx, &self->float_value, sizeof(self->float_value));
+}
+
+static void float_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+{
+    _uw_dump_start(fp, self, first_indent);
+    fprintf(fp, ": %f\n", self->float_value);
+}
+
+static UwResult float_to_string(UwValuePtr self)
+{
+    return UwError(UW_ERROR_NOT_IMPLEMENTED);
+}
+
+static bool float_is_true(UwValuePtr self)
+{
+    return self->float_value;
+}
+
+static bool float_equal_sametype(UwValuePtr self, UwValuePtr other)
+{
+    return self->float_value == other->float_value;
+}
+
+static bool float_equal(UwValuePtr self, UwValuePtr other)
+{
+    UwTypeId t = other->type_id;
+    for (;;) {
+        switch (t) {
+            case UwTypeId_Signed:      return self->float_value == (UwType_Float) other->signed_value;
+            case UwTypeId_Unsigned: return self->float_value == (UwType_Float) other->unsigned_value;
+            case UwTypeId_Float:    return self->float_value == other->float_value;
+            default: {
+                // check base type
+                t = _uw_types[t]->ancestor_id;
+                if (t == UwTypeId_Null) {
+                    return false;
+                }
+            }
+        }
+    }
+}
 
 static UwType float_type = {
     .id              = UwTypeId_Float,
@@ -422,18 +738,18 @@ static UwType float_type = {
     .data_offset     = 0,
     .data_size       = 0,
     .allocator       = nullptr,
-    ._create         = _uw_float_create,
+    ._create         = float_create,
     ._destroy        = nullptr,
     ._init           = nullptr,
     ._fini           = nullptr,
     ._clone          = nullptr,
-    ._hash           = _uw_float_hash,
+    ._hash           = float_hash,
     ._deepcopy       = nullptr,
-    ._dump           = _uw_float_dump,
-    ._to_string      = _uw_float_to_string,
-    ._is_true        = _uw_float_is_true,
-    ._equal_sametype = _uw_float_equal_sametype,
-    ._equal          = _uw_float_equal,
+    ._dump           = float_dump,
+    ._to_string      = float_to_string,
+    ._is_true        = float_is_true,
+    ._equal_sametype = float_equal_sametype,
+    ._equal          = float_equal,
 
     .num_interfaces  = 0,
     .interfaces      = nullptr
@@ -442,139 +758,70 @@ static UwType float_type = {
         // [UwInterfaceId_Comparison] = &float_type_comparison_interface
 };
 
-static UwType string_type = {
-    .id              = UwTypeId_String,
-    .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = false,
-    .data_optional   = true,
-    .name            = "String",
-    .data_offset     = sizeof(struct _UwStringExtraData),
-    .data_size       = 0,
-    .allocator       = &default_allocator,
-    ._create         = _uw_string_create,
-    ._destroy        = _uw_string_destroy,
-    ._init           = nullptr,           // custom constructor performs all the initialization
-    ._fini           = nullptr,           // there's nothing to finalize, just run custom destructor
-    ._clone          = _uw_string_clone,
-    ._hash           = _uw_string_hash,
-    ._deepcopy       = _uw_string_clone,  // strings are COW so copy is clone
-    ._dump           = _uw_string_dump,
-    ._to_string      = _uw_string_clone,  // yes, simply make a copy
-    ._is_true        = _uw_string_is_true,
-    ._equal_sametype = _uw_string_equal_sametype,
-    ._equal          = _uw_string_equal,
+/****************************************************************
+ * Abstract structure type.
+ */
 
-    .num_interfaces  = 0,
-    .interfaces      = nullptr
-        // [UwInterfaceId_RandomAccess] = &string_type_random_access_interface
-};
+static UwResult struct_create(UwTypeId type_id, va_list ap)
+{
+    _UwValue result = {
+        ._extradata_type_id = UwTypeId_Struct,
+        .extra_data = nullptr
+    };
+    return result;
+}
 
-static UwType charptr_type = {
-    .id              = UwTypeId_CharPtr,
-    .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = false,
-    .data_optional   = true,
-    .name            = "CharPtr",
-    .data_offset     = 0,
-    .data_size       = 0,
-    .allocator       = nullptr,
-    ._create         = _uw_charptr_create,
-    ._destroy        = nullptr,
-    ._init           = nullptr,
-    ._fini           = nullptr,
-    ._clone          = _uw_charptr_to_string,
-    ._hash           = _uw_charptr_hash,
-    ._deepcopy       = _uw_charptr_to_string,
-    ._dump           = _uw_charptr_dump,
-    ._to_string      = _uw_charptr_to_string,
-    ._is_true        = _uw_charptr_is_true,
-    ._equal_sametype = _uw_charptr_equal_sametype,
-    ._equal          = _uw_charptr_equal,
+static void struct_hash(UwValuePtr self, UwHashContext* ctx)
+/*
+ * Basic hashing.
+ */
+{
+    _uw_hash_uint64(ctx, self->type_id);
+}
 
-    .num_interfaces  = 0,
-    .interfaces      = nullptr
-};
+static UwResult struct_deepcopy(UwValuePtr self)
+/*
+ * Bare struct cannot be copied, this method must be defined in a subtype.
+ */
+{
+    return UwError(UW_ERROR_NOT_IMPLEMENTED);
+}
 
-static UwType list_type = {
-    .id              = UwTypeId_List,
-    .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = true,
-    .data_optional   = false,
-    .name            = "List",
-    .data_offset     = offsetof(struct _UwListExtraData, list_data),
-    .data_size       = sizeof(struct _UwList),
-    .allocator       = &default_allocator,
-    ._create         = _uw_default_create,
-    ._destroy        = _uw_default_destroy,
-    ._init           = _uw_list_init,
-    ._fini           = _uw_list_fini,
-    ._clone          = _uw_default_clone,
-    ._hash           = _uw_list_hash,
-    ._deepcopy       = _uw_list_deepcopy,
-    ._dump           = _uw_list_dump,
-    ._to_string      = _uw_list_to_string,
-    ._is_true        = _uw_list_is_true,
-    ._equal_sametype = _uw_list_equal_sametype,
-    ._equal          = _uw_list_equal,
+static void struct_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+{
+    _uw_dump_start(fp, self, first_indent);
+    _uw_dump_base_extra_data(fp, self->extra_data);
+    fputc('\n', fp);
+}
 
-    .num_interfaces  = 0,
-    .interfaces      = nullptr
-        // [UwInterfaceId_RandomAccess] = &list_type_random_access_interface,
-        // [UwInterfaceId_List]         = &list_type_list_interface
-};
+static UwResult struct_to_string(UwValuePtr self)
+{
+    return UwError(UW_ERROR_NOT_IMPLEMENTED);
+}
 
-static UwType map_type = {
-    .id              = UwTypeId_Map,
-    .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = true,
-    .data_optional   = false,
-    .name            = "Map",
-    .data_offset     = offsetof(struct _UwMapExtraData, map_data),
-    .data_size       = sizeof(struct _UwMap),
-    .allocator       = &default_allocator,
-    ._create         = _uw_default_create,
-    ._destroy        = _uw_default_destroy,
-    ._init           = _uw_map_init,
-    ._fini           = _uw_map_fini,
-    ._clone          = _uw_default_clone,
-    ._hash           = _uw_map_hash,
-    ._deepcopy       = _uw_map_deepcopy,
-    ._dump           = _uw_map_dump,
-    ._to_string      = _uw_map_to_string,
-    ._is_true        = _uw_map_is_true,
-    ._equal_sametype = _uw_map_equal_sametype,
-    ._equal          = _uw_map_equal,
+static bool struct_is_true(UwValuePtr self)
+/*
+ * Bare struct is always false.
+ */
+{
+    return false;
+}
 
-    .num_interfaces  = 0,
-    .interfaces      = nullptr
-        // [UwInterfaceId_RandomAccess] = &map_type_random_access_interface
-};
+static bool struct_equal_sametype(UwValuePtr self, UwValuePtr other)
+/*
+ * Bare struct is not equal to anything.
+ */
+{
+    return false;
+}
 
-static UwType status_type = {
-    .id              = UwTypeId_Status,
-    .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = false,
-    .data_optional   = true,
-    .name            = "Status",
-    .data_offset     = offsetof(struct _UwStatusExtraData, status_desc),  // extra_data is optional and not allocated by default
-    .data_size       = sizeof(char*),
-    .allocator       = &default_allocator,
-    ._create         = _uw_default_create,
-    ._destroy        = _uw_default_destroy,
-    ._init           = nullptr,
-    ._fini           = _uw_status_fini,
-    ._clone          = _uw_default_clone,
-    ._hash           = _uw_status_hash,
-    ._deepcopy       = _uw_status_deepcopy,
-    ._dump           = _uw_status_dump,
-    ._to_string      = _uw_status_to_string,
-    ._is_true        = _uw_status_is_true,
-    ._equal_sametype = _uw_status_equal_sametype,
-    ._equal          = _uw_status_equal,
-
-    .num_interfaces  = 0,
-    .interfaces      = nullptr
-};
+static bool struct_equal(UwValuePtr self, UwValuePtr other)
+/*
+ * Bare struct is not equal to anything.
+ */
+{
+    return false;
+}
 
 static UwType struct_type = {
     .id              = UwTypeId_Struct,
@@ -585,23 +832,30 @@ static UwType struct_type = {
     .data_offset     = 0,
     .data_size       = 0,
     .allocator       = &default_allocator,
-    ._create         = _uw_default_create,
+    ._create         = struct_create,
     ._destroy        = _uw_default_destroy,
     ._init           = nullptr,
     ._fini           = nullptr,
     ._clone          = _uw_default_clone,
-    ._hash           = _uw_struct_hash,
-    ._deepcopy       = _uw_struct_deepcopy,
-    ._dump           = _uw_struct_dump,
-    ._to_string      = _uw_struct_to_string,
-    ._is_true        = _uw_struct_is_true,
-    ._equal_sametype = _uw_struct_equal_sametype,
-    ._equal          = _uw_struct_equal,
+    ._hash           = struct_hash,
+    ._deepcopy       = struct_deepcopy,
+    ._dump           = struct_dump,
+    ._to_string      = struct_to_string,
+    ._is_true        = struct_is_true,
+    ._equal_sametype = struct_equal_sametype,
+    ._equal          = struct_equal,
 
     .num_interfaces  = 0,
     .interfaces      = nullptr
 };
 
+
+/****************************************************************
+ * Global list of types initialized with built-in types.
+ */
+
+extern UwType _uw_map_type;     // defined in uw_map.c
+extern UwType _uw_status_type;  // defined in uw_status.c
 
 static UwType* basic_types[] = {
     [UwTypeId_Null]     = &null_type,
@@ -610,11 +864,11 @@ static UwType* basic_types[] = {
     [UwTypeId_Signed]   = &signed_type,
     [UwTypeId_Unsigned] = &unsigned_type,
     [UwTypeId_Float]    = &float_type,
-    [UwTypeId_String]   = &string_type,
-    [UwTypeId_CharPtr]  = &charptr_type,
-    [UwTypeId_List]     = &list_type,
-    [UwTypeId_Map]      = &map_type,
-    [UwTypeId_Status]   = &status_type,
+    [UwTypeId_String]   = &_uw_string_type,
+    [UwTypeId_CharPtr]  = &_uw_charptr_type,
+    [UwTypeId_List]     = &_uw_list_type,
+    [UwTypeId_Map]      = &_uw_map_type,
+    [UwTypeId_Status]   = &_uw_status_type,
     [UwTypeId_Struct]   = &struct_type
 };
 
