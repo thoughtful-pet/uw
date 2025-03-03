@@ -15,53 +15,142 @@ extern "C" {
 #define _unlikely_(x)  __builtin_expect(!!(x), 0)
 
 struct _UwStringExtraData {
+
+    _UwExtraData  value_data;
+
     /*
-     * variable-size structure because of struct _UwString
+     * variable part:
+     *
+     * union {
+     *     // if str_uint_cap is not set, capacity and length are stored in UwValue
+     *     uint8_t str[];
+     *
+     *     // if str_uint_cap is set
+     *     struct {
+     *         unsigned capacity;
+     *         unsigned length;
+     *         uint8_t str[];
+     *     };
+     *  };
      */
-    _UwExtraData     value_data;
-    struct _UwString string_data;
 };
 
-#define _uw_str_is_embedded(value)  \
-    ((value)->str_header.is_embedded)
-
-#define _uw_get_string_ptr(value)  \
-    (  \
-        _uw_str_is_embedded(value)?  \
-            &(value)->str_header  \
-        :  \
-            &((struct _UwStringExtraData*) ((value)->extra_data))->string_data \
-    )
-
 /****************************************************************
- * Safety helpers.
- *
- * cap_size and char_size are stored as 0-based whereas all
- * functions use 1-based values.
- *
- * The following functions should be used to make the code
- * less error-prone, instead of accessing fields directly
- * and forgetting +/- 1.
+ * Low level helper functions.
  */
 
-static inline uint8_t _uw_string_cap_size(struct _UwString* s)
+static inline uint8_t _uw_string_char_size(UwValuePtr s)
+/*
+ * char_size is stored as 0-based whereas all
+ * functions use 1-based values.
+ */
 {
-    return s->cap_size + 1;
+    return s->str_char_size + 1;
 }
 
-static inline void _uw_string_set_cap_size(struct _UwString* s, uint8_t cap_size)
+static inline void _uw_string_set_char_size(UwValuePtr s, uint8_t char_size)
+/*
+ * char_size is stored as 0-based whereas all
+ * functions use 1-based values.
+ */
 {
-    s->cap_size = cap_size - 1;
+    s->str_char_size = char_size - 1;
 }
 
-static inline uint8_t _uw_string_char_size(struct _UwString* s)
+static inline uint8_t* _uw_string_char_ptr(UwValuePtr s, unsigned start_pos)
+/*
+ * Return address of character in string at `start_pos`.
+ */
 {
-    return s->char_size + 1;
+    unsigned offset = _uw_string_char_size(s) * start_pos;
+    if (_likely_(s->str_embedded)) {
+        return &s->str_1[offset];
+    } else {
+        uint8_t* ptr = ((uint8_t*) s->extra_data) + sizeof(struct _UwStringExtraData) + offset;
+        if (_unlikely_(s->str_uint_cap)) {
+            ptr += 2 * sizeof(unsigned);
+        }
+        return ptr;
+    }
 }
 
-static inline void _uw_string_set_char_size(struct _UwString* s, uint8_t char_size)
+static char _panic_bad_char_size[] = "Bad char size: %u\n";
+
+static inline unsigned get_embedded_capacity(uint8_t char_size)
 {
-    s->char_size = char_size - 1;
+    _UwValue v;
+    switch (char_size) {
+        case 1: return _UWC_LENGTH_OF(v.str_1);
+        case 2: return _UWC_LENGTH_OF(v.str_2);
+        case 3: return _UWC_LENGTH_OF(v.str_3);
+        case 4: return _UWC_LENGTH_OF(v.str_4);
+        default: uw_panic(_panic_bad_char_size, char_size);
+    }
+}
+
+static inline unsigned _uw_string_capacity(UwValuePtr s)
+{
+    if (_likely_(s->str_embedded)) {
+        return get_embedded_capacity(_uw_string_char_size(s));
+    } else if (_unlikely_(s->str_uint_cap)) {
+        return *( (unsigned*) (((uint8_t*) s->extra_data) + sizeof(struct _UwStringExtraData)) );
+    } else {
+        return s->str_capacity;
+    }
+}
+
+static inline void _uw_string_set_capacity(UwValuePtr s, unsigned capacity)
+{
+    if (_unlikely_(s->str_embedded)) {
+        // no op
+    } else if (_unlikely_(s->str_uint_cap)) {
+        *( (unsigned*) (((uint8_t*) s->extra_data) + sizeof(struct _UwStringExtraData)) ) = capacity;
+    } else {
+        s->str_capacity = capacity;
+    }
+}
+
+static inline unsigned _uw_string_length(UwValuePtr s)
+{
+    if (_likely_(s->str_embedded)) {
+        return s->str_embedded_length;
+    } else if (_unlikely_(s->str_uint_cap)) {
+        return *( (unsigned*) (((uint8_t*) s->extra_data) + sizeof(struct _UwStringExtraData) + sizeof(unsigned)) );
+    } else {
+        return s->str_length;
+    }
+}
+
+static inline void _uw_string_set_length(UwValuePtr s, unsigned length)
+{
+    if (_likely_(s->str_embedded)) {
+        s->str_embedded_length = length;
+    } else if (_unlikely_(s->str_uint_cap)) {
+        *( (unsigned*) (((uint8_t*) s->extra_data) + sizeof(struct _UwStringExtraData) + sizeof(unsigned)) ) = length;
+    } else {
+        s->str_length = length;
+    }
+}
+
+static inline unsigned _uw_string_inc_length(UwValuePtr s, unsigned increment)
+/*
+ * Increment length, return previous value.
+ */
+{
+    if (_likely_(s->str_embedded)) {
+        uint8_t length = s->str_embedded_length;
+        s->str_embedded_length = length + increment;
+        return length;
+    } else if (_unlikely_(s->str_uint_cap)) {
+        unsigned* length_ptr = (unsigned*) (((uint8_t*) s->extra_data) + sizeof(struct _UwStringExtraData) + sizeof(unsigned));
+        unsigned length = *length_ptr;
+        *length_ptr = length + increment;
+        return length;
+    } else {
+        unsigned length = s->str_length;
+        s->str_length = length + increment;
+        return length;
+    }
 }
 
 /****************************************************************
@@ -90,72 +179,6 @@ void _uw_string_dump_data(FILE* fp, UwValuePtr str, int indent);
 
 #define UWSTRING_BLOCK_SIZE    16
 
-/****************************************************************
- * Methods that depend on cap_size field.
- *
- * These basic methods are required by both string implementation
- * and test suite, that's why a separate file.
- */
-
-typedef unsigned (*CapGetter)(struct _UwString* str);
-typedef void     (*CapSetter)(struct _UwString* str, unsigned n);
-
-typedef struct {
-    CapGetter   get_length;
-    CapSetter   set_length;
-    CapGetter   get_capacity;
-    CapSetter   set_capacity;
-} CapMethods;
-
-extern CapMethods _uws_cap_methods[8];
-
-static inline CapMethods* get_cap_methods(struct _UwString* str)
-{
-    return &_uws_cap_methods[str->cap_size];
-}
-
-static inline uint8_t* cap_data_addr(uint8_t cap_size, struct _UwString* desired_addr)
-/*
- * Return aligned address of capacity data
- * that follows 1-byte str header at `desired_addr` which can be unaligned.
- *
- * This function does not dereference `desired_addr` and can be used to calculate
- * address starting from nullptr.
- */
-{
-    static_assert(
-        sizeof(struct _UwString) == 1
-    );
-    return align_pointer(
-        ((uint8_t*) desired_addr) + sizeof(struct _UwString),
-        cap_size
-    );
-}
-
-static inline uint8_t* get_char0_ptr(struct _UwString* desired_addr, uint8_t cap_size, uint8_t char_size)
-/*
- * Return address of the first character in string.
- * This function is also used to determine memory size for different cap_size and char_size.
- *
- * This function does not dereference `desired_addr` and can be used to calculate
- * address starting from nullptr.
- */
-{
-    return align_pointer(
-        cap_data_addr(cap_size, desired_addr) + cap_size * 2,  // 2 == length + capacity
-        char_size  // align at char_size boundary
-    );
-}
-
-static inline uint8_t* get_char_ptr(struct _UwString* s, unsigned start_pos)
-/*
- * Return address of character in string at `start_pos`.
- */
-{
-    uint8_t cap_size  = _uw_string_cap_size(s);
-    uint8_t char_size = _uw_string_char_size(s);
-    return get_char0_ptr(s, cap_size, char_size) + start_pos * char_size;
-}
 
 /****************************************************************
  * Methods that depend on char_size field.
@@ -165,11 +188,11 @@ typedef char32_t (*GetChar)(uint8_t* p);
 typedef void     (*PutChar)(uint8_t* p, char32_t c);
 typedef void     (*Hash)(uint8_t* self_ptr, unsigned length, UwHashContext* ctx);
 typedef uint8_t  (*MaxCharSize)(uint8_t* self_ptr, unsigned length);
-typedef bool     (*Equal)(uint8_t* self_ptr, struct _UwString* other, unsigned other_start_pos, unsigned length);
+typedef bool     (*Equal)(uint8_t* self_ptr, UwValuePtr other, unsigned other_start_pos, unsigned length);
 typedef bool     (*EqualCStr)(uint8_t* self_ptr, char* other, unsigned length);
 typedef bool     (*EqualUtf8)(uint8_t* self_ptr, char8_t* other, unsigned length);
 typedef bool     (*EqualUtf32)(uint8_t* self_ptr, char32_t* other, unsigned length);
-typedef void     (*CopyTo)(uint8_t* self_ptr, struct _UwString* dest, unsigned dest_start_pos, unsigned length);
+typedef void     (*CopyTo)(uint8_t* self_ptr, UwValuePtr dest, unsigned dest_start_pos, unsigned length);
 typedef void     (*CopyToUtf8)(uint8_t* self_ptr, char* dest_ptr, unsigned length);
 typedef unsigned (*CopyFromCStr)(uint8_t* self_ptr, char* src_ptr, unsigned length);
 typedef unsigned (*CopyFromUtf8)(uint8_t* self_ptr, char8_t* src_ptr, unsigned length);
@@ -193,9 +216,9 @@ typedef struct {
 
 extern StrMethods _uws_str_methods[4];
 
-static inline StrMethods* get_str_methods(struct _UwString* str)
+static inline StrMethods* get_str_methods(UwValuePtr str)
 {
-    return &_uws_str_methods[str->char_size];
+    return &_uws_str_methods[str->str_char_size];
 }
 
 /****************************************************************

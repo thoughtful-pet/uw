@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <uchar.h>
 
 #include <libpussy/allocator.h>
@@ -46,17 +47,7 @@ void uw_panic(char* fmt, ...);
  */
 
 // Type for type id.
-typedef uint8_t UwTypeId;
-#define _UW_TYPE_MAX  255
-
-#ifndef UW_TYPE_CAPACITY
-#    define UW_TYPE_CAPACITY  (_UW_TYPE_MAX + 1)
-#else
-#    if (UW_TYPE_CAPACITY == 0) || (UW_TYPE_CAPACITY > (_UW_TYPE_MAX + 1))
-#        undef UW_TYPE_CAPACITY
-#        define UW_TYPE_CAPACITY  (_UW_TYPE_MAX + 1)
-#    endif
-#endif
+typedef uint16_t UwTypeId;
 
 // Integral types
 typedef nullptr_t  UwType_Null;
@@ -118,20 +109,7 @@ struct __UwCompoundData {
 };
 
 
-struct _UwString {
-    // Internal string structure.
-    // Header:
-    uint8_t cap_size:3,      // length and capacity size in bytes minus one
-            char_size:2,     // character size in bytes minus one
-            is_embedded:1;   // the string data is embedded into UwValue
-    // Length and capacity follow the header and are aligned accordingly.
-    // Characters follow capacity and are aligned accordingly, except 24-bit characters.
-};
-
 typedef struct { uint8_t v[3]; } uint24_t;  // always little-endian
-
-// XXX UwString macros depend on uint8_t, can't be bigger without revising this library
-static_assert( sizeof(UwTypeId) == sizeof(uint8_t) );
 
 // make sure largest C type fits into 64 bits
 static_assert( sizeof(long long) <= sizeof(uint64_t) );
@@ -140,48 +118,65 @@ union __UwValue {
     /*
      * 128-bit value
      */
-    // UwValue
-    struct {
-        union {
-            uint64_t first64bits;
-            struct {
-                UwTypeId type_id;
-                union {
-                    uint8_t charptr_subtype; // see UW_CHARPTR* constants
-                    uint8_t status_class;    // see UWSC_* constants
-                    uint8_t carry;           // for integer arithmetic
-                };
-                union {
-                    uint16_t status_code;  // for UWSC_DEFAULT status class
-                    int16_t  uw_errno;     // errno for UWSC_ERRNO status class
-                };
-            };
-        };
-        union {
-            uint64_t second64bits;
 
+    UwTypeId /* uint16_t */ type_id;
+
+    struct {
+        // integral types
+        UwTypeId /* uint16_t */ _integral_type_id;
+        uint8_t carry;  // for integer arithmetic
+        uint8_t  _integral_pagging_1;
+        uint32_t _integral_pagging_2;
+        union {
             // Integral types
             UwType_Bool     bool_value;
             UwType_Signed   signed_value;
             UwType_Unsigned unsigned_value;
             UwType_Float    float_value;
+        };
+    };
 
-            // External data
-            _UwExtraData* extra_data;
-
+    struct {
+        // charptr
+        UwTypeId /* uint16_t */ _charptr_type_id;
+        uint8_t charptr_subtype; // see UW_CHARPTR* constants
+        uint8_t  _charptr_padding_1;
+        uint32_t _charptr_pagging_2;
+        union {
             // C string pointers for UwType_CharPtr
             char*     charptr;
             char8_t*  char8ptr;
             char32_t* char32ptr;
         };
     };
-    // embedded string
+
     struct {
-        UwTypeId _type_id;
-        struct _UwString str_header;
-        // cap_size for embedded strings is always 1 (stored as 0)
-        uint8_t str_length;
-        uint8_t str_capacity;
+        // values with allocated extra data
+        UwTypeId /* uint16_t */ _extradata_type_id;
+        uint16_t _extradata_pagging_1;
+        uint32_t _extradata_pagging_2;
+        _UwExtraData* extra_data;
+    };
+
+    struct {
+        // status
+        UwTypeId /* uint16_t */ _status_type_id;
+        uint8_t status_class;  // see UWSC_* constants
+        uint8_t _status_padding;
+        union {
+            uint16_t status_code;  // for UWSC_DEFAULT status class
+            int16_t  uw_errno;     // errno for UWSC_ERRNO status class
+        };
+        _UwExtraData* _status_extra_data;
+    };
+
+    struct {
+        // embedded string
+        UwTypeId /* uint16_t */ _emb_string_type_id;
+        uint8_t str_embedded:1,     // the string data is embedded into UwValue
+                _x_str_uint_cap:1,  // always zero for embedded strings
+                _emb_str_char_size:2; // character size in bytes minus one
+        uint8_t str_embedded_length;  // length of embedded string
         union {
             uint8_t  str_1[12];
             uint16_t str_2[6];
@@ -189,11 +184,41 @@ union __UwValue {
             uint32_t str_4[3];
         };
     };
+
+    struct {
+        // allocated string
+        UwTypeId /* uint16_t */ _string_type_id;
+        uint8_t _x_str_embedded:1,  // always zero for allocated string
+                str_uint_cap:1,     // capacity and length have unsigned type and stored in extra_data
+                str_char_size:2;    // character size in bytes minus one
+        uint8_t _str_padding;
+        // strings are copied on write, so it's okay
+        // to duplicate length and capacity in each UwValue
+        uint16_t str_capacity;
+        uint16_t str_length;
+        _UwExtraData* _string_extra_data;
+    };
 };
 
 typedef union __UwValue _UwValue;
 
-// make sure _UwValue has correct size
+// make sure _UwValue structure is correct
+static_assert( offsetof(_UwValue, charptr_subtype) == 2 );
+static_assert( offsetof(_UwValue, status_code)     == 4 );
+static_assert( offsetof(_UwValue, str_capacity)    == 4 );
+
+static_assert( offsetof(_UwValue, bool_value) == 8 );
+static_assert( offsetof(_UwValue, charptr)    == 8 );
+static_assert( offsetof(_UwValue, extra_data) == 8 );
+static_assert( offsetof(_UwValue, _status_extra_data) == 8 );
+static_assert( offsetof(_UwValue, _string_extra_data) == 8 );
+
+static_assert( offsetof(_UwValue, str_embedded_length) == 3 );
+static_assert( offsetof(_UwValue, str_1) == 4 );
+static_assert( offsetof(_UwValue, str_2) == 4 );
+static_assert( offsetof(_UwValue, str_3) == 4 );
+static_assert( offsetof(_UwValue, str_4) == 4 );
+
 static_assert( sizeof(_UwValue) == 16 );
 
 typedef _UwValue* UwValuePtr;
@@ -204,20 +229,18 @@ typedef _UwValue  UwResult;  // alias for return values
 #define UwValue _UW_VALUE_CLEANUP _UwValue
 
 // Built-in types
-#define UwTypeId_Null         0
-#define UwTypeId_Bool         1
-#define UwTypeId_Int          2  // abstract integer
-#define UwTypeId_Signed       3  // subtype of int, signed integer
-#define UwTypeId_Unsigned     4  // subtype of int, unsigned integer
-#define UwTypeId_Float        5
-#define UwTypeId_String       6
-#define UwTypeId_CharPtr      7  // container for static C strings
-#define UwTypeId_List         8  // always has extra data
-#define UwTypeId_Map          9  // always has extra data
-#define UwTypeId_Status      10  // extra_data is optional
-#define UwTypeId_Struct      11
-#define UwTypeId_File        12
-#define UwTypeId_StringIO    13
+#define UwTypeId_Null        0
+#define UwTypeId_Bool        1U
+#define UwTypeId_Int         2U  // abstract integer
+#define UwTypeId_Signed      3U  // subtype of int, signed integer
+#define UwTypeId_Unsigned    4U  // subtype of int, unsigned integer
+#define UwTypeId_Float       5U
+#define UwTypeId_String      6U
+#define UwTypeId_CharPtr     7U  // container for static C strings
+#define UwTypeId_List        8U  // always has extra data
+#define UwTypeId_Map         9U  // always has extra data
+#define UwTypeId_Status     10U  // extra_data is optional
+#define UwTypeId_Struct     11U
 
 // char* sub-types
 #define UW_CHARPTR    0
@@ -239,84 +262,7 @@ void _uw_hash_string(UwHashContext* ctx, char* str);
 void _uw_hash_string32(UwHashContext* ctx, char32_t* str);
 
 /****************************************************************
- * Interfaces
- *
- * IMPORTANT: all method names in interfaces must start with underscore.
- * That's because of limitations of ## preprocesor operator which
- * is used in uw_call, uw_super, and other convenience macros.
- *
- * Interface methods should always return UwResult.
- * Simply because if an interface may not exist,
- * the wrapper have to return UwError.
- */
-
-#ifndef UW_INTERFACE_CAPACITY
-#    define UW_INTERFACE_CAPACITY  256
-#else
-#    if UW_INTERFACE_CAPACITY == 0
-#        undef UW_INTERFACE_CAPACITY
-#        define UW_INTERFACE_CAPACITY  256
-#    endif
-#endif
-
-extern bool _uw_registered_interfaces[UW_INTERFACE_CAPACITY];
-/*
- * Global list of registered interfaces.
- * Its purpose is simply track assigned ids.
- *
- * Not using bit array because static initialization
- * of such array is a nightmare in C.
- */
-
-int uw_register_interface();
-/*
- * Add interface to the first available position in the global list.
- * Return interface id or -1 if the list is full.
- */
-
-/*
- * The following macro leverages naming scheme where
- * interface structure is named UwInterface_<interface_name>
- * and id is named UwInterfaceId_<interface_name>
- */
-#define uw_get_interface(value, interface_name)  \
-    (  \
-        (UwInterface_##interface_name *) \
-            _uw_types[(value)->type_id]->interfaces[UwInterfaceId_##interface_name]  \
-    )
-
-// Built-in interfaces
-// TBD, TODO
-#define UwInterfaceId_Logic         0
-    // TBD
-#define UwInterfaceId_Arithmetic    1
-    // TBD
-#define UwInterfaceId_Bitwise       2
-    // TBD
-#define UwInterfaceId_Comparison    3
-    // UwMethodCompare  -- compare_sametype, compare;
-#define UwInterfaceId_RandomAccess  4
-    // UwMethodLength
-    // UwMethodGetItem     (by index for arrays/strings or by key for maps)
-    // UwMethodSetItem     (by index for arrays/strings or by key for maps)
-    // UwMethodDeleteItem  (by index for arrays/strings or by key for maps)
-    // UwMethodPopItem -- necessary here? it's just delete_item(length - 1)
-#define UwInterfaceId_String        5
-    // TBD substring, truncate, trim, append_substring, etc
-#define UwInterfaceId_List          6
-    // string supports this interface
-    // UwMethodAppend
-    // UwMethodSlice
-    // UwMethodDeleteRange
-
-#define UwInterfaceId_File          7
-#define UwInterfaceId_FileReader    8
-#define UwInterfaceId_FileWriter    9
-
-#define UwInterfaceId_LineReader   10
-
-/****************************************************************
- * Types
+ * Types and interfaces
  */
 
 struct __UwCompoundChain {
@@ -345,6 +291,11 @@ typedef void     (*UwMethodDump)    (UwValuePtr self, FILE* fp, int first_indent
 typedef UwResult (*UwMethodToString)(UwValuePtr self);
 typedef bool     (*UwMethodIsTrue)  (UwValuePtr self);
 typedef bool     (*UwMethodEqual)   (UwValuePtr self, UwValuePtr other);
+
+typedef struct {
+    unsigned interface_id;
+    void* interface_methods;
+} _UwInterface;
 
 typedef struct {
     UwTypeId id;
@@ -376,10 +327,85 @@ typedef struct {
     UwMethodEqual    _equal_sametype;
     UwMethodEqual    _equal;
 
-    // extra interfaces
-    void* interfaces[UW_INTERFACE_CAPACITY];
-
+    // other interfaces
+    unsigned num_interfaces;
+    _UwInterface* interfaces;  // a subtype must define all interfaces of base type,
+                               // i.e. copy ancestor's interfaces if it does not define anything new
 } UwType;
+
+// Built-in interfaces
+/*
+// TBD, TODO
+#define UwInterfaceId_Logic         0
+    // TBD
+#define UwInterfaceId_Arithmetic    1
+    // TBD
+#define UwInterfaceId_Bitwise       2
+    // TBD
+#define UwInterfaceId_Comparison    3
+    // UwMethodCompare  -- compare_sametype, compare;
+#define UwInterfaceId_RandomAccess  4
+    // UwMethodLength
+    // UwMethodGetItem     (by index for arrays/strings or by key for maps)
+    // UwMethodSetItem     (by index for arrays/strings or by key for maps)
+    // UwMethodDeleteItem  (by index for arrays/strings or by key for maps)
+    // UwMethodPopItem -- necessary here? it's just delete_item(length - 1)
+#define UwInterfaceId_String        5
+    // TBD substring, truncate, trim, append_substring, etc
+#define UwInterfaceId_List          6
+    // string supports this interface
+    // UwMethodAppend
+    // UwMethodSlice
+    // UwMethodDeleteRange
+*/
+
+// Miscellaneous interfaces
+extern unsigned UwInterfaceId_File;
+extern unsigned UwInterfaceId_FileReader;
+extern unsigned UwInterfaceId_FileWriter;
+extern unsigned UwInterfaceId_LineReader;
+
+unsigned uw_register_interface();
+/*
+ * Add interface to the first available position in the global list.
+ * Return interface id or 0 if the list is full.
+ *
+ * XXX probably need a parameter, something like interface declaration -- TBD
+ *
+ * 0 is okay as an error indicator because the table already has basic interfaces.
+ */
+
+static inline void* _uw_get_interface(UwType* type, unsigned interface_id)
+{
+    // XXX okay for now, revise later
+    _UwInterface* iface = type->interfaces;
+    for (unsigned i = 0, n = type->num_interfaces; i < n; i++) {
+        if (iface->interface_id == interface_id) {
+            return iface->interface_methods;
+        }
+        iface++;
+    }
+    return nullptr;
+}
+
+/*
+ * The following macros leverage naming scheme where
+ * interface structure is named UwInterface_<interface_name>
+ * and id is named UwInterfaceId_<interface_name>
+ *
+ * IMPORTANT: all method names in interfaces must start with underscore.
+ * That's because of limitations of ## preprocesor operator which
+ * is used in uw_call, uw_super, and other convenience macros.
+ *
+ * Interface methods should always return UwResult.
+ * Simply because if an interface may not exist,
+ * the wrapper have to return UwError.
+ */
+#define uw_get_interface(value, interface_name)  \
+    (  \
+        (UwInterface_##interface_name *) \
+            _uw_get_interface(_uw_types[(value)->type_id], UwInterfaceId_##interface_name)  \
+    )
 
 // type checking
 #define uw_is_null(value)      uw_is_subtype((value), UwTypeId_Null)
@@ -412,7 +438,7 @@ typedef struct {
 #define uw_assert_file(value)      uw_assert(uw_is_file    (value))
 #define uw_assert_stringio(value)  uw_assert(uw_is_stringio(value))
 
-extern UwType* _uw_types[UW_TYPE_CAPACITY];
+extern UwType** _uw_types;
 /*
  * Global list of types initialized with built-in types.
  */
@@ -509,6 +535,8 @@ static inline char* _uw_get_type_name_from_value(UwValuePtr value) { return _uw_
 uint16_t uw_define_status(char* status);
 /*
  * Define status in the global table.
+ * Return status code or UW_ERROR_OOM
+ *
  * This function should be called from the very beginning of main() function
  * or from constructors that are called before main().
  */
@@ -613,7 +641,7 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
 #define __UWDECL_Bool(name, initializer)  \
     /* declare Bool variable */  \
     _UwValue name = {  \
-        .type_id = UwTypeId_Bool,  \
+        ._integral_type_id = UwTypeId_Bool,  \
         .bool_value = (initializer)  \
     }
 
@@ -629,7 +657,7 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
 #define __UWDECL_Signed(name, initializer)  \
     /* declare Signed variable */  \
     _UwValue name = {  \
-        .type_id = UwTypeId_Signed,  \
+        ._integral_type_id = UwTypeId_Signed,  \
         .signed_value = (initializer),  \
     }
 
@@ -645,7 +673,7 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
 #define __UWDECL_Unsigned(name, initializer)  \
     /* declare Unsigned variable */  \
     _UwValue name = {  \
-        .type_id = UwTypeId_Unsigned,  \
+        ._integral_type_id = UwTypeId_Unsigned,  \
         .unsigned_value = (initializer)  \
     }
 
@@ -661,7 +689,7 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
 #define __UWDECL_Float(name, initializer)  \
     /* declare Float variable */  \
     _UwValue name = {  \
-        .type_id = UwTypeId_Float,  \
+        ._integral_type_id = UwTypeId_Float,  \
         .float_value = (initializer)  \
     }
 
@@ -679,9 +707,8 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
 #define __UWDECL_String(name)  \
     /* declare empty String variable */  \
     _UwValue name = {  \
-        ._type_id = UwTypeId_String,  \
-        { .is_embedded = 1 },  \
-        .str_capacity = _UWC_LENGTH_OF(name.str_1)  \
+        ._emb_string_type_id = UwTypeId_String,  \
+        .str_embedded = 1  \
     }
 
 #define UWDECL_String(name)  _UW_VALUE_CLEANUP __UWDECL_String(name)
@@ -696,7 +723,7 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
 #define __UWDECL_CharPtr(name, initializer)  \
     /* declare CharPtr variable */  \
     _UwValue name = {  \
-        .type_id = UwTypeId_CharPtr,  \
+        ._charptr_type_id = UwTypeId_CharPtr,  \
         .charptr_subtype = UW_CHARPTR,  \
         .charptr = (initializer)  \
     }
@@ -713,7 +740,7 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
 #define __UWDECL_Char8Ptr(name, initializer)  \
     /* declare Char8Ptr variable */  \
     _UwValue name = {  \
-        .type_id = UwTypeId_CharPtr,  \
+        ._charptr_type_id = UwTypeId_CharPtr,  \
         .charptr_subtype = UW_CHAR8PTR,  \
         .char8ptr = (char8_t*) (initializer)  \
     }
@@ -730,7 +757,7 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
 #define __UWDECL_Char32Ptr(name, initializer)  \
     /* declare Char32Ptr variable */  \
     _UwValue name = {  \
-        .type_id = UwTypeId_CharPtr,  \
+        ._charptr_type_id = UwTypeId_CharPtr,  \
         .charptr_subtype = UW_CHAR32PTR,  \
         .char32ptr = (initializer)  \
     }
@@ -749,7 +776,7 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
 #define __UWDECL_Status(name, _status_class, _status_code)  \
     /* declare Status variable */  \
     _UwValue name = {  \
-        .type_id = UwTypeId_Status,  \
+        ._status_type_id = UwTypeId_Status,  \
         .status_class = _status_class,  \
         .status_code = _status_code  \
     }
@@ -806,7 +833,7 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
 #define __UWDECL_Errno(name, _errno)  \
     /* declare Status variable of UWSC_ERRNO class */  \
     _UwValue name = {  \
-        .type_id = UwTypeId_Status,  \
+        ._status_type_id = UwTypeId_Status,  \
         .status_class = UWSC_ERRNO,  \
         .uw_errno = _errno  \
     }
@@ -971,7 +998,7 @@ static inline UwResult _uwc_create_string_u8_wrapper(char* initializer)
     /* call interface method */  \
     ({  \
         UwInterface_##interface_name* iface =  \
-            _uw_types[(v)->type_id]->interfaces[UwInterfaceId_##interface_name];  \
+            _uw_get_interface(_uw_types[(v)->type_id], UwInterfaceId_##interface_name);  \
         iface?  \
             iface->_##method_name((v) __VA_OPT__(,) __VA_ARGS__)  \
         :  \
@@ -981,9 +1008,8 @@ static inline UwResult _uwc_create_string_u8_wrapper(char* initializer)
 #define uw_ifsuper(self, iface, method_name, ...)  \
     /* call super method of interface */  \
     ({  \
-        UwTypeId ancestor_id = _uw_types[(self)->type_id]->ancestor_id;  \
         UwInterface_##interface_name* iface =  \
-            _uw_types[ancestor_id->type_id]->interfaces[UwInterfaceId_##interface_name];  \
+            _uw_get_interface(_uw_types[(self)->type_id]->ancestor_id, UwInterfaceId_##interface_name);  \
         iface?  \
             iface->_##method_name((self) __VA_OPT__(,) __VA_ARGS__)  \
         :  \
@@ -1065,7 +1091,7 @@ static inline bool _uw_equal(UwValuePtr a, UwValuePtr b)
         // compare with self
         return true;
     }
-    if (a->first64bits == b->first64bits && a->second64bits == b->second64bits) {
+    if (memcmp(a, b, sizeof(_UwValue)) == 0) {
         // quick comparison
         return true;
     }
@@ -1160,6 +1186,21 @@ static inline void _uw_call_hash(UwValuePtr value, UwHashContext* ctx)
     UwMethodHash fn_hash = _uw_types[value->type_id]->_hash;
     fn_hash(value, ctx);
 }
+
+UwResult _uw_default_create(UwTypeId type_id, va_list ap);
+/*
+ * Default implementation of create method for types that have extra data.
+ */
+
+void _uw_default_destroy(UwValuePtr self);
+/*
+ * Default implementation of destroy method for types that have extra data.
+ */
+
+UwResult _uw_default_clone(UwValuePtr self);
+/*
+ * Default implementation of clone method.
+ */
 
 bool _uw_alloc_extra_data(UwValuePtr v);
 bool _uw_mandatory_alloc_extra_data(UwValuePtr v);

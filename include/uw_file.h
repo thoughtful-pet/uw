@@ -9,6 +9,8 @@
 extern "C" {
 #endif
 
+extern UwTypeId UwTypeId_File;
+
 /****************************************************************
  * File interface
  */

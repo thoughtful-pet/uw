@@ -1,5 +1,3 @@
-#include <string.h>
-
 #include "include/uw_base.h"
 
 static inline _UwParentsChunk* get_parents_list(_UwCompoundData* cdata)

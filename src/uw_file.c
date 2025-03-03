@@ -4,13 +4,46 @@
 
 #include "include/uw.h"
 #include "src/uw_charptr_internal.h"
-#include "src/uw_file_internal.h"
+
+struct _UwFile {
+    int fd;               // file descriptor
+    bool is_external_fd;  // fd is set by `set_fd` and should not be closed
+    int error;            // errno, set by `open`
+    _UwValue name;
+
+    // line reader data
+    // XXX okay for now, revise later
+    char8_t* buffer;
+    unsigned position;  // in the buffer
+    unsigned data_size; // in the buffer
+    char8_t  partial_utf8[4];  // UTF-8 sequence may span adjacent reads
+    unsigned partial_utf8_len;
+    _UwValue pushback;  // for unread_line
+    unsigned line_number;
+};
+
+struct _UwFileExtraData {
+    // outline structure to determine correct aligned offset
+    _UwExtraData   value_data;
+    struct _UwFile file_data;
+};
+
+#define _uw_get_file_ptr(value)  \
+    (  \
+        &((struct _UwFileExtraData*) ((value)->extra_data))->file_data \
+    )
+
+#define LINE_READER_BUFFER_SIZE  4096  // typical filesystem block size
+
+// forward declarations
+static UwResult file_close(UwValuePtr self);
+static UwResult read_line_inplace(UwValuePtr self, UwValuePtr line);
 
 /****************************************************************
  * Basic interface methods
  */
 
-UwResult _uw_file_init(UwValuePtr self, va_list ap)
+static UwResult file_init(UwValuePtr self, va_list ap)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
     f->fd = -1;
@@ -19,12 +52,12 @@ UwResult _uw_file_init(UwValuePtr self, va_list ap)
     return UwOK();
 }
 
-void _uw_file_fini(UwValuePtr self)
+static void file_fini(UwValuePtr self)
 {
-    _uwi_file_close(self);
+    file_close(self);
 }
 
-void _uw_file_hash(UwValuePtr self, UwHashContext* ctx)
+static void file_hash(UwValuePtr self, UwHashContext* ctx)
 {
     // it's not a hash of entire file content!
 
@@ -38,13 +71,13 @@ void _uw_file_hash(UwValuePtr self, UwHashContext* ctx)
     _uw_hash_uint64(ctx, f->is_external_fd);
 }
 
-UwResult _uw_file_deepcopy(UwValuePtr self)
+static UwResult file_deepcopy(UwValuePtr self)
 {
     // XXX duplicate fd?
     return UwError(UW_ERROR_NOT_IMPLEMENTED);
 }
 
-void _uw_file_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+static void file_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
@@ -64,24 +97,24 @@ void _uw_file_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent,
     fputc('\n', fp);
 }
 
-UwResult _uw_file_to_string(UwValuePtr self)
+static UwResult file_to_string(UwValuePtr self)
 {
     return UwError(UW_ERROR_NOT_IMPLEMENTED);
 }
 
-bool _uw_file_is_true(UwValuePtr self)
+static bool file_is_true(UwValuePtr self)
 {
     // XXX
     return false;
 }
 
-bool _uw_file_equal_sametype(UwValuePtr self, UwValuePtr other)
+static bool file_equal_sametype(UwValuePtr self, UwValuePtr other)
 {
     // XXX
     return false;
 }
 
-bool _uw_file_equal(UwValuePtr self, UwValuePtr other)
+static bool file_equal(UwValuePtr self, UwValuePtr other)
 {
     // XXX
     return false;
@@ -91,7 +124,7 @@ bool _uw_file_equal(UwValuePtr self, UwValuePtr other)
  * File interface methods
  */
 
-UwResult _uwi_file_open(UwValuePtr self, UwValuePtr file_name, int flags, mode_t mode)
+static UwResult file_open(UwValuePtr self, UwValuePtr file_name, int flags, mode_t mode)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
@@ -122,7 +155,7 @@ UwResult _uwi_file_open(UwValuePtr self, UwValuePtr file_name, int flags, mode_t
     return UwOK();
 }
 
-UwResult _uwi_file_close(UwValuePtr self)
+static UwResult file_close(UwValuePtr self)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
@@ -141,7 +174,7 @@ UwResult _uwi_file_close(UwValuePtr self)
     return UwOK();
 }
 
-UwResult _uwi_file_set_fd(UwValuePtr self, int fd)
+static UwResult file_set_fd(UwValuePtr self, int fd)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
@@ -156,13 +189,13 @@ UwResult _uwi_file_set_fd(UwValuePtr self, int fd)
     return UwOK();
 }
 
-UwResult _uwi_file_get_name(UwValuePtr self)
+static UwResult file_get_name(UwValuePtr self)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
     return uw_clone(&f->name);
 }
 
-UwResult _uwi_file_set_name(UwValuePtr self, UwValuePtr file_name)
+static UwResult file_set_name(UwValuePtr self, UwValuePtr file_name)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
@@ -182,7 +215,7 @@ UwResult _uwi_file_set_name(UwValuePtr self, UwValuePtr file_name)
  * FileReader interface methods
  */
 
-UwResult _uwi_file_read(UwValuePtr self, void* buffer, unsigned buffer_size, unsigned* bytes_read)
+static UwResult file_read(UwValuePtr self, void* buffer, unsigned buffer_size, unsigned* bytes_read)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
@@ -203,7 +236,7 @@ UwResult _uwi_file_read(UwValuePtr self, void* buffer, unsigned buffer_size, uns
  * FileWriter interface methods
  */
 
-UwResult _uwi_file_write(UwValuePtr self, void* data, unsigned size, unsigned* bytes_written)
+static UwResult file_write(UwValuePtr self, void* data, unsigned size, unsigned* bytes_written)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
@@ -224,7 +257,7 @@ UwResult _uwi_file_write(UwValuePtr self, void* data, unsigned size, unsigned* b
  * LineReader interface methods
  */
 
-UwResult _uwi_file_start_read_lines(UwValuePtr self)
+static UwResult start_read_lines(UwValuePtr self)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
@@ -250,11 +283,11 @@ UwResult _uwi_file_start_read_lines(UwValuePtr self)
     return UwOK();
 }
 
-UwResult _uwi_file_read_line(UwValuePtr self)
+static UwResult read_line(UwValuePtr self)
 {
     UwValue result = UwString();
     if (uw_ok(&result)) {
-        UwValue status =_uwi_file_read_line_inplace(self, &result);
+        UwValue status = read_line_inplace(self, &result);
         if (uw_error(&status)) {
             return uw_move(&status);
         }
@@ -262,14 +295,14 @@ UwResult _uwi_file_read_line(UwValuePtr self)
     return uw_move(&result);
 }
 
-UwResult _uwi_file_read_line_inplace(UwValuePtr self, UwValuePtr line)
+static UwResult read_line_inplace(UwValuePtr self, UwValuePtr line)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
     uw_string_truncate(line, 0);
 
     if (f->buffer == nullptr) {
-        UwValue status = _uwi_file_start_read_lines(self);
+        UwValue status = start_read_lines(self);
         if (uw_error(&status)) {
             return uw_move(&status);
         }
@@ -293,7 +326,7 @@ UwResult _uwi_file_read_line_inplace(UwValuePtr self, UwValuePtr line)
             }
             f->position = 0;
             {
-                UwValue status = _uwi_file_read(self, f->buffer, LINE_READER_BUFFER_SIZE, &f->data_size);
+                UwValue status = file_read(self, f->buffer, LINE_READER_BUFFER_SIZE, &f->data_size);
                 if (uw_error(&status)) {
                     return uw_move(&status);
                 }
@@ -366,7 +399,7 @@ UwResult _uwi_file_read_line_inplace(UwValuePtr self, UwValuePtr line)
     } while(true);
 }
 
-UwResult _uwi_file_unread_line(UwValuePtr self, UwValuePtr line)
+static UwResult unread_line(UwValuePtr self, UwValuePtr line)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
@@ -379,12 +412,12 @@ UwResult _uwi_file_unread_line(UwValuePtr self, UwValuePtr line)
     }
 }
 
-UwResult _uwi_file_get_line_number(UwValuePtr self)
+static UwResult get_line_number(UwValuePtr self)
 {
     return UwUnsigned(_uw_get_file_ptr(self)->line_number);
 }
 
-UwResult _uwi_file_stop_read_lines(UwValuePtr self)
+static UwResult stop_read_lines(UwValuePtr self)
 {
     struct _UwFile* f = _uw_get_file_ptr(self);
 
@@ -392,6 +425,93 @@ UwResult _uwi_file_stop_read_lines(UwValuePtr self)
     f->buffer = nullptr;
     uw_destroy(&f->pushback);
     return UwOK();
+}
+
+/****************************************************************
+ * File type and interfaces
+ */
+
+UwTypeId UwTypeId_File = 0;
+
+static UwInterface_File file_interface = {
+    ._open     = file_open,
+    ._close    = file_close,
+    ._set_fd   = file_set_fd,
+    ._get_name = file_get_name,
+    ._set_name = file_set_name
+};
+
+static UwInterface_FileReader file_reader_interface = {
+    ._read = file_read
+};
+
+static UwInterface_FileWriter file_writer_interface = {
+    ._write = file_write
+};
+
+static UwInterface_LineReader line_reader_interface = {
+    ._start             = start_read_lines,
+    ._read_line         = read_line,
+    ._read_line_inplace = read_line_inplace,
+    ._get_line_number   = get_line_number,
+    ._unread_line       = unread_line,
+    ._stop              = stop_read_lines
+};
+
+static _UwInterface file_interfaces[4] = {
+    // {UwInterfaceId_File,       &file_interface},
+    // {UwInterfaceId_FileReader, &file_reader_interface},
+    // {UwInterfaceId_FileWriter, &file_writer_interface},
+    // {UwInterfaceId_LineReader, &line_reader_interface}
+};
+
+static UwType file_type = {
+    .id              = 0,
+    .ancestor_id     = UwTypeId_Null,  // no ancestor
+    .compound        = false,
+    .data_optional   = false,
+    .name            = "File",
+    .data_offset     = offsetof(struct _UwFileExtraData, file_data),
+    .data_size       = sizeof(struct _UwFile),
+    .allocator       = &default_allocator,
+    ._create         = _uw_default_create,
+    ._destroy        = _uw_default_destroy,
+    ._init           = file_init,
+    ._fini           = file_fini,
+    ._clone          = _uw_default_clone,
+    ._hash           = file_hash,
+    ._deepcopy       = file_deepcopy,
+    ._dump           = file_dump,
+    ._to_string      = file_to_string,
+    ._is_true        = file_is_true,
+    ._equal_sametype = file_equal_sametype,
+    ._equal          = file_equal,
+
+    .num_interfaces  = _UWC_LENGTH_OF(file_interfaces),
+    .interfaces      = file_interfaces
+};
+
+[[ gnu::constructor ]]
+static void init_file_type()
+{
+    if (UwInterfaceId_File == 0)       { UwInterfaceId_File       = uw_register_interface(); }
+    if (UwInterfaceId_FileReader == 0) { UwInterfaceId_FileReader = uw_register_interface(); }
+    if (UwInterfaceId_FileWriter == 0) { UwInterfaceId_FileWriter = uw_register_interface(); }
+    if (UwInterfaceId_LineReader == 0) { UwInterfaceId_LineReader = uw_register_interface(); }
+
+    file_interfaces[0].interface_id = UwInterfaceId_File;
+    file_interfaces[0].interface_methods = &file_interface;
+
+    file_interfaces[1].interface_id = UwInterfaceId_FileReader;
+    file_interfaces[1].interface_methods = &file_reader_interface;
+
+    file_interfaces[2].interface_id = UwInterfaceId_FileWriter;
+    file_interfaces[2].interface_methods = &file_writer_interface;
+
+    file_interfaces[3].interface_id = UwInterfaceId_LineReader;
+    file_interfaces[3].interface_methods = &line_reader_interface;
+
+    UwTypeId_File = uw_add_type(&file_type);
 }
 
 /****************************************************************

@@ -47,7 +47,7 @@ static void init_statuses()
         abort();
     }
 
-    num_statuses = sizeof(basic_statuses) / sizeof(basic_statuses[0]);
+    num_statuses = _UWC_LENGTH_OF(basic_statuses);
     for(uint16_t i = 0; i < num_statuses; i++) {
         char* status = basic_statuses[i];
         if (!status) {
@@ -65,19 +65,20 @@ uint16_t uw_define_status(char* status)
 
     if (num_statuses == 65535) {
         fprintf(stderr, "Cannot define more statuses than %u\n", num_statuses);
-        abort();
+        return UW_ERROR_OOM;
     }
     if (num_statuses == statuses_capacity) {
         size_t page_size = sysconf(_SC_PAGE_SIZE);
         size_t old_memsize = (statuses_capacity * sizeof(char*) + page_size - 1) & ~(page_size - 1);
         size_t new_memsize = ((statuses_capacity + 1) * sizeof(char*) + page_size - 1) & ~(page_size - 1);
-        statuses_capacity = new_memsize / sizeof(char*);
 
-        statuses = mremap(statuses, old_memsize, new_memsize, MREMAP_MAYMOVE);
-        if (statuses == MAP_FAILED) {
+        char** new_statuses = mremap(statuses, old_memsize, new_memsize, MREMAP_MAYMOVE);
+        if (new_statuses == MAP_FAILED) {
             perror("mremap");
-            abort();
+            return UW_ERROR_OOM;
         }
+        statuses = new_statuses;
+        statuses_capacity = new_memsize / sizeof(char*);
     }
     uint16_t status_code = num_statuses++;
     statuses[status_code] = status;

@@ -402,80 +402,37 @@ void test_integral_types()
 
 void test_string()
 {
-    struct _UwString* s;
-    CapMethods* capmeth;
-
-    { // testing max allocation with 1-byte capacity
-        unsigned capacity_1_byte = 256 - offsetof(struct _UwStringExtraData, string_data)
-                                   - 3; // header, length, and capacity;
-        UwValue v = uw_create_empty_string(capacity_1_byte, 1);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == capacity_1_byte);
-        TEST(_uw_string_char_size(s) == 1);
-        TEST(_uw_string_cap_size(s) == 1);
-        //uw_dump(stdout, &v);
-    }
-    { // testing min allocation with 2-bytes capacity
-        unsigned capacity_2_bytes = 272 - offsetof(struct _UwStringExtraData, string_data)
-                                    - 1  // header
-                                    - 1  // padding
-                                    - 2  // length
-                                    - 2; // capacity
-        UwValue v = uw_create_empty_string(capacity_2_bytes, 1);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == capacity_2_bytes);
-        TEST(_uw_string_char_size(s) == 1);
-        TEST(_uw_string_cap_size(s) == 2);
-        //uw_dump(stdout, &v);
-    }
-    { // testing cap_size=1 char_size=1
+    { // testing char_size=1
         UwValue v = uw_create_empty_string(0, 1);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 12);
-        TEST(_uw_string_char_size(s) == 1);
-        TEST(_uw_string_cap_size(s) == 1);
+        TEST(_uw_string_length(&v) == 0);
+        TEST(_uw_string_capacity(&v) == 12);
+        TEST(_uw_string_char_size(&v) == 1);
         //uw_dump(stdout, &v);
 
         uw_string_append(&v, "hello");
 
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-
-        TEST(capmeth->get_length(s) == 5);
-        TEST(capmeth->get_capacity(s) == 12);
+        TEST(_uw_string_length(&v) == 5);
+        TEST(_uw_string_capacity(&v) == 12);
         //uw_dump(stdout, &v);
 
         uw_string_append(&v, '!');
 
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-
-        TEST(capmeth->get_length(s) == 6);
-        TEST(capmeth->get_capacity(s) == 12);
+        TEST(_uw_string_length(&v) == 6);
+        TEST(_uw_string_capacity(&v) == 12);
         //uw_dump(stdout, &v);
 
-        // increase capacity to 2 bytes
+        // XXX TODO increase capacity to more than 64K
         for (int i = 0; i < 250; i++) {
             uw_string_append_char(&v, ' ');
         }
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-
-        TEST(capmeth->get_length(s) == 256);
-        TEST(capmeth->get_capacity(s) == 278);
-        TEST(_uw_string_char_size(s) == 1);
-        TEST(_uw_string_cap_size(s) == 2);
+        TEST(_uw_string_length(&v) == 256);
+        TEST(_uw_string_char_size(&v) == 1);
         //uw_dump(stdout, &v);
 
         uw_string_append(&v, "everybody");
         uw_string_erase(&v, 5, 255);
         TEST(uw_equal(&v, "hello everybody"));
+        //uw_dump(stdout, &v);
         TEST(!uw_equal(&v, ""));
 
         // test comparison
@@ -531,10 +488,8 @@ void test_string()
         uw_string_truncate(&v, 0);
         TEST(uw_equal(&v, ""));
 
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 278);
+        TEST(_uw_string_length(&v) == 0);
+        TEST(_uw_string_capacity(&v) == 268);
         //uw_dump(stdout, &v);
 
         // test append substring
@@ -549,74 +504,31 @@ void test_string()
         // change char size to 2-byte by appending wider chars -- the string will be copied
         uw_string_append(&v, u8"สวัสดี");
 
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 6);
-        TEST(capmeth->get_capacity(s) == 6);
-        TEST(_uw_string_char_size(s) == 2);
-        TEST(_uw_string_cap_size(s) == 1);
+        TEST(_uw_string_length(&v) == 6);
+        TEST(_uw_string_capacity(&v) == 6);
+        TEST(_uw_string_char_size(&v) == 2);
         TEST(uw_equal(&v, u8"สวัสดี"));
         //uw_dump(stdout, &v);
     }
 
-#   if 0 //def DEBUG
-    { // testing cap_size=2 char_size=1
-        UwValue v = uw_create_empty_string2(2, 1);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 2);
-        TEST(_uw_string_char_size(s) == 1);
-        TEST(_uw_string_cap_size(s) == 2);
-        uw_dump(stdout, &v);
-    }
-
-    { // testing cap_size=4 char_size=1
-        UwValue v = uw_create_empty_string2(4, 1);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 4);
-        TEST(_uw_string_char_size(s) == 1);
-        TEST(_uw_string_cap_size(s) == 4);
-        //uw_dump(stdout, &v);
-    }
-
-#   if UINT_WIDTH > 32
-    { // testing cap_size=8 char_size=1
-        UwValue v = uw_create_empty_string2(8, 1);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 8);
-        TEST(_uw_string_char_size(s) == 1);
-        TEST(_uw_string_cap_size(s) == 8);
-        //uw_dump(stdout, &v);
-    }
-#   endif
-#   endif
-
-    { // testing cap_size=1 char_size=2
+    { // testing char_size=2
         UwValue v = uw_create_empty_string(1, 2);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 6);
-        TEST(_uw_string_char_size(s) == 2);
-        TEST(_uw_string_cap_size(s) == 1);
+        TEST(_uw_string_length(&v) == 0);
+        TEST(_uw_string_capacity(&v) == 6);
+        TEST(_uw_string_char_size(&v) == 2);
         //uw_dump(stdout, &v);
 
         uw_string_append(&v, u8"สบาย");
 
-        TEST(capmeth->get_length(s) == 4);
-        TEST(capmeth->get_capacity(s) == 6);
+        TEST(_uw_string_length(&v) == 4);
+        TEST(_uw_string_capacity(&v) == 6);
         //uw_dump(stdout, &v);
 
         uw_string_append(&v, 0x0e14);
         uw_string_append(&v, 0x0e35);
 
-        TEST(capmeth->get_length(s) == 6);
-        TEST(capmeth->get_capacity(s) == 6);
+        TEST(_uw_string_length(&v) == 6);
+        TEST(_uw_string_capacity(&v) == 6);
         TEST(uw_equal(&v, u8"สบายดี"));
         //uw_dump(stdout, &v);
 
@@ -629,13 +541,9 @@ void test_string()
         for (int i = 0; i < 251; i++) {
             uw_string_append(&v, ' ');
         }
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-
-        TEST(capmeth->get_length(s) == 255);
-        TEST(capmeth->get_capacity(s) == 267);
-        TEST(_uw_string_char_size(s) == 2);
-        TEST(_uw_string_cap_size(s) == 2);
+        TEST(_uw_string_length(&v) == 255);
+        TEST(_uw_string_capacity(&v) == 262);
+        TEST(_uw_string_char_size(&v) == 2);
         //uw_dump(stdout, &v);
 
         uw_string_append(&v, U"สบาย");
@@ -682,146 +590,26 @@ void test_string()
         TEST(uw_equal(&v, U"บายบาย"));
         uw_string_truncate(&v, 0);
 
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 267);
+        TEST(_uw_string_length(&v) == 0);
+        TEST(_uw_string_capacity(&v) == 262);
         //uw_dump(stdout, &v);
     }
 
-#   if 0 //def DEBUG
-    { // testing cap_size=2 char_size=2
-        UwValue v = uw_create_empty_string2(2, 2);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 1);
-        TEST(_uw_string_char_size(s) == 2);
-        TEST(_uw_string_cap_size(s) == 2);
-        uw_dump(stdout, &v);
-    }
-
-    { // testing cap_size=4 char_size=2
-        UwValue v = uw_create_empty_string2(4, 2);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 2);
-        TEST(_uw_string_char_size(s) == 2);
-        TEST(_uw_string_cap_size(s) == 4);
-        //uw_dump(stdout, &v);
-    }
-
-#   if UINT_WIDTH > 32
-    { // testing cap_size=8 char_size=2
-        UwValue v = uw_create_empty_string2(8, 2);
-        //uw_dump(stdout, s_8_2);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 4);
-        TEST(_uw_string_char_size(s) == 2);
-        TEST(_uw_string_cap_size(s) == 8);
-        //uw_dump(stdout, &v);
-    }
-#   endif
-#   endif
-
-    { // testing cap_size=1 char_size=3
+    { // testing char_size=3
         UwValue v = uw_create_empty_string(1, 3);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 4);
-        TEST(_uw_string_char_size(s) == 3);
-        TEST(_uw_string_cap_size(s) == 1);
+        TEST(_uw_string_length(&v) == 0);
+        TEST(_uw_string_capacity(&v) == 4);
+        TEST(_uw_string_char_size(&v) == 3);
         //uw_dump(stdout, &v);
     }
 
-#   if 0 //def DEBUG
-    { // testing cap_size=2 char_size=3
-        UwValue v = uw_create_empty_string2(2, 3);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 3);
-        TEST(_uw_string_char_size(s) == 3);
-        TEST(_uw_string_cap_size(s) == 2);
-        //uw_dump(stdout, &v);
-    }
-
-    { // testing cap_size=4 char_size=3
-        UwValue v = uw_create_empty_string2(4, 3);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 1);
-        TEST(_uw_string_char_size(s) == 3);
-        TEST(_uw_string_cap_size(s) == 4);
-        //uw_dump(stdout, &v);
-    }
-
-#   if UINT_WIDTH > 32
-    { // testing cap_size=8 char_size=3
-        UwValue v = uw_create_empty_string2(8, 3);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 2);
-        TEST(_uw_string_char_size(s) == 3);
-        TEST(_uw_string_cap_size(s) == 8);
-        //uw_dump(stdout, &v);
-    }
-#   endif
-#   endif
-
-    { // testing cap_size=1 char_size=4
+    { // testing char_size=4
         UwValue v = uw_create_empty_string(1, 4);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 3);
-        TEST(_uw_string_char_size(s) == 4);
-        TEST(_uw_string_cap_size(s) == 1);
+        TEST(_uw_string_length(&v) == 0);
+        TEST(_uw_string_capacity(&v) == 3);
+        TEST(_uw_string_char_size(&v) == 4);
         //uw_dump(stdout, &v);
     }
-
-#   if 0 //def DEBUG
-    { // testing cap_size=2 char_size=4
-        UwValue v = uw_create_empty_string2(2, 4);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 2);
-        TEST(_uw_string_char_size(s) == 4);
-        TEST(_uw_string_cap_size(s) == 2);
-        //uw_dump(stdout, &v);
-    }
-
-    { // testing cap_size=4 char_size=4
-        UwValue v = uw_create_empty_string2(4, 4);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 1);
-        TEST(_uw_string_char_size(s) == 4);
-        TEST(_uw_string_cap_size(s) == 4);
-        //uw_dump(stdout, &v);
-    }
-
-#if UINT_WIDTH > 32
-    { // testing cap_size=8 char_size=4
-        UwValue v = uw_create_empty_string2(8, 4);
-        s = _uw_get_string_ptr(&v);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_length(s) == 0);
-        TEST(capmeth->get_capacity(s) == 2);
-        TEST(_uw_string_char_size(s) == 4);
-        TEST(_uw_string_cap_size(s) == 8);
-        //uw_dump(stdout, &v);
-    }
-#   endif
-#   endif
 
     { // test trimming
         UwValue v = uw_create(u8"  สวัสดี   ");
@@ -883,11 +671,8 @@ void test_string()
         UWDECL_String(str);
 
         uw_string_append_buffer(&str, data, sizeof(data));
-
-        s = _uw_get_string_ptr(&str);
-        capmeth = get_cap_methods(s);
-        TEST(capmeth->get_capacity(s) >= capmeth->get_length(s));
-        TEST(capmeth->get_length(s) == 2500);
+        TEST(_uw_string_capacity(&str) >= _uw_string_length(&str));
+        TEST(_uw_string_length(&str) == 2500);
         //uw_dump(stdout, &str);
     }
 }
@@ -1087,8 +872,6 @@ int main(int argc, char* argv[])
     //pet_allocator.trace = true;
     //pet_allocator.verbose = true;
     init_allocator(&pet_allocator);
-
-    fprintf(stderr, "Types capacity: %d; interfaces capacity: %d\n", UW_TYPE_CAPACITY, UW_INTERFACE_CAPACITY);
 
     struct timespec start_time, end_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);

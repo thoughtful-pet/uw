@@ -4,6 +4,8 @@
 extern "C" {
 #endif
 
+extern UwTypeId UwTypeId_StringIO;
+
 /****************************************************************
  * LineReader interface
  */

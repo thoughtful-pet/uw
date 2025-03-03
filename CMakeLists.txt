@@ -57,13 +57,6 @@ foreach(TARGET ${common_defs_targets})
         target_compile_definitions(${TARGET} PUBLIC DEBUG)
     endif()
 
-    if(DEFINED ENV{UW_TYPE_CAPACITY})
-        target_compile_definitions(${TARGET} PUBLIC UW_TYPE_CAPACITY=$ENV{UW_TYPE_CAPACITY})
-    endif()
-    if(DEFINED ENV{UW_INTERFACE_CAPACITY})
-        target_compile_definitions(${TARGET} PUBLIC UW_INTERFACE_CAPACITY=$ENV{UW_INTERFACE_CAPACITY})
-    endif()
-
     if(DEFINED ICU_FOUND AND NOT DEFINED ENV{UW_WITHOUT_ICU})
         target_compile_definitions(${TARGET} PUBLIC UW_WITH_ICU)
     endif()

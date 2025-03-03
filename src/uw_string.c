@@ -1,5 +1,4 @@
 #include <limits.h>
-#include <string.h>
 
 #include "include/uw.h"
 #include "src/uw_charptr_internal.h"
@@ -7,18 +6,13 @@
 
 // lookup table to validate capacity
 
-#define _header_size  \
-    (offsetof(struct _UwStringExtraData, string_data) + 8 /* slightly longer than string header */)
+#define _header_size  (sizeof(struct _UwStringExtraData) + 2 * sizeof(unsigned))
 
-static unsigned _max_capacity[8] = {
+static unsigned _max_capacity[4] = {
     UINT_MAX - _header_size,
     (UINT_MAX - _header_size) / 2,
     (UINT_MAX - _header_size) / 3,
-    (UINT_MAX - _header_size) / 4,
-    0,  // unused
-    0,  // unused
-    0,  // unused
-    (UINT_MAX - _header_size) / 8
+    (UINT_MAX - _header_size) / 4
 };
 
 /****************************************************************
@@ -28,42 +22,11 @@ static unsigned _max_capacity[8] = {
 void* uw_string_get_bytes(UwValuePtr str, unsigned* length)
 {
     uw_assert_string(str);
-    struct _UwString* s = _uw_get_string_ptr(str);
-    uint8_t char_size = _uw_string_char_size(s);
-    CapMethods* capmeth = get_cap_methods(s);
-    *length = char_size * capmeth->get_length(s);
-    return (void*) get_char_ptr(s, 0);
+    uint8_t char_size = _uw_string_char_size(str);
+    *length = char_size * _uw_string_length(str);
+    return (void*) _uw_string_char_ptr(str, 0);
 }
 
-[[noreturn]]
-static void panic_bad_cap_size(struct _UwString* str)
-{
-    uw_panic("Bad length/capacity size: %u\n", _uw_string_cap_size(str));
-}
-
-[[noreturn]]
-static void panic_bad_char_size(uint8_t char_size)
-{
-    uw_panic("Bad char size: %u\n", char_size);
-}
-
-static inline uint8_t calc_cap_size(unsigned capacity)
-{
-    if (capacity < 256) {
-        return 1;
-    } else if (capacity < 65536) {
-        return 2;
-#if UINT_WIDTH == 32
-    } else {
-        return 4;
-#else
-    } else if (capacity < (1ULL << 32)) {
-        return 4;
-    } else {
-        return 8;
-#endif
-    }
-}
 static inline uint8_t calc_char_size(char32_t c)
 {
     if (c < 256) {
@@ -115,106 +78,21 @@ static inline uint8_t char_width_to_char_size(uint8_t width)
     return 1;
 }
 
-static unsigned _calc_string_memsize_helper(struct _UwString* desired_addr,
-                                            unsigned desired_capacity,
-                                            uint8_t cap_size, uint8_t char_size,
-                                            unsigned* real_capacity)
-/*
- * Calculate memsize for string with given `char_size`, `cap_size`,  and `desired_capacity`.
- * Return memsize and real capacity.
- *
- * This function does not dereference `desired_addr` and can be used to calculate
- * size starting from nullptr.
- */
-{
-    // final test, if previous ones failed to return OOM error
-    uw_assert(desired_capacity <= _max_capacity[char_size]);
-
-    // get address of the first character in string
-    uint8_t* char0_addr = get_char0_ptr(desired_addr, cap_size, char_size);
-
-    // calculate end address
-    uint8_t* end_addr = align_pointer(
-        char0_addr + char_size * desired_capacity,
-        UWSTRING_BLOCK_SIZE
-    );
-    ptrdiff_t memsize = end_addr - (uint8_t*) desired_addr;
-    ptrdiff_t strsize = end_addr - char0_addr;
-
-#   if UINT_MAX < PTRDIFF_MAX
-        if (memsize > UINT_MAX) {
-            uw_panic("String memory size is too big: %td\n", memsize);
-        }
-#   endif
-
-    *real_capacity = (unsigned) (strsize / char_size);
-    return (unsigned) memsize;
-}
-
-static unsigned calc_string_memsize(struct _UwString* desired_addr,
-                                    unsigned desired_capacity, uint8_t char_size,
-                                    unsigned* real_capacity)
-/*
- * Calculate size of memory for string starting from possibly unaligned `desired_addr`.
- *
- * This function does not dereference `desired_addr` and can be used to calculate
- * size starting from nullptr.
- */
-{
-    // calculate capacity that padded memory block may hold (and memsize, of course)
-    uint8_t cap_size = calc_cap_size(desired_capacity);
-    unsigned memsize = _calc_string_memsize_helper(
-        desired_addr, desired_capacity, cap_size, char_size, real_capacity
-    );
-    uint8_t real_cap_size = calc_cap_size(*real_capacity);
-
-    // now check if cap_size increased
-
-    if (real_cap_size == cap_size) {
-        // no need to increase, real capacity and memsize are final,
-        // do nothing here
-    }
-    else if (real_cap_size < cap_size) {
-        // uh oh
-        uw_panic("Something went wrong: real cap_size %u must be greater or equal %u\n", real_cap_size, cap_size);
-
-    } else {
-        // yes, cap_size should be increased
-        // re-calculate
-        memsize = _calc_string_memsize_helper(
-            desired_addr, *real_capacity, real_cap_size, char_size, real_capacity
-        );
-    }
-
-    return memsize;
-}
-
-static inline unsigned calc_extra_data_size(uint8_t char_size, unsigned desired_capacity, unsigned* real_capacity)
+static unsigned calc_extra_data_size(uint8_t char_size, unsigned desired_capacity, unsigned* real_capacity)
 /*
  * Calculate memory size for extra data.
  */
 {
-    unsigned offset = offsetof(struct _UwStringExtraData, string_data);
-    return offset + calc_string_memsize((void*) (ptrdiff_t) offset, desired_capacity, char_size, real_capacity);
-}
-
-static inline unsigned get_string_memsize(struct _UwString* s)
-/*
- * Get memory size occupied by string.
- */
-{
-    uint8_t* end_addr = align_pointer(
-        get_char_ptr(s, get_cap_methods(s)->get_capacity(s)),
-        UWSTRING_BLOCK_SIZE
-    );
-    ptrdiff_t memsize = end_addr - (uint8_t*) s;
-
-#   if UINT_MAX < PTRDIFF_MAX
-        if (memsize > UINT_MAX) {
-            uw_panic("String memory size is too big: %td\n", memsize);
-        }
-#   endif
-    return (unsigned) memsize;
+    unsigned header_size = sizeof(struct _UwStringExtraData);
+    if (_unlikely_(desired_capacity >= 65536)) {
+        header_size += 2 * sizeof(unsigned);
+    }
+    unsigned size = header_size + char_size * desired_capacity + UWSTRING_BLOCK_SIZE - 1;
+    size &= ~(UWSTRING_BLOCK_SIZE - 1);
+    if (real_capacity) {
+        *real_capacity = (size - header_size) / char_size;
+    }
+    return size;
 }
 
 static inline unsigned get_extra_data_size(UwValuePtr str)
@@ -222,63 +100,39 @@ static inline unsigned get_extra_data_size(UwValuePtr str)
  * Get memory size occupied by extra data.
  */
 {
-    struct _UwString* s = _uw_get_string_ptr(str);
-    return offsetof(struct _UwStringExtraData, string_data) + get_string_memsize(s);
+    return calc_extra_data_size(_uw_string_char_size(str), _uw_string_capacity(str), nullptr);
 }
 
-static inline unsigned get_embedded_capacity(uint8_t char_size)
-{
-    static _UwValue v;
-    switch (char_size) {
-        case 1: return _UWC_LENGTH_OF(v.str_1);
-        case 2: return _UWC_LENGTH_OF(v.str_2);
-        case 3: return _UWC_LENGTH_OF(v.str_3);
-        case 4: return _UWC_LENGTH_OF(v.str_4);
-        default: panic_bad_char_size(char_size);
-    }
-}
-
-static bool make_empty_string(UwValuePtr result, uint8_t cap_size, unsigned capacity, uint8_t char_size)
+static bool make_empty_string(UwValuePtr result, unsigned capacity, uint8_t char_size)
 /*
  * Create empty string with desired parameters.
  * Result type_id must be set before calling this function, other fields are assumed undefined.
  * Return false if OOM.
  */
 {
+    result->str_embedded_length = 0;
+
     // check if string can be embedded into result
 
-    if (cap_size == 1) {
-
-        unsigned result_capacity = get_embedded_capacity(char_size);
-        if (capacity <= result_capacity) {
-            _uw_string_set_cap_size (&result->str_header, 1);
-            _uw_string_set_char_size(&result->str_header, char_size);
-            result->str_length = 0;
-            result->str_capacity = result_capacity;
-            result->str_header.is_embedded = 1;
-            result->str_4[0] = 0;
-            result->str_4[1] = 0;
-            result->str_4[2] = 0;
-            static_assert(sizeof(result->str_4) == 12);
-            return true;
-        }
+    if (capacity <= get_embedded_capacity(char_size)) {
+        _uw_string_set_char_size(result, char_size);
+        result->str_embedded = 1;
+        result->str_uint_cap = 0;
+        bzero(result->str_1, sizeof(result->str_1));
+        return true;
     }
 
     if(capacity > _max_capacity[char_size]) {
         return false;
     }
 
-    result->str_header.is_embedded = 0;
+    result->str_embedded = 0;
+    result->str_uint_cap = capacity >= 65536;
 
     // allocate string
 
     unsigned real_capacity;
     unsigned memsize = calc_extra_data_size(char_size, capacity, &real_capacity);
-    uw_assert(capacity <= real_capacity);
-    uint8_t real_cap_size = calc_cap_size(real_capacity);
-    if (cap_size < real_cap_size) {
-        cap_size = real_cap_size;
-    }
 
     UwType* t = _uw_types[result->type_id];
 
@@ -286,51 +140,49 @@ static bool make_empty_string(UwValuePtr result, uint8_t cap_size, unsigned capa
     if (!result->extra_data) {
         return false;
     }
-
     result->extra_data->refcount = 1;
 
-    struct _UwString* s = _uw_get_string_ptr(result);
-
-    _uw_string_set_cap_size (s, cap_size);
-    _uw_string_set_char_size(s, char_size);
-
-    CapMethods* capmeth = get_cap_methods(s);
-    capmeth->set_length(s, 0);
-    capmeth->set_capacity(s, real_capacity);
+    _uw_string_set_char_size(result, char_size);
+    _uw_string_set_length(result, 0);
+    _uw_string_set_capacity(result, real_capacity);
     return result;
 }
 
-static struct _UwString* expand_string(UwValuePtr str, unsigned increment, uint8_t new_char_size)
+static bool expand_string(UwValuePtr str, unsigned increment, uint8_t new_char_size)
 /*
- * Expand string if necessary, replacing `str->extra_data`.
+ * Expand string in place, if necessary, replacing `str->extra_data`.
  *
- * If string refcount is greater than 1, always make a copy because the string is about to be updated.
- *
- * Return pointer to string data
+ * If string refcount is greater than 1, always make a copy of `str->extra_data`
+ * because the string is about to be updated.
  */
 {
     uw_assert_string(str);
-    if (_uw_str_is_embedded(str)) {
-        struct _UwString* s = _uw_get_string_ptr(str);
-        if (new_char_size < _uw_string_char_size(s)) {
+    uint8_t char_size = _uw_string_char_size(str);
+    if (str->str_embedded) {
+        if (new_char_size < char_size) {
             if (increment == 0) {
-                return s;
+                // no need to expand
+                return true;
             }
-            new_char_size = _uw_string_char_size(s);
+            // current char_size is greater than new one, use current as new:
+            new_char_size = char_size;
         }
-        if (increment > _max_capacity[new_char_size] - str->str_length) {
-            return nullptr;
+        if (increment > _max_capacity[new_char_size] - str->str_embedded_length) {
+            return false;
         }
-        unsigned new_length = str->str_length + increment;
+        unsigned new_length = str->str_embedded_length + increment;
         if (new_length <= get_embedded_capacity(new_char_size)) {
             // no need to expand
-            if (new_char_size > _uw_string_char_size(s)) {
+            if (new_char_size > char_size) {
                 // but need to make existing chars wider
-                _UwValue saved_str = *str;
-                struct _UwString* s_src   = _uw_get_string_ptr(&saved_str);
-                get_str_methods(s_src)->copy_to(get_char_ptr(s_src, 0), s, 0, str->str_length);
+                _UwValue orig_str = *str;
+                _uw_string_set_char_size(str, new_char_size);
+                get_str_methods(&orig_str)->copy_to(
+                    _uw_string_char_ptr(&orig_str, 0),
+                    str, 0, orig_str.str_embedded_length
+                );
             }
-            return s;
+            return true;
         }
         goto copy_string;
     }
@@ -346,8 +198,6 @@ static struct _UwString* expand_string(UwValuePtr str, unsigned increment, uint8
 
         // refcount is 1, check if string needs expanding
 
-        struct _UwString* s = _uw_get_string_ptr(str);
-        uint8_t char_size = _uw_string_char_size(s);
         if (new_char_size > char_size) {
             // copy string if char size needs to increase
             // make refcount zero to free original data after copy
@@ -355,107 +205,86 @@ static struct _UwString* expand_string(UwValuePtr str, unsigned increment, uint8
             goto copy_string;
         }
 
-        CapMethods* capmeth = get_cap_methods(s);
-        unsigned length = capmeth->get_length(s);
+        unsigned length = _uw_string_length(str);
 
         if (increment > _max_capacity[new_char_size] - length) {
-            return nullptr;
+            return false;
         }
 
         unsigned new_length = length + increment;
-        unsigned capacity = capmeth->get_capacity(s);
+        unsigned capacity = _uw_string_capacity(str);
 
         if (new_length <= capacity) {
             // no need to expand
-            return s;
+            return true;
         }
 
         // reallocate data
 
-        unsigned check_capacity;
-        unsigned orig_memsize = calc_extra_data_size(char_size, capacity, &check_capacity);
-        uw_assert(capacity == check_capacity);
-
+        unsigned orig_memsize = get_extra_data_size(str);
         unsigned new_capacity;
         unsigned new_memsize = calc_extra_data_size(char_size, new_length, &new_capacity);
 
-        bool addr_changed;
         if (!_uw_types[str->type_id]->allocator->reallocate((void**) &str->extra_data,
-                                                            orig_memsize, new_memsize, true, &addr_changed)) {
-            return nullptr;
-        }
-        if (addr_changed) {
-            s = _uw_get_string_ptr(str);
+                                                            orig_memsize, new_memsize, true, nullptr)) {
+            return false;
         }
 
-        uint8_t old_cap_size = calc_cap_size(capacity);
-        uint8_t new_cap_size = calc_cap_size(new_capacity);
+        if (capacity < 65536 && new_capacity >= 65536) {
+            // header size increased
 
-        if (new_cap_size > old_cap_size) {
-            // header size increased, move string to the right
-            uint8_t* src_addr  = get_char0_ptr(s, old_cap_size, char_size);
-            uint8_t* dest_addr = get_char0_ptr(s, new_cap_size, char_size);
+            // move string to the right
+            uint8_t* src_addr  = ((uint8_t*) str->extra_data) + sizeof(struct _UwStringExtraData);
+            uint8_t* dest_addr = src_addr + sizeof(unsigned);
             memmove(dest_addr, src_addr, length * char_size);
+
+            // update string parameters
+            str->str_uint_cap = 1;
+            _uw_string_set_length(str, length);  // update length in the extra_data
         }
+        _uw_string_set_capacity(str, new_capacity);
 
-        _uw_string_set_cap_size (s, new_cap_size);
-
-        capmeth = get_cap_methods(s);
-        capmeth->set_length(s, length);           // keep old length
-        capmeth->set_capacity(s, new_capacity);
-
-        return s;
+        return true;
     }
 
 copy_string: {
 
-        // save original string
-        _UwValue saved_str = *str;
-        struct _UwString* s_src   = _uw_get_string_ptr(&saved_str);
-
-        uint8_t src_char_size = _uw_string_char_size(s_src);
-        unsigned length = get_cap_methods(s_src)->get_length(s_src);
+        _UwValue orig_str = *str;
+        unsigned length = _uw_string_length(str);
 
         if (increment > _max_capacity[new_char_size] - length) {
+            // cannot expand
             // restore refcount of the original string
-            if (!_uw_str_is_embedded(str)) {
+            if (!str->str_embedded) {
                 str->extra_data->refcount++;
             }
-            return nullptr;
+            return false;
         }
 
         unsigned new_length = length + increment;
 
-        if (new_char_size < src_char_size) {
-            new_char_size = src_char_size;
+        if (new_char_size < char_size) {
+            new_char_size = char_size;
         }
 
         // allocate string
-        if (!make_empty_string(str, calc_cap_size(new_length), new_length, new_char_size)) {
+        if (!make_empty_string(str, new_length, new_char_size)) {
             // restore refcount of the original string
-            if (!_uw_str_is_embedded(str)) {
+            if (!str->str_embedded) {
                 str->extra_data->refcount++;
             }
-            return nullptr;
+            return false;
         }
-        struct _UwString* s_dest  = _uw_get_string_ptr(str);
 
-        // copy saved data to allocated string
-        get_str_methods(s_src)->copy_to(get_char_ptr(s_src, 0), s_dest, 0, length);
-
-        // keep old length
-        get_cap_methods(s_dest)->set_length(s_dest, length);
+        // copy original string to new string
+        get_str_methods(&orig_str)->copy_to(_uw_string_char_ptr(&orig_str, 0), str, 0, length);
+        _uw_string_set_length(str, length);
 
         // free saved string if not embedded and reference count is zero
-        if (!_uw_str_is_embedded(&saved_str) && saved_str.extra_data->refcount == 0) {
-
-            unsigned capacity = get_cap_methods(s_src)->get_capacity(s_src);
-            unsigned cleck_capacity;
-            unsigned memsize = calc_extra_data_size(src_char_size, capacity, &cleck_capacity);
-            uw_assert(capacity == cleck_capacity);
-            _uw_types[saved_str.type_id]->allocator->release((void**) &saved_str.extra_data, memsize);
+        if (!orig_str.str_embedded && orig_str.extra_data->refcount == 0) {
+            _uw_types[orig_str.type_id]->allocator->release((void**) &orig_str.extra_data, get_extra_data_size(&orig_str));
         }
-        return s_dest;
+        return true;
     }
 }
 
@@ -476,7 +305,7 @@ UwResult _uw_string_create(UwTypeId type_id, va_list ap)
 
 void _uw_string_destroy(UwValuePtr self)
 {
-    if (_uw_str_is_embedded(self)) {
+    if (self->str_embedded) {
         return;
     }
     if (0 == --self->extra_data->refcount) {
@@ -489,7 +318,7 @@ void _uw_string_destroy(UwValuePtr self)
 UwResult _uw_string_clone(UwValuePtr self)
 {
     UwValue result = *self;
-    if (!result.str_header.is_embedded) {
+    if (!result.str_embedded) {
         if (result.extra_data) {
             result.extra_data->refcount++;
         }
@@ -502,10 +331,9 @@ void _uw_string_hash(UwValuePtr self, UwHashContext* ctx)
     // mind maps: the hash should be the same for subtypes, that's why not using self->type_id here
     _uw_hash_uint64(ctx, UwTypeId_String);
 
-    struct _UwString* s = _uw_get_string_ptr(self);
-    unsigned length = get_cap_methods(s)->get_length(s);
+    unsigned length = _uw_string_length(self);
     if (length) {
-        get_str_methods(s)->hash(get_char_ptr(s, 0), length, ctx);
+        get_str_methods(self)->hash(_uw_string_char_ptr(self, 0), length, ctx);
     }
 }
 
@@ -517,29 +345,24 @@ void _uw_string_dump(UwValuePtr self, FILE* fp, int first_indent, int next_inden
 
 void _uw_string_dump_data(FILE* fp, UwValuePtr str, int indent)
 {
-    struct _UwString* s;
-
-    if (_uw_str_is_embedded(str)) {
+    if (str->str_embedded) {
         fprintf(fp, " embedded,");
-        s = &str->str_header;
     } else {
-        fprintf(fp, " data=%p, refcount=%u,", str->extra_data, str->extra_data->refcount);
-        s = _uw_get_string_ptr(str);
+        fprintf(fp, " data=%p, refcount=%u, uint_cap=%s,",
+                str->extra_data, str->extra_data->refcount, str->str_uint_cap? "true" : "false");
     }
-    CapMethods* capmeth = get_cap_methods(s);
-    unsigned length = capmeth->get_length(s);
+    unsigned length = _uw_string_length(str);
 
-    fprintf(fp, " %u chars, capacity=%u, char size=%u, cap size=%u\n",
-            length, capmeth->get_capacity(s),
-            _uw_string_char_size(s), _uw_string_cap_size(s));
+    fprintf(fp, " %u chars, capacity=%u, char size=%u\n",
+            length, _uw_string_capacity(str), _uw_string_char_size(str));
     indent += 4;
 
     if (length) {
         // print first 80 characters
         _uw_print_indent(fp, indent);
-        StrMethods* strmeth = get_str_methods(s);
+        StrMethods* strmeth = get_str_methods(str);
         for(unsigned i = 0; i < length; i++) {
-            _uw_putchar32_utf8(fp, strmeth->get_char(get_char_ptr(s, i)));
+            _uw_putchar32_utf8(fp, strmeth->get_char(_uw_string_char_ptr(str, i)));
             if (i == 80) {
                 fprintf(fp, "...");
                 break;
@@ -551,30 +374,28 @@ void _uw_string_dump_data(FILE* fp, UwValuePtr str, int indent)
 
 bool _uw_string_is_true(UwValuePtr self)
 {
-    struct _UwString* str = _uw_get_string_ptr(self);
-    CapMethods* capmeth = get_cap_methods(str);
-    return capmeth->get_length(str);
+    return _uw_string_length(self);
 }
 
-static inline bool _uw_string_eq(struct _UwString* a, struct _UwString* b)
+static inline bool _uw_string_eq(UwValuePtr a, UwValuePtr b)
 {
     if (a == b) {
         return true;
     }
-    unsigned a_length = get_cap_methods(a)->get_length(a);
-    unsigned b_length = get_cap_methods(b)->get_length(b);
+    unsigned a_length = _uw_string_length(a);
+    unsigned b_length = _uw_string_length(b);
     if (a_length != b_length) {
         return false;
     }
     if (a_length == 0) {
         return true;
     }
-    return get_str_methods(a)->equal(get_char_ptr(a, 0), b, 0, a_length);
+    return get_str_methods(a)->equal(_uw_string_char_ptr(a, 0), b, 0, a_length);
 }
 
 bool _uw_string_equal_sametype(UwValuePtr self, UwValuePtr other)
 {
-    return _uw_string_eq(_uw_get_string_ptr(self), _uw_get_string_ptr(other));
+    return _uw_string_eq(self, other);
 }
 
 bool _uw_string_equal(UwValuePtr self, UwValuePtr other)
@@ -583,7 +404,7 @@ bool _uw_string_equal(UwValuePtr self, UwValuePtr other)
     for (;;) {
         switch (t) {
             case UwTypeId_String:
-                return _uw_string_eq(_uw_get_string_ptr(self), _uw_get_string_ptr(other));
+                return _uw_string_eq(self, other);
 
             case UwTypeId_CharPtr:
                 return _uw_charptr_equal_string(other, self);
@@ -777,14 +598,13 @@ char8_t* utf8_skip(char8_t* str, unsigned n)
 unsigned uw_strlen_in_utf8(UwValuePtr str)
 {
     uw_assert_string(str);
-    struct _UwString* s = _uw_get_string_ptr(str);
-    uint8_t char_size = _uw_string_char_size(s);
+    uint8_t char_size = _uw_string_char_size(str);
 
-    StrMethods* strmeth = get_str_methods(s);
-    char8_t* ptr = get_char_ptr(s, 0);
+    StrMethods* strmeth = get_str_methods(str);
+    char8_t* ptr = _uw_string_char_ptr(str, 0);
 
     unsigned length = 0;
-    unsigned n = get_cap_methods(s)->get_length(s);
+    unsigned n = _uw_string_length(str);
     while (n) {
         char32_t c = strmeth->get_char(ptr);
         if (c < 0x80) {
@@ -907,76 +727,6 @@ uint8_t u32_char_size(char32_t* str, unsigned max_len)
     return char_width_to_char_size(width);
 }
 
-/****************************************************************
- * Methods that depend on cap_size field.
- */
-
-#define CAP_DATA_ADDR(typename, str)  \
-    ((typename*) (  \
-        cap_data_addr(sizeof(typename), (str))  \
-    ))
-
-#define CAP_METHODS_IMPL(typename)  \
-    static inline unsigned get_length_##typename(struct _UwString* str)  \
-    {  \
-        return CAP_DATA_ADDR(typename, str)[0];  \
-    }  \
-    static unsigned _get_length_##typename(struct _UwString* str)  \
-    {  \
-        return get_length_##typename(str);  \
-    }  \
-    static inline void set_length_##typename(struct _UwString* str, unsigned n)  \
-    {  \
-        CAP_DATA_ADDR(typename, str)[0] = (typename) n;  \
-    }  \
-    static void _set_length_##typename(struct _UwString* str, unsigned n)  \
-    {  \
-        set_length_##typename(str, n);  \
-    }  \
-    static inline unsigned get_capacity_##typename(struct _UwString* str)  \
-    {  \
-        return CAP_DATA_ADDR(typename, str)[1];  \
-    }  \
-    static unsigned _get_capacity_##typename(struct _UwString* str)  \
-    {  \
-        return get_capacity_##typename(str);  \
-    }  \
-    static inline void set_capacity_##typename(struct _UwString* str, unsigned n)  \
-    {  \
-        CAP_DATA_ADDR(typename, str)[1] = (typename) n;  \
-    }  \
-    static void _set_capacity_##typename(struct _UwString* str, unsigned n)  \
-    {  \
-        set_capacity_##typename(str, n);  \
-    }
-
-CAP_METHODS_IMPL(uint8_t)
-CAP_METHODS_IMPL(uint16_t)
-CAP_METHODS_IMPL(uint32_t)
-
-#if UINT_WIDTH > 32
-    CAP_METHODS_IMPL(uint64_t)
-#endif
-
-static unsigned _get_length_x(struct _UwString* str)              { panic_bad_cap_size(str); }
-static void     _set_length_x(struct _UwString* str, unsigned n)  { panic_bad_cap_size(str); }
-#define _get_capacity_x  _get_length_x
-#define _set_capacity_x  _set_length_x
-
-CapMethods _uws_cap_methods[] = {
-    { _get_length_uint8_t,  _set_length_uint8_t,  _get_capacity_uint8_t,  _set_capacity_uint8_t  },
-    { _get_length_uint16_t, _set_length_uint16_t, _get_capacity_uint16_t, _set_capacity_uint16_t },
-    { _get_length_x,        _set_length_x,        _get_capacity_x,        _set_capacity_x        },
-    { _get_length_uint32_t, _set_length_uint32_t, _get_capacity_uint32_t, _set_capacity_uint32_t },
-    { _get_length_x,        _set_length_x,        _get_capacity_x,        _set_capacity_x        },
-    { _get_length_x,        _set_length_x,        _get_capacity_x,        _set_capacity_x        },
-    { _get_length_x,        _set_length_x,        _get_capacity_x,        _set_capacity_x        },
-#if UINT_WIDTH > 32
-    { _get_length_uint64_t, _set_length_uint64_t, _get_capacity_uint64_t, _set_capacity_uint64_t }
-#else
-    { _get_length_x,        _set_length_x,        _get_capacity_x,        _set_capacity_x        }
-#endif
-};
 
 /****************************************************************
  * Methods that depend on char_size field.
@@ -1216,10 +966,10 @@ STR_EQ_O24_HELPER_IMPL(uint16_t)
 STR_EQ_O24_HELPER_IMPL(uint32_t)
 
 #define STR_EQ_IMPL(type_name_self)  \
-    static bool _eq_##type_name_self(uint8_t* self_ptr, struct _UwString* other, unsigned other_start_pos, unsigned length)  \
+    static bool _eq_##type_name_self(uint8_t* self_ptr, UwValuePtr other, unsigned other_start_pos, unsigned length)  \
     {  \
-        uint8_t* other_ptr = get_char_ptr(other, other_start_pos);  \
-        switch (other->char_size) {  \
+        uint8_t* other_ptr = _uw_string_char_ptr(other, other_start_pos);  \
+        switch (other->str_char_size) {  \
             case 0: return eq_##type_name_self##_uint8_t(self_ptr, (uint8_t*) other_ptr, length);  \
             case 1: return eq_##type_name_self##_uint16_t(self_ptr, (uint16_t*) other_ptr, length);  \
             case 2: return eq_##type_name_self##_uint24_t(self_ptr, (uint24_t*) other_ptr, length);  \
@@ -1392,10 +1142,10 @@ STR_COPY_TO_D24_HELPER_IMPL(uint16_t)
 STR_COPY_TO_D24_HELPER_IMPL(uint32_t)
 
 #define STR_COPY_TO_IMPL(type_name_self)  \
-    static void _cp_to_##type_name_self(uint8_t* self_ptr, struct _UwString* dest, unsigned dest_start_pos, unsigned length)  \
+    static void _cp_to_##type_name_self(uint8_t* self_ptr, UwValuePtr dest, unsigned dest_start_pos, unsigned length)  \
     {  \
-        uint8_t* dest_ptr = get_char_ptr(dest, dest_start_pos);  \
-        switch (dest->char_size) {  \
+        uint8_t* dest_ptr = _uw_string_char_ptr(dest, dest_start_pos);  \
+        switch (dest->str_char_size) {  \
             case 0: cp_##type_name_self##_uint8_t(self_ptr, (uint8_t*) dest_ptr, length); return; \
             case 1: cp_##type_name_self##_uint16_t(self_ptr, (uint16_t*) dest_ptr, length); return; \
             case 2: cp_##type_name_self##_uint24_t(self_ptr, (uint24_t*) dest_ptr, length); return; \
@@ -1557,26 +1307,11 @@ UwResult uw_create_empty_string(unsigned capacity, uint8_t char_size)
     // using not autocleaned variable here, no uw_move necessary on exit
     __UWDECL_String(result);
 
-    if (!make_empty_string(&result, calc_cap_size(capacity), capacity, char_size)) {
+    if (!make_empty_string(&result, capacity, char_size)) {
         return UwOOM();
     }
     return result;
 }
-
-#ifdef DEBUG
-
-UwResult uw_create_empty_string2(uint8_t cap_size, uint8_t char_size)
-{
-    // using not autocleaned variable here, no uw_move necessary on exit
-    __UWDECL_String(result);
-
-    if (!make_empty_string(&result, cap_size, 0, char_size)) {
-        return UwOOM();
-    }
-    return result;
-}
-
-#endif
 
 UwResult uw_create_string_cstr(char* initializer)
 {
@@ -1591,13 +1326,12 @@ UwResult uw_create_string_cstr(char* initializer)
     // using not autocleaned variable here, no uw_move necessary on exit
     __UWDECL_String(result);
 
-    if (!make_empty_string(&result, calc_cap_size(length), length, 1)) {
+    if (!make_empty_string(&result, length, 1)) {
         return UwOOM();
     }
     if (initializer) {
-        struct _UwString* s = _uw_get_string_ptr(&result);
-        get_str_methods(s)->copy_from_cstr(get_char_ptr(s, 0), initializer, length);
-        get_cap_methods(s)->set_length(s, length);
+        get_str_methods(&result)->copy_from_cstr(_uw_string_char_ptr(&result, 0), initializer, length);
+        _uw_string_set_length(&result, length);
     }
     return result;
 }
@@ -1616,13 +1350,12 @@ UwResult _uw_create_string_u8(char8_t* initializer)
     // using not autocleaned variable here, no uw_move necessary on exit
     __UWDECL_String(result);
 
-    if (!make_empty_string(&result, calc_cap_size(length), length, char_size)) {
+    if (!make_empty_string(&result, length, char_size)) {
         return UwOOM();
     }
     if (initializer) {
-        struct _UwString* s = _uw_get_string_ptr(&result);
-        get_str_methods(s)->copy_from_utf8(get_char_ptr(s, 0), initializer, length);
-        get_cap_methods(s)->set_length(s, length);
+        get_str_methods(&result)->copy_from_utf8(_uw_string_char_ptr(&result, 0), initializer, length);
+        _uw_string_set_length(&result, length);
     }
     return result;
 }
@@ -1641,13 +1374,12 @@ UwResult _uw_create_string_u32(char32_t* initializer)
     // using not autocleaned variable here, no uw_move necessary on exit
     __UWDECL_String(result);
 
-    if (!make_empty_string(&result, calc_cap_size(length), length, char_size)) {
+    if (!make_empty_string(&result, length, char_size)) {
         return UwOOM();
     }
     if (initializer) {
-        struct _UwString* s = _uw_get_string_ptr(&result);
-        get_str_methods(s)->copy_from_utf32(get_char_ptr(s, 0), initializer, length);
-        get_cap_methods(s)->set_length(s, length);
+        get_str_methods(&result)->copy_from_utf32(_uw_string_char_ptr(&result, 0), initializer, length);
+        _uw_string_set_length(&result, length);
     }
     return result;
 }
@@ -1656,26 +1388,22 @@ UwResult _uw_create_string_u32(char32_t* initializer)
  * String functions
  */
 
-uint8_t uw_string_char_size(UwValuePtr s)
+uint8_t uw_string_char_size(UwValuePtr str)
 {
-    uw_assert_string(s);
-    return _uw_string_char_size(_uw_get_string_ptr(s));
+    uw_assert_string(str);
+    return _uw_string_char_size(str);
 }
 
 unsigned uw_strlen(UwValuePtr str)
 {
     uw_assert_string(str);
-    struct _UwString* s = _uw_get_string_ptr(str);
-    return get_cap_methods(s)->get_length(s);
+    return _uw_string_length(str);
 }
 
 #define STRING_EQ_IMPL(suffix, type_name_b)  \
 {  \
     uw_assert_string(a);  \
-    struct _UwString* astr = _uw_get_string_ptr(a);  \
-    \
-    unsigned a_length = get_cap_methods(astr)->get_length(astr);  \
-    return get_str_methods(astr)->equal_##suffix(get_char_ptr(astr, 0), (type_name_b*) b, a_length);  \
+    return get_str_methods(a)->equal_##suffix(_uw_string_char_ptr(a, 0), (type_name_b*) b, _uw_string_length(a));  \
 }
 
 bool  uw_equal_cstr(UwValuePtr a, char* b)     STRING_EQ_IMPL(cstr, char)
@@ -1685,9 +1413,7 @@ bool _uw_equal_u32 (UwValuePtr a, char32_t* b) STRING_EQ_IMPL(u32,  char32_t)
 #define SUBSTRING_EQ_IMPL(suffix, type_name_b)  \
 {  \
     uw_assert_string(a);  \
-    struct _UwString* astr = _uw_get_string_ptr(a);  \
-    \
-    unsigned a_length = get_cap_methods(astr)->get_length(astr);  \
+    unsigned a_length = _uw_string_length(a);  \
     \
     if (end_pos > a_length) {  \
         end_pos = a_length;  \
@@ -1699,7 +1425,7 @@ bool _uw_equal_u32 (UwValuePtr a, char32_t* b) STRING_EQ_IMPL(u32,  char32_t)
         return true;  \
     }  \
     \
-    return get_str_methods(astr)->equal_##suffix(get_char_ptr(astr, start_pos), b, end_pos - start_pos);  \
+    return get_str_methods(a)->equal_##suffix(_uw_string_char_ptr(a, start_pos), b, end_pos - start_pos);  \
 }
 
 bool  uw_substring_eq_cstr(UwValuePtr a, unsigned start_pos, unsigned end_pos, char*     b) SUBSTRING_EQ_IMPL(cstr, char)
@@ -1709,9 +1435,7 @@ bool _uw_substring_eq_u32 (UwValuePtr a, unsigned start_pos, unsigned end_pos, c
 bool _uw_substring_eq(UwValuePtr a, unsigned start_pos, unsigned end_pos, UwValuePtr b)
 {
     uw_assert_string(a);
-    struct _UwString* astr = _uw_get_string_ptr(a);
-
-    unsigned a_length = get_cap_methods(astr)->get_length(astr);
+    unsigned a_length = _uw_string_length(a);
 
     if (end_pos > a_length) {
         end_pos = a_length;
@@ -1721,37 +1445,32 @@ bool _uw_substring_eq(UwValuePtr a, unsigned start_pos, unsigned end_pos, UwValu
     }
 
     uw_assert_string(b);
-    struct _UwString* bstr = _uw_get_string_ptr(b);
 
-    if (end_pos == start_pos && get_cap_methods(bstr)->get_length(bstr) == 0) {
+    if (end_pos == start_pos && _uw_string_length(b) == 0) {
         return true;
     }
 
-    return get_str_methods(astr)->equal(get_char_ptr(astr, start_pos), bstr, 0, end_pos - start_pos);
+    return get_str_methods(a)->equal(_uw_string_char_ptr(a, start_pos), b, 0, end_pos - start_pos);
 }
 
 CStringPtr uw_string_to_cstring(UwValuePtr str)
 {
     uw_assert_string(str);
-
-    struct _UwString* s = _uw_get_string_ptr(str);
-    unsigned length = get_cap_methods(s)->get_length(s);
+    unsigned length = _uw_string_length(str);
 
     CStringPtr result = malloc(length + 1);
     if (!result) {
         return nullptr;
     }
-    get_str_methods(s)->copy_to_u8(get_char_ptr(s, 0), result, length);
+    get_str_methods(str)->copy_to_u8(_uw_string_char_ptr(str, 0), result, length);
     return result;
 }
 
 void uw_string_copy_buf(UwValuePtr str, char* buffer)
 {
     uw_assert_string(str);
-
-    struct _UwString* s = _uw_get_string_ptr(str);
-    unsigned length = get_cap_methods(s)->get_length(s);
-    get_str_methods(s)->copy_to_u8(get_char_ptr(s, 0), buffer, length);
+    unsigned length = _uw_string_length(str);
+    get_str_methods(str)->copy_to_u8(_uw_string_char_ptr(str, 0), buffer, length);
 }
 
 void uw_destroy_cstring(CStringPtr* str)
@@ -1762,40 +1481,31 @@ void uw_destroy_cstring(CStringPtr* str)
 
 bool _uw_string_append_char(UwValuePtr dest, char c)
 {
-    struct _UwString* sd = expand_string(dest, 1, 1);
-    if (!sd) {
+    if (!expand_string(dest, 1, 1)) {
         return false;
     }
-    CapMethods* capmeth = get_cap_methods(sd);
-    unsigned length = capmeth->get_length(sd);
-    get_str_methods(sd)->put_char(get_char_ptr(sd, length), (unsigned char) c);
-    capmeth->set_length(sd, length + 1);
+    unsigned length = _uw_string_inc_length(dest, 1);
+    get_str_methods(dest)->put_char(_uw_string_char_ptr(dest, length), (unsigned char) c);
     return true;
 }
 
 bool _uw_string_append_c32(UwValuePtr dest, char32_t c)
 {
-    struct _UwString* sd = expand_string(dest, 1, calc_char_size(c));
-    if (!sd) {
+    if (!expand_string(dest, 1, calc_char_size(c))) {
         return false;
     }
-    CapMethods* capmeth = get_cap_methods(sd);
-    unsigned length = capmeth->get_length(sd);
-    get_str_methods(sd)->put_char(get_char_ptr(sd, length), c);
-    capmeth->set_length(sd, length + 1);
+    unsigned length = _uw_string_inc_length(dest, 1);
+    get_str_methods(dest)->put_char(_uw_string_char_ptr(dest, length), c);
     return true;
 }
 
 static bool append_cstr(UwValuePtr dest, char* src, unsigned src_len)
 {
-    struct _UwString* sd = expand_string(dest, src_len, 1);
-    if (!sd) {
+    if (!expand_string(dest, src_len, 1)) {
         return false;
     }
-    CapMethods* capmeth = get_cap_methods(sd);
-    unsigned dest_len = capmeth->get_length(sd);
-    get_str_methods(sd)->copy_from_cstr(get_char_ptr(sd, dest_len), src, src_len);
-    capmeth->set_length(sd, src_len + dest_len);
+    unsigned dest_length = _uw_string_inc_length(dest, src_len);
+    get_str_methods(dest)->copy_from_cstr(_uw_string_char_ptr(dest, dest_length), src, src_len);
     return true;
 }
 
@@ -1824,14 +1534,11 @@ static bool append_u8(UwValuePtr dest, char8_t* src, unsigned src_len, uint8_t s
  * `src_len` contains the number of codepoints, not the number of bytes in `src`
  */
 {
-    struct _UwString* sd = expand_string(dest, src_len, src_char_size);
-    if (!sd) {
+    if (!expand_string(dest, src_len, src_char_size)) {
         return false;
     }
-    CapMethods* capmeth = get_cap_methods(sd);
-    unsigned dest_len = capmeth->get_length(sd);
-    get_str_methods(sd)->copy_from_utf8(get_char_ptr(sd, dest_len), src, src_len);
-    capmeth->set_length(sd, src_len + dest_len);
+    unsigned dest_length = _uw_string_inc_length(dest, src_len);
+    get_str_methods(dest)->copy_from_utf8(_uw_string_char_ptr(dest, dest_length), src, src_len);
     return true;
 }
 
@@ -1860,14 +1567,11 @@ bool _uw_string_append_substring_u8(UwValuePtr dest, char8_t* src, unsigned src_
 
 static bool append_u32(UwValuePtr dest, char32_t* src, unsigned src_len, uint8_t src_char_size)
 {
-    struct _UwString* sd = expand_string(dest, src_len, src_char_size);
-    if (!sd) {
+    if (!expand_string(dest, src_len, src_char_size)) {
         return false;
     }
-    CapMethods* capmeth = get_cap_methods(sd);
-    unsigned dest_len = capmeth->get_length(sd);
-    get_str_methods(sd)->copy_from_utf32(get_char_ptr(sd, dest_len), src, src_len);
-    capmeth->set_length(sd, src_len + dest_len);
+    unsigned dest_length = _uw_string_inc_length(dest, src_len);
+    get_str_methods(dest)->copy_from_utf32(_uw_string_char_ptr(dest, dest_length), src, src_len);
     return true;
 }
 
@@ -1894,34 +1598,28 @@ bool _uw_string_append_substring_u32(UwValuePtr dest, char32_t*  src, unsigned s
     return append_u32(dest, src, src_len, src_char_size);
 }
 
-static bool append_string(UwValuePtr dest, struct _UwString* src, unsigned src_start_pos, unsigned src_len)
+static bool append_string(UwValuePtr dest, UwValuePtr src, unsigned src_start_pos, unsigned src_len)
 {
-    struct _UwString* sd = expand_string(dest, src_len, _uw_string_char_size(src));
-    if (!sd) {
+    if (!expand_string(dest, src_len, _uw_string_char_size(src))) {
         return false;
     }
-    CapMethods* capmeth = get_cap_methods(sd);
-    unsigned dest_len = capmeth->get_length(sd);
-    get_str_methods(src)->copy_to(get_char_ptr(src, src_start_pos), sd, dest_len, src_len);
-    capmeth->set_length(sd, src_len + dest_len);
+    unsigned dest_length = _uw_string_inc_length(dest, src_len);
+    get_str_methods(src)->copy_to(_uw_string_char_ptr(src, src_start_pos), dest, dest_length, src_len);
     return true;
 }
 
 bool _uw_string_append(UwValuePtr dest, UwValuePtr src)
 {
     uw_assert_string(src);
-    struct _UwString* s = _uw_get_string_ptr(src);
-
-    unsigned src_len = get_cap_methods(s)->get_length(s);
-    return append_string(dest, s, 0, src_len);
+    unsigned src_len = _uw_string_length(src);
+    return append_string(dest, src, 0, src_len);
 }
 
 bool _uw_string_append_substring(UwValuePtr dest, UwValuePtr src, unsigned src_start_pos, unsigned src_end_pos)
 {
     uw_assert_string(src);
-    struct _UwString* s = _uw_get_string_ptr(src);
 
-    unsigned src_len = get_cap_methods(s)->get_length(s);
+    unsigned src_len = _uw_string_length(src);
     if (src_end_pos > src_len) {
         src_end_pos = src_len;
     }
@@ -1930,7 +1628,7 @@ bool _uw_string_append_substring(UwValuePtr dest, UwValuePtr src, unsigned src_s
     }
     src_len = src_end_pos - src_start_pos;
 
-    return append_string(dest, s, src_start_pos, src_len);
+    return append_string(dest, src, src_start_pos, src_len);
 }
 
 bool uw_string_append_utf8(UwValuePtr dest, char8_t* buffer, unsigned size, unsigned* bytes_processed)
@@ -1943,14 +1641,11 @@ bool uw_string_append_utf8(UwValuePtr dest, char8_t* buffer, unsigned size, unsi
     unsigned src_len = utf8_strlen2_buf(buffer, bytes_processed, &src_char_size);
 
     if (src_len) {
-        struct _UwString* sd = expand_string(dest, src_len, src_char_size);
-        if (!sd) {
+        if (!expand_string(dest, src_len, src_char_size)) {
             return false;
         }
-        CapMethods* capmeth = get_cap_methods(sd);
-        unsigned dest_len = capmeth->get_length(sd);
-        get_str_methods(sd)->copy_from_utf8(get_char_ptr(sd, dest_len), buffer, src_len);
-        capmeth->set_length(sd, src_len + dest_len);
+        unsigned dest_length = _uw_string_inc_length(dest, src_len);
+        get_str_methods(dest)->copy_from_utf8(_uw_string_char_ptr(dest, dest_length), buffer, src_len);
     }
     return true;
 }
@@ -1962,15 +1657,12 @@ bool uw_string_append_buffer(UwValuePtr dest, uint8_t* buffer, unsigned size)
     }
     uw_assert(uw_string_char_size(dest) == 1);
 
-    struct _UwString* sd = expand_string(dest, size, 1);
-    if (!sd) {
+    if (!expand_string(dest, size, 1)) {
         return false;
     }
-    CapMethods* capmeth = get_cap_methods(sd);
-    StrMethods* strmeth = get_str_methods(sd);
-    unsigned dest_len = capmeth->get_length(sd);
-    capmeth->set_length(sd, dest_len + size);
-    uint8_t* ptr = get_char_ptr(sd, dest_len);
+    StrMethods* strmeth = get_str_methods(dest);
+    unsigned dest_length = _uw_string_inc_length(dest, size);
+    uint8_t* ptr = _uw_string_char_ptr(dest, dest_length);
     while (size--) {
         strmeth->put_char(ptr++, *buffer++);
     }
@@ -1984,15 +1676,13 @@ bool _uw_string_insert_many_c32(UwValuePtr str, unsigned position, char32_t chr,
     }
     uw_assert(position <= uw_strlen(str));
 
-    struct _UwString* s = expand_string(str, n, calc_char_size(chr));
-    if (!s) {
+    if (!expand_string(str, n, calc_char_size(chr))) {
         return false;
     }
-    CapMethods* capmeth = get_cap_methods(s);
-    StrMethods* strmeth = get_str_methods(s);
-    unsigned len = capmeth->get_length(s);
-    uint8_t char_size = _uw_string_char_size(s);
-    uint8_t* insertion_ptr = get_char_ptr(s, position);
+    StrMethods* strmeth = get_str_methods(str);
+    unsigned len = _uw_string_inc_length(str, n);
+    uint8_t char_size = _uw_string_char_size(str);
+    uint8_t* insertion_ptr = _uw_string_char_ptr(str, position);
 
     if (position < len) {
         memmove(insertion_ptr + n * char_size, insertion_ptr, (len - position) * char_size);
@@ -2001,19 +1691,15 @@ bool _uw_string_insert_many_c32(UwValuePtr str, unsigned position, char32_t chr,
         strmeth->put_char(insertion_ptr, chr);
         insertion_ptr += char_size;
     }
-    capmeth->set_length(s, len + n);
     return true;
 }
 
 UwResult uw_string_get_substring(UwValuePtr str, unsigned start_pos, unsigned end_pos)
 {
     uw_assert_string(str);
-    struct _UwString* s = _uw_get_string_ptr(str);
+    StrMethods* strmeth = get_str_methods(str);
 
-    CapMethods* capmeth = get_cap_methods(s);
-    StrMethods* strmeth = get_str_methods(s);
-
-    unsigned length = capmeth->get_length(s);
+    unsigned length = _uw_string_length(str);
 
     if (end_pos > length) {
         end_pos = length;
@@ -2022,15 +1708,13 @@ UwResult uw_string_get_substring(UwValuePtr str, unsigned start_pos, unsigned en
         return uw_create_empty_string(0, 1);
     }
     length = end_pos - start_pos;
-    uint8_t* src = get_char_ptr(s, start_pos);
+    uint8_t* src = _uw_string_char_ptr(str, start_pos);
     uint8_t char_size = strmeth->max_char_size(src, length);
 
     UwValue result = uw_create_empty_string(length, char_size);
     if (uw_ok(&result)) {
-        struct _UwString* dest = _uw_get_string_ptr(&result);
-
-        get_cap_methods(dest)->set_length(dest, length);
-        strmeth->copy_to(src, dest, 0, length);
+        strmeth->copy_to(src, &result, 0, length);
+        _uw_string_set_length(&result, length);
     }
     return result;
 }
@@ -2038,10 +1722,9 @@ UwResult uw_string_get_substring(UwValuePtr str, unsigned start_pos, unsigned en
 char32_t uw_string_at(UwValuePtr str, unsigned position)
 {
     uw_assert_string(str);
-    struct _UwString* s = _uw_get_string_ptr(str);
-    unsigned length = get_cap_methods(s)->get_length(s);
+    unsigned length = _uw_string_length(str);
     if (position < length) {
-        return get_str_methods(s)->get_char(get_char_ptr(s, position));
+        return get_str_methods(str)->get_char(_uw_string_char_ptr(str, position));
     } else {
         return 0;
     }
@@ -2052,23 +1735,21 @@ bool uw_string_erase(UwValuePtr str, unsigned start_pos, unsigned end_pos)
     if (start_pos >= uw_strlen(str) || start_pos >= end_pos) {
         return true;
     }
-    struct _UwString* s = expand_string(str, 0, 0);  // make copy if refcount > 1
-    if (!s) {
+    if (!expand_string(str, 0, 0)) {  // make copy if refcount > 1
         return false;
     }
-    CapMethods* capmeth = get_cap_methods(s);
-    unsigned length = capmeth->get_length(s);
-    uint8_t char_size = _uw_string_char_size(s);
+    unsigned length = _uw_string_length(str);
+    uint8_t char_size = _uw_string_char_size(str);
 
     if (end_pos >= length) {
         // truncate
         length = start_pos;
     } else {
         unsigned tail_len = length - end_pos;
-        memmove(get_char_ptr(s, start_pos), get_char_ptr(s, end_pos), tail_len * char_size);
+        memmove(_uw_string_char_ptr(str, start_pos), _uw_string_char_ptr(str, end_pos), tail_len * char_size);
         length -= end_pos - start_pos;
     }
-    capmeth->set_length(s, length);
+    _uw_string_set_length(str, length);
     return true;
 }
 
@@ -2077,23 +1758,21 @@ bool uw_string_truncate(UwValuePtr str, unsigned position)
     if (position >= uw_strlen(str)) {
         return true;
     }
-    struct _UwString* s = expand_string(str, 0, 0);  // make copy if refcount > 1
-    if (!s) {
+    if (!expand_string(str, 0, 0)) {  // make copy if refcount > 1
         return false;
     }
-    get_cap_methods(s)->set_length(s, position);
+    _uw_string_set_length(str, position);
     return true;
 }
 
 bool uw_string_indexof(UwValuePtr str, char32_t chr, unsigned start_pos, unsigned* result)
 {
     uw_assert_string(str);
-    struct _UwString* s = _uw_get_string_ptr(str);
-    CapMethods* capmeth = get_cap_methods(s);
-    StrMethods* strmeth = get_str_methods(s);
+    StrMethods* strmeth = get_str_methods(str);
 
-    unsigned length = capmeth->get_length(s);
-    uint8_t* ptr = get_char_ptr(s, start_pos);
+    unsigned length = _uw_string_length(str);
+    uint8_t* ptr = _uw_string_char_ptr(str, start_pos);
+    uint8_t char_size = _uw_string_char_size(str);
 
     for (unsigned i = start_pos; i < length; i++) {
         char32_t codepoint = strmeth->get_char(ptr);
@@ -2103,7 +1782,7 @@ bool uw_string_indexof(UwValuePtr str, char32_t chr, unsigned start_pos, unsigne
             }
             return true;
         }
-        ptr += _uw_string_char_size(s);
+        ptr += char_size;
     }
     return false;
 }
@@ -2111,12 +1790,11 @@ bool uw_string_indexof(UwValuePtr str, char32_t chr, unsigned start_pos, unsigne
 bool uw_string_ltrim(UwValuePtr str)
 {
     uw_assert_string(str);
-    struct _UwString* s = _uw_get_string_ptr(str);
-    StrMethods* strmeth = get_str_methods(s);
-    unsigned len = get_cap_methods(s)->get_length(s);
-    uint8_t char_size = _uw_string_char_size(s);
+    StrMethods* strmeth = get_str_methods(str);
+    unsigned len = _uw_string_length(str);
+    uint8_t char_size = _uw_string_char_size(str);
 
-    char8_t* ptr = get_char_ptr(s, 0);
+    char8_t* ptr = _uw_string_char_ptr(str, 0);
     unsigned i = 0;
     while (i < len) {
         char32_t c = strmeth->get_char(ptr);
@@ -2132,12 +1810,11 @@ bool uw_string_ltrim(UwValuePtr str)
 bool uw_string_rtrim(UwValuePtr str)
 {
     uw_assert_string(str);
-    struct _UwString* s = _uw_get_string_ptr(str);
-    StrMethods* strmeth = get_str_methods(s);
-    unsigned n = get_cap_methods(s)->get_length(s);
-    uint8_t char_size = _uw_string_char_size(s);
+    StrMethods* strmeth = get_str_methods(str);
+    unsigned n = _uw_string_length(str);
+    uint8_t char_size = _uw_string_char_size(str);
 
-    char8_t* ptr = get_char_ptr(s, n);
+    char8_t* ptr = _uw_string_char_ptr(str, n);
     while (n) {
         ptr -= char_size;
         char32_t c = strmeth->get_char(ptr);
@@ -2156,15 +1833,14 @@ bool uw_string_trim(UwValuePtr str)
 
 bool uw_string_lower(UwValuePtr str)
 {
-    struct _UwString* s = expand_string(str, 0, 0);  // make copy if refcount > 1
-    if (!s) {
+    if (!expand_string(str, 0, 0)) {  // make copy if refcount > 1
         return false;
     }
-    StrMethods* strmeth = get_str_methods(s);
-    unsigned n = get_cap_methods(s)->get_length(s);
-    uint8_t char_size = _uw_string_char_size(s);
+    StrMethods* strmeth = get_str_methods(str);
+    unsigned n = _uw_string_length(str);
+    uint8_t char_size = _uw_string_char_size(str);
 
-    char8_t* ptr = get_char_ptr(s, 0);
+    char8_t* ptr = _uw_string_char_ptr(str, 0);
     while (n) {
         strmeth->put_char(ptr, uw_char_lower(strmeth->get_char(ptr)));
         ptr += char_size;
@@ -2175,15 +1851,14 @@ bool uw_string_lower(UwValuePtr str)
 
 bool uw_string_upper(UwValuePtr str)
 {
-    struct _UwString* s = expand_string(str, 0, 0);  // make copy if refcount > 1
-    if (!s) {
+    if (!expand_string(str, 0, 0)) {  // make copy if refcount > 1
         return false;
     }
-    StrMethods* strmeth = get_str_methods(s);
-    unsigned n = get_cap_methods(s)->get_length(s);
-    uint8_t char_size = _uw_string_char_size(s);
+    StrMethods* strmeth = get_str_methods(str);
+    unsigned n = _uw_string_length(str);
+    uint8_t char_size = _uw_string_char_size(str);
 
-    char8_t* ptr = get_char_ptr(s, 0);
+    char8_t* ptr = _uw_string_char_ptr(str, 0);
     while (n) {
         strmeth->put_char(ptr, uw_char_upper(strmeth->get_char(ptr)));
         ptr += char_size;
@@ -2195,19 +1870,17 @@ bool uw_string_upper(UwValuePtr str)
 UwResult uw_string_split_chr(UwValuePtr str, char32_t splitter)
 {
     uw_assert_string(str);
+    StrMethods* strmeth = get_str_methods(str);
 
-    struct _UwString* s = _uw_get_string_ptr(str);
-    StrMethods* strmeth = get_str_methods(s);
-
-    unsigned len = get_cap_methods(s)->get_length(s);
-    uint8_t char_size = _uw_string_char_size(s);
+    unsigned len = _uw_string_length(str);
+    uint8_t char_size = _uw_string_char_size(str);
 
     UwValue result = UwList();
     if (uw_error(&result)) {
         return uw_move(&result);
     }
 
-    char8_t* ptr = get_char_ptr(s, 0);
+    char8_t* ptr = _uw_string_char_ptr(str, 0);
     char8_t* start = ptr;
     unsigned i = 0;
     unsigned start_i = 0;
@@ -2223,9 +1896,8 @@ UwResult uw_string_split_chr(UwValuePtr str, char32_t splitter)
                 return uw_move(&substr);
             }
             if (substr_len) {
-                struct _UwString* subs = _uw_get_string_ptr(&substr);
-                strmeth->copy_to(start, subs, 0, substr_len);
-                get_cap_methods(subs)->set_length(subs, substr_len);
+                strmeth->copy_to(start, &substr, 0, substr_len);
+                _uw_string_set_length(&substr, substr_len);
             }
             if (!uw_list_append(&result, &substr)) {
                 return UwOOM();
@@ -2247,9 +1919,8 @@ UwResult uw_string_split_chr(UwValuePtr str, char32_t splitter)
             return uw_move(&substr);
         }
         if (substr_len) {
-            struct _UwString* subs = _uw_get_string_ptr(&substr);
-            strmeth->copy_to(start, subs, 0, substr_len);
-            get_cap_methods(subs)->set_length(subs, substr_len);
+            strmeth->copy_to(start, &substr, 0, substr_len);
+            _uw_string_set_length(&substr, substr_len);
         }
         if (!uw_list_append(&result, &substr)) {
             return UwOOM();

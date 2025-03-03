@@ -4,7 +4,7 @@
 UwResult _uw_struct_create(UwTypeId type_id, va_list ap)
 {
     _UwValue result = {
-        .type_id = UwTypeId_Struct,
+        ._extradata_type_id = UwTypeId_Struct,
         .extra_data = nullptr
     };
     return result;

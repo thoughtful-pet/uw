@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-uint8_t uw_string_char_size(UwValuePtr s);
+uint8_t uw_string_char_size(UwValuePtr str);
 
 // check if `index` is within string length
 #define uw_string_index_valid(str, index) ((index) < uw_strlen(str))
@@ -398,10 +398,9 @@ static inline UwResult _uw_string_join_u8_wrapper(char* separator, UwValuePtr li
 #define __UWDECL_String_1_12(name, len, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11)  \
     /* declare String variable, character size 1 byte, up to 12 chars */  \
     _UwValue name = {  \
-        ._type_id = UwTypeId_String,  \
-        {  .is_embedded = 1 },  \
-        .str_length = (len),  \
-        .str_capacity = 12,  \
+        ._emb_string_type_id = UwTypeId_String,  \
+        .str_embedded = 1,  \
+        .str_embedded_length = (len),  \
         .str_1[0] = (c0),  \
         .str_1[1] = (c1),  \
         .str_1[2] = (c2),  \
@@ -412,8 +411,8 @@ static inline UwResult _uw_string_join_u8_wrapper(char* separator, UwValuePtr li
         .str_1[7] = (c7),  \
         .str_1[8] = (c8),  \
         .str_1[9] = (c9),  \
-        .str_1[10] = (c10),  \
-        .str_1[11] = (c11)  \
+        .str_1[10] = (c10), \
+        .str_1[11] = (c11) \
     }
 
 #define UWDECL_String_1_12(len, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11)  \
@@ -430,19 +429,16 @@ static inline UwResult _uw_string_join_u8_wrapper(char* separator, UwValuePtr li
 #define __UWDECL_String_2_6(name, len, c0, c1, c2, c3, c4, c5)  \
     /* declare String variable, character size 2 bytes, up to 6 chars */  \
     _UwValue name = {  \
-        ._type_id = UwTypeId_String,  \
-        {  \
-            .char_size = 1,  \
-            .is_embedded = 1  \
-        },  \
-        .str_length = (len),  \
-        .str_capacity = 6,  \
+        ._emb_string_type_id = UwTypeId_String,  \
+        ._emb_str_char_size = 1,  \
+        .str_embedded = 1,  \
+        .str_embedded_length = (len),  \
         .str_2[0] = (c0),  \
         .str_2[1] = (c1),  \
         .str_2[2] = (c2),  \
         .str_2[3] = (c3),  \
         .str_2[4] = (c4),  \
-        .str_2[5] = (c5)  \
+        .str_2[5] = (c5)   \
     }
 
 #define UWDECL_String_2_6(len, c0, c1, c2, c3, c4, c5)  \
@@ -459,17 +455,14 @@ static inline UwResult _uw_string_join_u8_wrapper(char* separator, UwValuePtr li
 #define __UWDECL_String_3_4(name, len, c0, c1, c2, c3)  \
     /* declare String variable, character size 3 bytes, up to 4 chars */  \
     _UwValue name = {  \
-        ._type_id = UwTypeId_String,  \
-        {  \
-            .char_size = 2,  \
-            .is_embedded = 1  \
-        },  \
-        .str_length = (len),  \
-        .str_capacity = 4,  \
+        ._emb_string__type_id = UwTypeId_String,  \
+        ._emb_str_char_size = 2,  \
+        .str_embedded = 1,  \
+        .str_embedded_length = (len),  \
         .str_3[0] = {{ [0] = (uint8_t) (c0), [1] = (uint8_t) ((c0) >> 8), [2] = (uint8_t) ((c0) >> 16) }},  \
         .str_3[1] = {{ [0] = (uint8_t) (c1), [1] = (uint8_t) ((c1) >> 8), [2] = (uint8_t) ((c1) >> 16) }},  \
         .str_3[2] = {{ [0] = (uint8_t) (c2), [1] = (uint8_t) ((c2) >> 8), [2] = (uint8_t) ((c2) >> 16) }},  \
-        .str_3[3] = {{ [0] = (uint8_t) (c3), [1] = (uint8_t) ((c3) >> 8), [2] = (uint8_t) ((c3) >> 16) }}  \
+        .str_3[3] = {{ [0] = (uint8_t) (c3), [1] = (uint8_t) ((c3) >> 8), [2] = (uint8_t) ((c3) >> 16) }}   \
     }
 
 #define UWDECL_String_3_4(len, c0, c1, c2, c3)  \
@@ -486,16 +479,13 @@ static inline UwResult _uw_string_join_u8_wrapper(char* separator, UwValuePtr li
 #define __UWDECL_String_4_3(name, len, c0, c1, c2)  \
     /* declare String variable, character size 4 bytes, up to 3 chars */  \
     _UwValue name = {  \
-        ._type_id = UwTypeId_String,  \
-        {  \
-            .char_size = 3,  \
-            .is_embedded = 1  \
-        },  \
-        .str_length = (len),  \
-        .str_capacity = 3,  \
+        ._emb_string_type_id = UwTypeId_String,  \
+        ._emb_str_char_size = 3,  \
+        .str_embedded = 1,  \
+        .str_embedded_length = (len),  \
         .str_4[0] = (c0),  \
         .str_4[1] = (c1),  \
-        .str_4[2] = (c2)  \
+        .str_4[2] = (c2)   \
     }
 
 #define UWDECL_String_4_3(len, c0, c1, c2)  \

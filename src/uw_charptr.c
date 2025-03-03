@@ -1,5 +1,3 @@
-#include <string.h>
-
 #include "include/uw_base.h"
 #include "include/uw_string.h"
 #include "src/uw_charptr_internal.h"

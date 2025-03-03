@@ -1,5 +1,4 @@
 #include <limits.h>
-#include <string.h>
 
 #include "include/uw.h"
 #include "src/uw_charptr_internal.h"

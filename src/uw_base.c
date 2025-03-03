@@ -1,4 +1,9 @@
-#include <string.h>
+#ifndef _GNU_SOURCE
+#   define _GNU_SOURCE
+#endif
+
+#include <unistd.h>
+#include <sys/mman.h>
 
 #include "include/uw_base.h"
 #include "include/uw_file.h"
@@ -6,7 +11,6 @@
 #include "src/uw_bool_internal.h"
 #include "src/uw_charptr_internal.h"
 #include "src/uw_struct_internal.h"
-#include "src/uw_file_internal.h"
 #include "src/uw_float_internal.h"
 #include "src/uw_hash_internal.h"
 #include "src/uw_int_internal.h"
@@ -16,7 +20,6 @@
 #include "src/uw_signed_internal.h"
 #include "src/uw_status_internal.h"
 #include "src/uw_string_internal.h"
-#include "src/uw_string_io_internal.h"
 #include "src/uw_unsigned_internal.h"
 
 /****************************************************************
@@ -86,10 +89,7 @@ void _uw_free_extra_data(UwValuePtr v)
     }
 }
 
-static UwResult default_create(UwTypeId type_id, va_list ap)
-/*
- * Default implementation of create method for types that have extra data.
- */
+UwResult _uw_default_create(UwTypeId type_id, va_list ap)
 {
     UwValue result = {};
     result.type_id    = type_id;
@@ -109,10 +109,7 @@ static UwResult default_create(UwTypeId type_id, va_list ap)
     }
 }
 
-static UwResult default_clone(UwValuePtr self)
-/*
- * Default implementation of clone method.
- */
+UwResult _uw_default_clone(UwValuePtr self)
 {
     if (self->extra_data) {
         self->extra_data->refcount++;
@@ -120,10 +117,7 @@ static UwResult default_clone(UwValuePtr self)
     return *self;
 }
 
-static void default_destroy(UwValuePtr self)
-/*
- * Default implementation of destroy method for types that have extra data.
- */
+void _uw_default_destroy(UwValuePtr self)
 {
     _UwExtraData* extra_data = self->extra_data;
 
@@ -255,30 +249,22 @@ bool uw_charptr_to_string(UwValuePtr v)
  * Global list of interfaces
  */
 
-bool _uw_registered_interfaces[UW_INTERFACE_CAPACITY] = {
-    [UwInterfaceId_Logic]        = true,
-    [UwInterfaceId_Arithmetic]   = true,
-    [UwInterfaceId_Bitwise]      = true,
-    [UwInterfaceId_Comparison]   = true,
-    [UwInterfaceId_RandomAccess] = true,
-    [UwInterfaceId_String]       = true,
-    [UwInterfaceId_List]         = true,
-    [UwInterfaceId_File]         = true,
-    [UwInterfaceId_FileReader]   = true,
-    [UwInterfaceId_FileWriter]   = true,
-    [UwInterfaceId_LineReader]   = true
-};
+static unsigned num_registered_interfaces = 0;
 
-int uw_register_interface()
+unsigned uw_register_interface()
 {
-    for (int i = 0; i < UW_INTERFACE_CAPACITY; i++) {
-        if (!_uw_registered_interfaces[i]) {
-            _uw_registered_interfaces[i] = true;
-            return i;
-        }
+    if (num_registered_interfaces == UINT_MAX) {
+        fprintf(stderr, "Cannot define more interfaces than %u\n", UINT_MAX);
+        return 0;
     }
-    return -1;
+    return num_registered_interfaces++;
 }
+
+// Miscellaneous interfaces
+unsigned UwInterfaceId_File;
+unsigned UwInterfaceId_FileReader;
+unsigned UwInterfaceId_FileWriter;
+unsigned UwInterfaceId_LineReader;
 
 /****************************************************************
  * Global list of types initialized with built-in types.
@@ -306,7 +292,8 @@ static UwType null_type = {
     ._equal_sametype = _uw_null_equal_sametype,
     ._equal          = _uw_null_equal,
 
-    .interfaces = {}
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
 };
 
 static UwType bool_type = {
@@ -331,9 +318,9 @@ static UwType bool_type = {
     ._equal_sametype = _uw_bool_equal_sametype,
     ._equal          = _uw_bool_equal,
 
-    .interfaces = {
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
         // [UwInterfaceId_Logic] = &bool_type_logic_interface
-    }
 };
 
 static UwType int_type = {
@@ -358,12 +345,12 @@ static UwType int_type = {
     ._equal_sametype = _uw_int_equal_sametype,
     ._equal          = _uw_int_equal,
 
-    .interfaces = {
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
         // [UwInterfaceId_Logic]      = &int_type_logic_interface,
         // [UwInterfaceId_Arithmetic] = &int_type_arithmetic_interface,
         // [UwInterfaceId_Bitwise]    = &int_type_bitwise_interface,
         // [UwInterfaceId_Comparison] = &int_type_comparison_interface
-    }
 };
 
 static UwType signed_type = {
@@ -388,12 +375,12 @@ static UwType signed_type = {
     ._equal_sametype = _uw_signed_equal_sametype,
     ._equal          = _uw_signed_equal,
 
-    .interfaces = {
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
         // [UwInterfaceId_Logic]      = &int_type_logic_interface,
         // [UwInterfaceId_Arithmetic] = &int_type_arithmetic_interface,
         // [UwInterfaceId_Bitwise]    = &int_type_bitwise_interface,
         // [UwInterfaceId_Comparison] = &int_type_comparison_interface
-    }
 };
 
 static UwType unsigned_type = {
@@ -418,12 +405,12 @@ static UwType unsigned_type = {
     ._equal_sametype = _uw_unsigned_equal_sametype,
     ._equal          = _uw_unsigned_equal,
 
-    .interfaces = {
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
         // [UwInterfaceId_Logic]      = &int_type_logic_interface,
         // [UwInterfaceId_Arithmetic] = &int_type_arithmetic_interface,
         // [UwInterfaceId_Bitwise]    = &int_type_bitwise_interface,
         // [UwInterfaceId_Comparison] = &int_type_comparison_interface
-    }
 };
 
 static UwType float_type = {
@@ -448,11 +435,11 @@ static UwType float_type = {
     ._equal_sametype = _uw_float_equal_sametype,
     ._equal          = _uw_float_equal,
 
-    .interfaces = {
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
         // [UwInterfaceId_Logic]      = &float_type_logic_interface,
         // [UwInterfaceId_Arithmetic] = &float_type_arithmetic_interface,
         // [UwInterfaceId_Comparison] = &float_type_comparison_interface
-    }
 };
 
 static UwType string_type = {
@@ -461,7 +448,7 @@ static UwType string_type = {
     .compound        = false,
     .data_optional   = true,
     .name            = "String",
-    .data_offset     = offsetof(struct _UwStringExtraData, string_data),
+    .data_offset     = sizeof(struct _UwStringExtraData),
     .data_size       = 0,
     .allocator       = &default_allocator,
     ._create         = _uw_string_create,
@@ -477,9 +464,9 @@ static UwType string_type = {
     ._equal_sametype = _uw_string_equal_sametype,
     ._equal          = _uw_string_equal,
 
-    .interfaces = {
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
         // [UwInterfaceId_RandomAccess] = &string_type_random_access_interface
-    }
 };
 
 static UwType charptr_type = {
@@ -504,7 +491,8 @@ static UwType charptr_type = {
     ._equal_sametype = _uw_charptr_equal_sametype,
     ._equal          = _uw_charptr_equal,
 
-    .interfaces = {}
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
 };
 
 static UwType list_type = {
@@ -516,11 +504,11 @@ static UwType list_type = {
     .data_offset     = offsetof(struct _UwListExtraData, list_data),
     .data_size       = sizeof(struct _UwList),
     .allocator       = &default_allocator,
-    ._create         = default_create,
-    ._destroy        = default_destroy,
+    ._create         = _uw_default_create,
+    ._destroy        = _uw_default_destroy,
     ._init           = _uw_list_init,
     ._fini           = _uw_list_fini,
-    ._clone          = default_clone,
+    ._clone          = _uw_default_clone,
     ._hash           = _uw_list_hash,
     ._deepcopy       = _uw_list_deepcopy,
     ._dump           = _uw_list_dump,
@@ -529,10 +517,10 @@ static UwType list_type = {
     ._equal_sametype = _uw_list_equal_sametype,
     ._equal          = _uw_list_equal,
 
-    .interfaces = {
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
         // [UwInterfaceId_RandomAccess] = &list_type_random_access_interface,
         // [UwInterfaceId_List]         = &list_type_list_interface
-    }
 };
 
 static UwType map_type = {
@@ -544,11 +532,11 @@ static UwType map_type = {
     .data_offset     = offsetof(struct _UwMapExtraData, map_data),
     .data_size       = sizeof(struct _UwMap),
     .allocator       = &default_allocator,
-    ._create         = default_create,
-    ._destroy        = default_destroy,
+    ._create         = _uw_default_create,
+    ._destroy        = _uw_default_destroy,
     ._init           = _uw_map_init,
     ._fini           = _uw_map_fini,
-    ._clone          = default_clone,
+    ._clone          = _uw_default_clone,
     ._hash           = _uw_map_hash,
     ._deepcopy       = _uw_map_deepcopy,
     ._dump           = _uw_map_dump,
@@ -557,9 +545,9 @@ static UwType map_type = {
     ._equal_sametype = _uw_map_equal_sametype,
     ._equal          = _uw_map_equal,
 
-    .interfaces = {
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
         // [UwInterfaceId_RandomAccess] = &map_type_random_access_interface
-    }
 };
 
 static UwType status_type = {
@@ -571,11 +559,11 @@ static UwType status_type = {
     .data_offset     = offsetof(struct _UwStatusExtraData, status_desc),  // extra_data is optional and not allocated by default
     .data_size       = sizeof(char*),
     .allocator       = &default_allocator,
-    ._create         = default_create,
-    ._destroy        = default_destroy,
+    ._create         = _uw_default_create,
+    ._destroy        = _uw_default_destroy,
     ._init           = nullptr,
     ._fini           = _uw_status_fini,
-    ._clone          = default_clone,
+    ._clone          = _uw_default_clone,
     ._hash           = _uw_status_hash,
     ._deepcopy       = _uw_status_deepcopy,
     ._dump           = _uw_status_dump,
@@ -584,7 +572,8 @@ static UwType status_type = {
     ._equal_sametype = _uw_status_equal_sametype,
     ._equal          = _uw_status_equal,
 
-    .interfaces = {}
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
 };
 
 static UwType struct_type = {
@@ -596,11 +585,11 @@ static UwType struct_type = {
     .data_offset     = 0,
     .data_size       = 0,
     .allocator       = &default_allocator,
-    ._create         = default_create,
-    ._destroy        = default_destroy,
+    ._create         = _uw_default_create,
+    ._destroy        = _uw_default_destroy,
     ._init           = nullptr,
     ._fini           = nullptr,
-    ._clone          = default_clone,
+    ._clone          = _uw_default_clone,
     ._hash           = _uw_struct_hash,
     ._deepcopy       = _uw_struct_deepcopy,
     ._dump           = _uw_struct_dump,
@@ -609,104 +598,12 @@ static UwType struct_type = {
     ._equal_sametype = _uw_struct_equal_sametype,
     ._equal          = _uw_struct_equal,
 
-    .interfaces = {}
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
 };
 
-static UwInterface_File file_type_file_interface = {
-    ._open     = _uwi_file_open,
-    ._close    = _uwi_file_close,
-    ._set_fd   = _uwi_file_set_fd,
-    ._get_name = _uwi_file_get_name,
-    ._set_name = _uwi_file_set_name
-};
 
-static UwInterface_FileReader file_type_file_reader_interface = {
-    ._read = _uwi_file_read
-};
-
-static UwInterface_FileWriter file_type_file_writer_interface = {
-    ._write = _uwi_file_write
-};
-
-static UwInterface_LineReader file_type_line_reader_interface = {
-    ._start             = _uwi_file_start_read_lines,
-    ._read_line         = _uwi_file_read_line,
-    ._read_line_inplace = _uwi_file_read_line_inplace,
-    ._get_line_number   = _uwi_file_get_line_number,
-    ._unread_line       = _uwi_file_unread_line,
-    ._stop              = _uwi_file_stop_read_lines
-};
-
-static UwType file_type = {
-    .id              = UwTypeId_File,
-    .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = false,
-    .data_optional   = false,
-    .name            = "File",
-    .data_offset     = offsetof(struct _UwFileExtraData, file_data),
-    .data_size       = sizeof(struct _UwFile),
-    .allocator       = &default_allocator,
-    ._create         = default_create,
-    ._destroy        = default_destroy,
-    ._init           = _uw_file_init,
-    ._fini           = _uw_file_fini,
-    ._clone          = default_clone,
-    ._hash           = _uw_file_hash,
-    ._deepcopy       = _uw_file_deepcopy,
-    ._dump           = _uw_file_dump,
-    ._to_string      = _uw_file_to_string,
-    ._is_true        = _uw_file_is_true,
-    ._equal_sametype = _uw_file_equal_sametype,
-    ._equal          = _uw_file_equal,
-
-    .interfaces = {
-        [UwInterfaceId_File]       = &file_type_file_interface,
-        [UwInterfaceId_FileReader] = &file_type_file_reader_interface,
-        [UwInterfaceId_FileWriter] = &file_type_file_writer_interface,
-        [UwInterfaceId_LineReader] = &file_type_line_reader_interface
-    }
-};
-
-static UwInterface_LineReader stringio_type_line_reader_interface = {
-    ._start             = _uwi_stringio_start_read_lines,
-    ._read_line         = _uwi_stringio_read_line,
-    ._read_line_inplace = _uwi_stringio_read_line_inplace,
-    ._get_line_number   = _uwi_stringio_get_line_number,
-    ._unread_line       = _uwi_stringio_unread_line,
-    ._stop              = _uwi_stringio_stop_read_lines
-};
-
-static UwType stringio_type = {
-    .id              = UwTypeId_StringIO,
-    .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = false,
-    .data_optional   = false,
-    .name            = "StringIO",
-    .data_offset     = offsetof(struct _UwStringIOExtraData, stringio_data),
-    .data_size       = sizeof(struct _UwStringIO),
-    .allocator       = &default_allocator,
-    ._create         = default_create,
-    ._destroy        = default_destroy,
-    ._init           = _uw_stringio_init,
-    ._fini           = _uw_stringio_fini,
-    ._clone          = default_clone,
-    ._hash           = _uw_stringio_hash,
-    ._deepcopy       = _uw_stringio_deepcopy,
-    ._dump           = _uw_stringio_dump,
-    ._to_string      = _uw_stringio_to_string,
-    ._is_true        = _uw_stringio_is_true,
-    ._equal_sametype = _uw_stringio_equal_sametype,
-    ._equal          = _uw_stringio_equal,
-
-    // in a subtype all interfaces of base types must be in place:
-    .interfaces = {
-        // [UwInterfaceId_RandomAccess] = &string_type_random_access_interface
-        [UwInterfaceId_LineReader] = &stringio_type_line_reader_interface
-    }
-};
-
-UwType* _uw_types[UW_TYPE_CAPACITY] = {
-
+static UwType* basic_types[] = {
     [UwTypeId_Null]     = &null_type,
     [UwTypeId_Bool]     = &bool_type,
     [UwTypeId_Int]      = &int_type,
@@ -718,27 +615,67 @@ UwType* _uw_types[UW_TYPE_CAPACITY] = {
     [UwTypeId_List]     = &list_type,
     [UwTypeId_Map]      = &map_type,
     [UwTypeId_Status]   = &status_type,
-    [UwTypeId_Struct]   = &struct_type,
-    [UwTypeId_File]     = &file_type,
-    [UwTypeId_StringIO] = &stringio_type
+    [UwTypeId_Struct]   = &struct_type
 };
 
+UwType** _uw_types = nullptr;
+static size_t uw_types_capacity = 0;
+static UwTypeId num_uw_types = 0;
+
+[[ gnu::constructor ]]
+static void init_uw_types()
+{
+    if (_uw_types) {
+        return;
+    }
+
+    size_t page_size = sysconf(_SC_PAGE_SIZE);
+    size_t memsize = (sizeof(basic_types) + page_size - 1) & ~(page_size - 1);
+    uw_types_capacity = memsize / sizeof(char*);
+
+    _uw_types = mmap(NULL, memsize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (_uw_types == MAP_FAILED) {
+        perror("mmap");
+        abort();
+    }
+
+    num_uw_types = _UWC_LENGTH_OF(basic_types);
+    for(UwTypeId i = 0; i < num_uw_types; i++) {
+        UwType* t = basic_types[i];
+        if (!t) {
+            fprintf(stderr, "Type %u is not defined\n", i);
+            abort();
+        }
+        _uw_types[i] = t;
+    }
+}
 
 UwTypeId uw_add_type(UwType* type)
 {
-    UwTypeId i = 0;
-    do {
-        if (_uw_types[i] == nullptr) {
-            _uw_types[i] = type;
-            return i;
+    // the order constructor are called is undefined, make sure _uw_types is initialized
+    init_uw_types();
+
+    if (num_uw_types == ((1 << 8 * sizeof(UwTypeId)) - 1)) {
+        fprintf(stderr, "Cannot define more types than %u\n", num_uw_types);
+        return UwTypeId_Null;
+    }
+    if (num_uw_types == uw_types_capacity) {
+        size_t page_size = sysconf(_SC_PAGE_SIZE);
+        size_t old_memsize = (uw_types_capacity * sizeof(UwType*) + page_size - 1) & ~(page_size - 1);
+        size_t new_memsize = ((uw_types_capacity + 1) * sizeof(UwType*) + page_size - 1) & ~(page_size - 1);
+
+        UwType** new_uw_types = mremap(_uw_types, old_memsize, new_memsize, MREMAP_MAYMOVE);
+        if (new_uw_types == MAP_FAILED) {
+            perror("mremap");
+            return UwTypeId_Null;
         }
-        i++;
-#if UW_TYPE_CAPACITY <= _UW_TYPE_MAX
-    } while (i < UW_TYPE_CAPACITY);
-#else
-    } while (i != 0);
-#endif
-    return UwTypeId_Null;
+        _uw_types = new_uw_types;
+        uw_types_capacity = new_memsize / sizeof(char*);
+    }
+    UwTypeId type_id = num_uw_types++;
+    type->id = type_id;
+    _uw_types[type_id] = type;
+    return type_id;
 }
 
 UwTypeId uw_subtype(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_size)
@@ -746,7 +683,6 @@ UwTypeId uw_subtype(UwType* type, char* name, UwTypeId ancestor_id, unsigned dat
     uw_assert(ancestor_id != UwTypeId_Null);
 
     UwType* ancestor = _uw_types[ancestor_id];
-    uw_assert(ancestor != nullptr);
 
     *type = *ancestor;  // copy type structure
 
@@ -755,9 +691,5 @@ UwTypeId uw_subtype(UwType* type, char* name, UwTypeId ancestor_id, unsigned dat
     type->data_offset = ancestor->data_offset + ancestor->data_size;
     type->data_size = data_size;
 
-    UwTypeId type_id = uw_add_type(type);
-    if (type_id != UwTypeId_Null) {
-        type->id = (UwTypeId) type_id;
-    }
-    return type_id;
+    return uw_add_type(type);
 }
