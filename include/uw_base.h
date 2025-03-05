@@ -850,7 +850,14 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
 // List and Map can't be declared in-place, defining rvalues only
 
 #define UwList(...)  _uw_create(UwTypeId_List __VA_OPT__(,) __VA_ARGS__, UwVaEnd())
+/*
+ * List constructor arguments are list items.
+ */
+
 #define UwMap(...)   _uw_create(UwTypeId_Map  __VA_OPT__(,) __VA_ARGS__, UwVaEnd())
+/*
+ * Map constructor arguments are key-value pairs.
+ */
 
 
 UwResult _uw_create(UwTypeId type_id, ...);
