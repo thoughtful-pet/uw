@@ -4,6 +4,7 @@
 #include <time.h>
 
 #include "include/uw.h"
+#include "include/uw_netutils.h"
 #include "src/uw_string_internal.h"
 
 int num_tests = 0;
@@ -862,6 +863,66 @@ void test_string_io()
     }
 }
 
+void test_netutils()
+{
+    {
+        UwValue subnet = uw_create_string("192.168.0.0/24");
+        UwValue netmask = UwNull();
+        UwValue parsed_subnet = uw_parse_ipv4_subnet(&subnet, &netmask);
+        IPv4subnet n_subnet = {
+            .subnet  = (192 << 24) + (168 << 16),
+            .netmask = 0xFFFFFF00
+        };
+        TEST(parsed_subnet.unsigned_value == n_subnet.value);
+    }
+    {
+        UwValue subnet = uw_create_string("192.168.0.0");
+        UwValue netmask = uw_create_string("255.255.255.0");
+        UwValue parsed_subnet = uw_parse_ipv4_subnet(&subnet, &netmask);
+        IPv4subnet n_subnet = {
+            .subnet  = (192 << 24) + (168 << 16),
+            .netmask = 0xFFFFFF00
+        };
+        TEST(parsed_subnet.unsigned_value == n_subnet.value);
+    }
+    {
+        // prefer CIDR netmask
+        UwValue subnet = uw_create_string("192.168.0.0/8");
+        UwValue netmask = uw_create_string("255.255.255.0");
+        UwValue parsed_subnet = uw_parse_ipv4_subnet(&subnet, &netmask);
+        IPv4subnet n_subnet = {
+            .subnet  = (192 << 24) + (168 << 16),
+            .netmask = 0xFF000000
+        };
+        TEST(parsed_subnet.unsigned_value == n_subnet.value);
+    }
+    {
+        // bad IP address
+        UwValue subnet = uw_create_string("392.168.0.0/24");
+        UwValue netmask = UwNull();
+        UwValue parsed_subnet = uw_parse_ipv4_subnet(&subnet, &netmask);
+        TEST(uw_error(&parsed_subnet));
+        TEST(parsed_subnet.status_code == UW_ERROR_BAD_IP_ADDRESS);
+        //uw_dump(stdout, &parsed_subnet);
+    }
+    {
+        // bad CIDR netmask
+        UwValue subnet = uw_create_string("192.168.0.0/124");
+        UwValue netmask = UwNull();
+        UwValue parsed_subnet = uw_parse_ipv4_subnet(&subnet, &netmask);
+        TEST(parsed_subnet.status_code == UW_ERROR_BAD_NETMASK);
+        //uw_dump(stdout, &parsed_subnet);
+    }
+    {
+        // bad CIDR netmask
+        UwValue subnet = uw_create_string("192.168.0.0/24/12");
+        UwValue netmask = UwNull();
+        UwValue parsed_subnet = uw_parse_ipv4_subnet(&subnet, &netmask);
+        TEST(parsed_subnet.status_code == UW_ERROR_BAD_NETMASK);
+        //uw_dump(stdout, &parsed_subnet);
+    }
+}
+
 int main(int argc, char* argv[])
 {
     //debug_allocator.verbose = true;
@@ -883,6 +944,7 @@ int main(int argc, char* argv[])
     test_map();
     test_file();
     test_string_io();
+    test_netutils();
 
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     print_timediff(stderr, "time elapsed:", &start_time, &end_time);
