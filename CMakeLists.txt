@@ -22,6 +22,7 @@ add_library(uw STATIC
     src/uw_hash.c
     src/uw_list.c
     src/uw_map.c
+    src/uw_netutils.c
     src/uw_status.c
     src/uw_string.c
     src/uw_string_io.c
