@@ -403,6 +403,8 @@ void test_integral_types()
 
 void test_string()
 {
+    TEST(uw_char_isspace(0) == false);
+
     { // testing char_size=1
         UwValue v = uw_create_empty_string(0, 1);
         TEST(_uw_string_length(&v) == 0);
@@ -506,7 +508,7 @@ void test_string()
         uw_string_append(&v, u8"สวัสดี");
 
         TEST(_uw_string_length(&v) == 6);
-        TEST(_uw_string_capacity(&v) == 6);
+        TEST(_uw_string_capacity(&v) == 270);  // capacity is slightly changed because of alignment and char_size increase
         TEST(_uw_string_char_size(&v) == 2);
         TEST(uw_equal(&v, u8"สวัสดี"));
         //uw_dump(stdout, &v);

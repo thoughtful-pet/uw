@@ -251,6 +251,7 @@ copy_string: {
 
         _UwValue orig_str = *str;
         unsigned length = _uw_string_length(str);
+        unsigned capacity = _uw_string_capacity(str);
 
         if (increment > _max_capacity[new_char_size] - length) {
             // cannot expand
@@ -261,14 +262,17 @@ copy_string: {
             return false;
         }
 
-        unsigned new_length = length + increment;
+        unsigned new_capacity = length + increment;
+        if (new_capacity < capacity) {
+            new_capacity = capacity;
+        }
 
         if (new_char_size < char_size) {
             new_char_size = char_size;
         }
 
         // allocate string
-        if (!make_empty_string(str, new_length, new_char_size)) {
+        if (!make_empty_string(str, new_capacity, new_char_size)) {
             // restore refcount of the original string
             if (!str->str_embedded) {
                 str->extra_data->refcount++;
