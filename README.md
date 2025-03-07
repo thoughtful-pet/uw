@@ -86,3 +86,4 @@ Yes, C is weird. C++ could handle this better, but it's weird in its own way.
 * if a string is about to be modified and refcount is 1, it is modified in place.
 * if a string is about to be modified and refcount is more than 1, a copy is created
   with refcount 1 and then modified in place.
+* string capacity is preserved on copy

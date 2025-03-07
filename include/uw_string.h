@@ -430,8 +430,8 @@ static inline UwResult _uw_string_join_u8_wrapper(char* separator, UwValuePtr li
     /* declare String variable, character size 2 bytes, up to 6 chars */  \
     _UwValue name = {  \
         ._emb_string_type_id = UwTypeId_String,  \
-        ._emb_str_char_size = 1,  \
         .str_embedded = 1,  \
+        .str_embedded_char_size = 1,  \
         .str_embedded_length = (len),  \
         .str_2[0] = (c0),  \
         .str_2[1] = (c1),  \
@@ -455,9 +455,9 @@ static inline UwResult _uw_string_join_u8_wrapper(char* separator, UwValuePtr li
 #define __UWDECL_String_3_4(name, len, c0, c1, c2, c3)  \
     /* declare String variable, character size 3 bytes, up to 4 chars */  \
     _UwValue name = {  \
-        ._emb_string__type_id = UwTypeId_String,  \
-        ._emb_str_char_size = 2,  \
+        ._emb_string_type_id = UwTypeId_String,  \
         .str_embedded = 1,  \
+        .str_embedded_char_size = 2,  \
         .str_embedded_length = (len),  \
         .str_3[0] = {{ [0] = (uint8_t) (c0), [1] = (uint8_t) ((c0) >> 8), [2] = (uint8_t) ((c0) >> 16) }},  \
         .str_3[1] = {{ [0] = (uint8_t) (c1), [1] = (uint8_t) ((c1) >> 8), [2] = (uint8_t) ((c1) >> 16) }},  \
@@ -480,8 +480,8 @@ static inline UwResult _uw_string_join_u8_wrapper(char* separator, UwValuePtr li
     /* declare String variable, character size 4 bytes, up to 3 chars */  \
     _UwValue name = {  \
         ._emb_string_type_id = UwTypeId_String,  \
-        ._emb_str_char_size = 3,  \
         .str_embedded = 1,  \
+        .str_embedded_char_size = 3,  \
         .str_embedded_length = (len),  \
         .str_4[0] = (c0),  \
         .str_4[1] = (c1),  \

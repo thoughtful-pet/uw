@@ -14,25 +14,48 @@ extern "C" {
 #define _likely_(x)    __builtin_expect(!!(x), 1)
 #define _unlikely_(x)  __builtin_expect(!!(x), 0)
 
+/*
+ * String structures for various size of length and capacity
+ */
+
+typedef struct {
+    uint8_t header;
+    uint8_t capacity;
+    uint8_t length;
+    uint8_t padding;
+    uint8_t data;
+} _UwStrCap8;
+
+typedef struct {
+    uint16_t header;
+    uint16_t capacity;
+    uint16_t length;
+    uint8_t data;
+} _UwStrCap16;
+
+typedef struct {
+    unsigned header;
+    unsigned capacity;
+    unsigned length;
+    uint8_t data;
+} _UwStrCapU;
+
+typedef union {
+    struct {
+        uint8_t embedded:1,  // always zero
+                char_size:2,
+                unused:1,
+                cap_size:4;
+    };
+    _UwStrCap8  cap8;
+    _UwStrCap16 cap16;
+    _UwStrCapU  capU;
+} _UwString;
+
 struct _UwStringExtraData {
 
     _UwExtraData  value_data;
-
-    /*
-     * variable part:
-     *
-     * union {
-     *     // if str_uint_cap is not set, capacity and length are stored in UwValue
-     *     uint8_t str[];
-     *
-     *     // if str_uint_cap is set
-     *     struct {
-     *         unsigned capacity;
-     *         unsigned length;
-     *         uint8_t str[];
-     *     };
-     *  };
-     */
+    _UwString str;
 };
 
 #define UWSTRING_BLOCK_SIZE    16
@@ -48,22 +71,22 @@ extern UwType _uw_string_type;
  * Low level helper functions.
  */
 
+#define string_struct(s) ((struct _UwStringExtraData*) ((s)->extra_data))->str
+
+static char _panic_bad_char_size[] = "Bad char size: %u\n";
+static char _panic_bad_cap_size[]  = "Bad size of capacity: %u\n";
+
 static inline uint8_t _uw_string_char_size(UwValuePtr s)
 /*
  * char_size is stored as 0-based whereas all
  * functions use 1-based values.
  */
 {
-    return s->str_char_size + 1;
-}
-
-static inline void _uw_string_set_char_size(UwValuePtr s, uint8_t char_size)
-/*
- * char_size is stored as 0-based whereas all
- * functions use 1-based values.
- */
-{
-    s->str_char_size = char_size - 1;
+    if (_likely_(s->str_embedded)) {
+        return s->str_embedded_char_size + 1;
+    } else {
+        return string_struct(s).char_size + 1;
+    }
 }
 
 static inline uint8_t* _uw_string_char_ptr(UwValuePtr s, unsigned start_pos)
@@ -75,15 +98,15 @@ static inline uint8_t* _uw_string_char_ptr(UwValuePtr s, unsigned start_pos)
     if (_likely_(s->str_embedded)) {
         return &s->str_1[offset];
     } else {
-        uint8_t* ptr = ((uint8_t*) s->extra_data) + sizeof(struct _UwStringExtraData) + offset;
-        if (_unlikely_(s->str_uint_cap)) {
-            ptr += 2 * sizeof(unsigned);
+        uint8_t cap_size = string_struct(s).cap_size;
+        switch (cap_size) {
+            case 1: return (&string_struct(s).cap8.data) + offset;
+            case 2: return (&string_struct(s).cap16.data) + offset;
+            case sizeof(unsigned): return (&string_struct(s).capU.data) + offset;
+            default: uw_panic(_panic_bad_cap_size, cap_size);
         }
-        return ptr;
     }
 }
-
-static char _panic_bad_char_size[] = "Bad char size: %u\n";
 
 static inline unsigned get_embedded_capacity(uint8_t char_size)
 {
@@ -101,21 +124,38 @@ static inline unsigned _uw_string_capacity(UwValuePtr s)
 {
     if (_likely_(s->str_embedded)) {
         return get_embedded_capacity(_uw_string_char_size(s));
-    } else if (_unlikely_(s->str_uint_cap)) {
-        return *( (unsigned*) (((uint8_t*) s->extra_data) + sizeof(struct _UwStringExtraData)) );
     } else {
-        return s->str_capacity;
+        uint8_t cap_size = string_struct(s).cap_size;
+        switch (cap_size) {
+            case 1: return string_struct(s).cap8.capacity;
+            case 2: return string_struct(s).cap16.capacity;
+            case sizeof(unsigned): return string_struct(s).capU.capacity;
+            default: uw_panic(_panic_bad_cap_size, cap_size);
+        }
     }
 }
 
-static inline void _uw_string_set_capacity(UwValuePtr s, unsigned capacity)
+static inline void _uw_string_set_caplen(UwValuePtr s, unsigned capacity, unsigned length)
 {
     if (_unlikely_(s->str_embedded)) {
         // no op
-    } else if (_unlikely_(s->str_uint_cap)) {
-        *( (unsigned*) (((uint8_t*) s->extra_data) + sizeof(struct _UwStringExtraData)) ) = capacity;
     } else {
-        s->str_capacity = capacity;
+        uint8_t cap_size = string_struct(s).cap_size;
+        switch (cap_size) {
+            case 1:
+                string_struct(s).cap8.capacity = capacity;
+                string_struct(s).cap8.length = length;
+                break;
+            case 2:
+                string_struct(s).cap16.capacity = capacity;
+                string_struct(s).cap16.length = length;
+                break;
+            case sizeof(unsigned):
+                string_struct(s).capU.capacity = capacity;
+                string_struct(s).capU.length = length;
+                break;
+            default: uw_panic(_panic_bad_cap_size, cap_size);
+        }
     }
 }
 
@@ -123,10 +163,14 @@ static inline unsigned _uw_string_length(UwValuePtr s)
 {
     if (_likely_(s->str_embedded)) {
         return s->str_embedded_length;
-    } else if (_unlikely_(s->str_uint_cap)) {
-        return *( (unsigned*) (((uint8_t*) s->extra_data) + sizeof(struct _UwStringExtraData) + sizeof(unsigned)) );
     } else {
-        return s->str_length;
+        uint8_t cap_size = string_struct(s).cap_size;
+        switch (cap_size) {
+            case 1: return string_struct(s).cap8.length;
+            case 2: return string_struct(s).cap16.length;
+            case sizeof(unsigned): return string_struct(s).capU.length;
+            default: uw_panic(_panic_bad_cap_size, cap_size);
+        }
     }
 }
 
@@ -134,10 +178,14 @@ static inline void _uw_string_set_length(UwValuePtr s, unsigned length)
 {
     if (_likely_(s->str_embedded)) {
         s->str_embedded_length = length;
-    } else if (_unlikely_(s->str_uint_cap)) {
-        *( (unsigned*) (((uint8_t*) s->extra_data) + sizeof(struct _UwStringExtraData) + sizeof(unsigned)) ) = length;
     } else {
-        s->str_length = length;
+        uint8_t cap_size = string_struct(s).cap_size;
+        switch (cap_size) {
+            case 1: string_struct(s).cap8.length = length; break;
+            case 2: string_struct(s).cap16.length = length; break;
+            case sizeof(unsigned): string_struct(s).capU.length = length; break;
+            default: uw_panic(_panic_bad_cap_size, cap_size);
+        }
     }
 }
 
@@ -146,20 +194,20 @@ static inline unsigned _uw_string_inc_length(UwValuePtr s, unsigned increment)
  * Increment length, return previous value.
  */
 {
+    unsigned length;
     if (_likely_(s->str_embedded)) {
-        uint8_t length = s->str_embedded_length;
+        length = s->str_embedded_length;
         s->str_embedded_length = length + increment;
-        return length;
-    } else if (_unlikely_(s->str_uint_cap)) {
-        unsigned* length_ptr = (unsigned*) (((uint8_t*) s->extra_data) + sizeof(struct _UwStringExtraData) + sizeof(unsigned));
-        unsigned length = *length_ptr;
-        *length_ptr = length + increment;
-        return length;
     } else {
-        unsigned length = s->str_length;
-        s->str_length = length + increment;
-        return length;
+        uint8_t cap_size = string_struct(s).cap_size;
+        switch (cap_size) {
+            case 1: length = string_struct(s).cap8.length;  string_struct(s).cap8.length  = length + increment; break;
+            case 2: length = string_struct(s).cap16.length; string_struct(s).cap16.length = length + increment; break;
+            case sizeof(unsigned): length = string_struct(s).capU.length; string_struct(s).capU.length = length + increment; break;
+            default: uw_panic(_panic_bad_cap_size, cap_size);
+        }
     }
+    return length;
 }
 
 /****************************************************************
@@ -198,9 +246,13 @@ typedef struct {
 
 extern StrMethods _uws_str_methods[4];
 
-static inline StrMethods* get_str_methods(UwValuePtr str)
+static inline StrMethods* get_str_methods(UwValuePtr s)
 {
-    return &_uws_str_methods[str->str_char_size];
+    if (_likely_(s->str_embedded)) {
+        return &_uws_str_methods[s->str_embedded_char_size];
+    } else {
+        return &_uws_str_methods[string_struct(s).char_size];
+    }
 }
 
 /****************************************************************

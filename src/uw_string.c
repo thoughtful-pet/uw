@@ -1,12 +1,14 @@
 #include <limits.h>
 
+#include <libpussy/dump.h>
+
 #include "include/uw.h"
 #include "src/uw_charptr_internal.h"
 #include "src/uw_string_internal.h"
 
 // lookup table to validate capacity
 
-#define _header_size  (sizeof(struct _UwStringExtraData) + 2 * sizeof(unsigned))
+#define _header_size  sizeof(_UwString)
 
 static unsigned _max_capacity[4] = {
     UINT_MAX - _header_size,
@@ -78,14 +80,29 @@ static inline uint8_t char_width_to_char_size(uint8_t width)
     return 1;
 }
 
+static inline uint8_t calc_cap_size(unsigned capacity)
+{
+    if (_likely_(capacity < 256)) {
+        return 1;
+    } else if (_unlikely_(capacity < 65536)) {
+        return 2;
+    } else {
+        return sizeof(unsigned);
+    }
+}
+
 static unsigned calc_extra_data_size(uint8_t char_size, unsigned desired_capacity, unsigned* real_capacity)
 /*
  * Calculate memory size for extra data.
  */
 {
-    unsigned header_size = sizeof(struct _UwStringExtraData);
-    if (_unlikely_(desired_capacity >= 65536)) {
-        header_size += 2 * sizeof(unsigned);
+    unsigned header_size;
+    if (_likely_(desired_capacity <= 256 - offsetof(struct _UwStringExtraData, str.cap8.data))) {
+        header_size = offsetof(struct _UwStringExtraData, str.cap8.data);
+    } else if (_unlikely_(desired_capacity <= 65536 - offsetof(struct _UwStringExtraData, str.cap16.data))) {
+        header_size = offsetof(struct _UwStringExtraData, str.cap16.data);
+    } else {
+        header_size = offsetof(struct _UwStringExtraData, str.capU.data);
     }
     unsigned size = header_size + char_size * desired_capacity + UWSTRING_BLOCK_SIZE - 1;
     size &= ~(UWSTRING_BLOCK_SIZE - 1);
@@ -115,10 +132,11 @@ static bool make_empty_string(UwValuePtr result, unsigned capacity, uint8_t char
     // check if string can be embedded into result
 
     if (capacity <= get_embedded_capacity(char_size)) {
-        _uw_string_set_char_size(result, char_size);
         result->str_embedded = 1;
-        result->str_uint_cap = 0;
-        bzero(result->str_1, sizeof(result->str_1));
+        result->str_embedded_char_size = char_size - 1;  // char_size is stored as 0-based
+        result->str_4[0] = 0;
+        result->str_4[1] = 0;
+        result->str_4[2] = 0;
         return true;
     }
 
@@ -127,7 +145,6 @@ static bool make_empty_string(UwValuePtr result, unsigned capacity, uint8_t char
     }
 
     result->str_embedded = 0;
-    result->str_uint_cap = capacity >= 65536;
 
     // allocate string
 
@@ -142,10 +159,11 @@ static bool make_empty_string(UwValuePtr result, unsigned capacity, uint8_t char
     }
     result->extra_data->refcount = 1;
 
-    _uw_string_set_char_size(result, char_size);
-    _uw_string_set_length(result, 0);
-    _uw_string_set_capacity(result, real_capacity);
-    return result;
+    string_struct(result).cap_size = calc_cap_size(real_capacity);
+    string_struct(result).char_size = char_size - 1;  // char_size is stored as 0-based
+
+    _uw_string_set_caplen(result, real_capacity, 0);
+    return true;
 }
 
 static bool expand_string(UwValuePtr str, unsigned increment, uint8_t new_char_size)
@@ -176,7 +194,7 @@ static bool expand_string(UwValuePtr str, unsigned increment, uint8_t new_char_s
             if (new_char_size > char_size) {
                 // but need to make existing chars wider
                 _UwValue orig_str = *str;
-                _uw_string_set_char_size(str, new_char_size);
+                str->str_embedded_char_size = new_char_size - 1;  // char_size is stored as 0-based
                 get_str_methods(&orig_str)->copy_to(
                     _uw_string_char_ptr(&orig_str, 0),
                     str, 0, orig_str.str_embedded_length
@@ -200,8 +218,7 @@ static bool expand_string(UwValuePtr str, unsigned increment, uint8_t new_char_s
 
         if (new_char_size > char_size) {
             // copy string if char size needs to increase
-            // make refcount zero to free original data after copy
-            str->extra_data->refcount = 0;
+            str->extra_data->refcount = 0; // make refcount zero to free original data after copy
             goto copy_string;
         }
 
@@ -219,31 +236,25 @@ static bool expand_string(UwValuePtr str, unsigned increment, uint8_t new_char_s
             return true;
         }
 
-        // reallocate data
-
         unsigned orig_memsize = get_extra_data_size(str);
         unsigned new_capacity;
         unsigned new_memsize = calc_extra_data_size(char_size, new_length, &new_capacity);
+
+        uint8_t new_cap_size = calc_cap_size(new_capacity);
+        if (new_cap_size > string_struct(str).cap_size) {
+            // when cap_size changes, reallocating would require data move
+            // it's easier and less error-prone to copy string
+            str->extra_data->refcount = 0; // make refcount zero to free original data after copy
+            goto copy_string;
+        }
+
+        // reallocate data
 
         if (!_uw_types[str->type_id]->allocator->reallocate((void**) &str->extra_data,
                                                             orig_memsize, new_memsize, true, nullptr)) {
             return false;
         }
-
-        if (capacity < 65536 && new_capacity >= 65536) {
-            // header size increased
-
-            // move string to the right
-            uint8_t* src_addr  = ((uint8_t*) str->extra_data) + sizeof(struct _UwStringExtraData);
-            uint8_t* dest_addr = src_addr + sizeof(unsigned);
-            memmove(dest_addr, src_addr, length * char_size);
-
-            // update string parameters
-            str->str_uint_cap = 1;
-            _uw_string_set_length(str, length);  // update length in the extra_data
-        }
-        _uw_string_set_capacity(str, new_capacity);
-
+        _uw_string_set_caplen(str, new_capacity, length);
         return true;
     }
 
@@ -279,7 +290,6 @@ copy_string: {
             }
             return false;
         }
-
         // copy original string to new string
         get_str_methods(&orig_str)->copy_to(_uw_string_char_ptr(&orig_str, 0), str, 0, length);
         _uw_string_set_length(str, length);
@@ -330,6 +340,18 @@ static UwResult string_clone(UwValuePtr self)
     return uw_move(&result);
 }
 
+static UwResult string_deepcopy(UwValuePtr self)
+{
+    UwValue result = UwString();
+    unsigned length = _uw_string_length(self);
+    if (!make_empty_string(&result, length, _uw_string_char_size(self))) {
+        return UwOOM();
+    }
+    get_str_methods(self)->copy_to(_uw_string_char_ptr(self, 0), &result, 0, length);
+    _uw_string_set_length(&result, length);
+    return uw_move(&result);
+}
+
 static void string_hash(UwValuePtr self, UwHashContext* ctx)
 {
     // mind maps: the hash should be the same for subtypes, that's why not using self->type_id here
@@ -352,13 +374,16 @@ void _uw_string_dump_data(FILE* fp, UwValuePtr str, int indent)
     if (str->str_embedded) {
         fprintf(fp, " embedded,");
     } else {
-        fprintf(fp, " data=%p, refcount=%u, uint_cap=%s,",
-                str->extra_data, str->extra_data->refcount, str->str_uint_cap? "true" : "false");
+        fprintf(fp, " data=%p, refcount=%u, cap_size=%u, data size=%u, ptr=%p",
+                str->extra_data, str->extra_data->refcount, string_struct(str).cap_size,
+                get_extra_data_size(str), _uw_string_char_ptr(str, 0));
     }
-    unsigned length = _uw_string_length(str);
 
-    fprintf(fp, " %u chars, capacity=%u, char size=%u\n",
-            length, _uw_string_capacity(str), _uw_string_char_size(str));
+    unsigned capacity = _uw_string_capacity(str);
+    unsigned length = _uw_string_length(str);
+    uint8_t char_size = _uw_string_char_size(str);
+
+    fprintf(fp, " length=%u, capacity=%u, char size=%u\n", length, capacity, char_size);
     indent += 4;
 
     if (length) {
@@ -373,6 +398,16 @@ void _uw_string_dump_data(FILE* fp, UwValuePtr str, int indent)
             }
         }
         fputc('\n', fp);
+
+        uint8_t* addr = _uw_string_char_ptr(str, 0);
+        dump_hex(fp, indent, addr, length * char_size, (uint8_t*) (((ptrdiff_t) addr) & 15), true, true);
+        if (length < capacity) {
+            _uw_print_indent(fp, indent);
+            fputs("capacity remainder:\n", fp);
+            uint8_t* rem_addr = _uw_string_char_ptr(str, length);
+            dump_hex(fp, indent, rem_addr, (capacity - length) * char_size,
+                     (uint8_t*) ((((ptrdiff_t) addr) & 15) + length * char_size), true, true);
+        }
     }
 }
 
@@ -430,7 +465,7 @@ UwType _uw_string_type = {
     .compound        = false,
     .data_optional   = true,
     .name            = "String",
-    .data_offset     = sizeof(struct _UwStringExtraData),
+    .data_offset     = offsetof(struct _UwStringExtraData, str),
     .data_size       = 0,
     .allocator       = &default_allocator,
     ._create         = string_create,
@@ -439,9 +474,9 @@ UwType _uw_string_type = {
     ._fini           = nullptr,       // there's nothing to finalize, just run custom destructor
     ._clone          = string_clone,
     ._hash           = string_hash,
-    ._deepcopy       = string_clone,  // strings are COW so copy is clone
+    ._deepcopy       = string_deepcopy,
     ._dump           = string_dump,
-    ._to_string      = string_clone,  // yes, simply make a copy
+    ._to_string      = string_deepcopy,  // yes, simply make a copy
     ._is_true        = string_is_true,
     ._equal_sametype = string_equal_sametype,
     ._equal          = string_equal,
@@ -1000,11 +1035,11 @@ STR_EQ_O24_HELPER_IMPL(uint32_t)
     static bool _eq_##type_name_self(uint8_t* self_ptr, UwValuePtr other, unsigned other_start_pos, unsigned length)  \
     {  \
         uint8_t* other_ptr = _uw_string_char_ptr(other, other_start_pos);  \
-        switch (other->str_char_size) {  \
-            case 0: return eq_##type_name_self##_uint8_t(self_ptr, (uint8_t*) other_ptr, length);  \
-            case 1: return eq_##type_name_self##_uint16_t(self_ptr, (uint16_t*) other_ptr, length);  \
-            case 2: return eq_##type_name_self##_uint24_t(self_ptr, (uint24_t*) other_ptr, length);  \
-            case 3: return eq_##type_name_self##_uint32_t(self_ptr, (uint32_t*) other_ptr, length);  \
+        switch (_uw_string_char_size(other)) {  \
+            case 1: return eq_##type_name_self##_uint8_t(self_ptr, (uint8_t*) other_ptr, length);  \
+            case 2: return eq_##type_name_self##_uint16_t(self_ptr, (uint16_t*) other_ptr, length);  \
+            case 3: return eq_##type_name_self##_uint24_t(self_ptr, (uint24_t*) other_ptr, length);  \
+            case 4: return eq_##type_name_self##_uint32_t(self_ptr, (uint32_t*) other_ptr, length);  \
             default: return false;  \
         }  \
     }
@@ -1176,11 +1211,11 @@ STR_COPY_TO_D24_HELPER_IMPL(uint32_t)
     static void _cp_to_##type_name_self(uint8_t* self_ptr, UwValuePtr dest, unsigned dest_start_pos, unsigned length)  \
     {  \
         uint8_t* dest_ptr = _uw_string_char_ptr(dest, dest_start_pos);  \
-        switch (dest->str_char_size) {  \
-            case 0: cp_##type_name_self##_uint8_t(self_ptr, (uint8_t*) dest_ptr, length); return; \
-            case 1: cp_##type_name_self##_uint16_t(self_ptr, (uint16_t*) dest_ptr, length); return; \
-            case 2: cp_##type_name_self##_uint24_t(self_ptr, (uint24_t*) dest_ptr, length); return; \
-            case 3: cp_##type_name_self##_uint32_t(self_ptr, (uint32_t*) dest_ptr, length); return; \
+        switch (_uw_string_char_size(dest)) {  \
+            case 1: cp_##type_name_self##_uint8_t(self_ptr, (uint8_t*) dest_ptr, length); return; \
+            case 2: cp_##type_name_self##_uint16_t(self_ptr, (uint16_t*) dest_ptr, length); return; \
+            case 3: cp_##type_name_self##_uint24_t(self_ptr, (uint24_t*) dest_ptr, length); return; \
+            case 4: cp_##type_name_self##_uint32_t(self_ptr, (uint32_t*) dest_ptr, length); return; \
         }  \
     }
 

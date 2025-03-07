@@ -167,15 +167,14 @@ union __UwValue {
             uint16_t status_code;  // for UWSC_DEFAULT status class
             int16_t  uw_errno;     // errno for UWSC_ERRNO status class
         };
-        _UwExtraData* _status_extra_data;
+        _UwExtraData* status_data;
     };
 
     struct {
         // embedded string
         UwTypeId /* uint16_t */ _emb_string_type_id;
-        uint8_t str_embedded:1,     // the string data is embedded into UwValue
-                _x_str_uint_cap:1,  // always zero for embedded strings
-                _emb_str_char_size:2; // character size in bytes minus one
+        uint8_t str_embedded:1,       // the string data is embedded into UwValue
+                str_embedded_char_size:2;
         uint8_t str_embedded_length;  // length of embedded string
         union {
             uint8_t  str_1[12];
@@ -188,15 +187,9 @@ union __UwValue {
     struct {
         // allocated string
         UwTypeId /* uint16_t */ _string_type_id;
-        uint8_t _x_str_embedded:1,  // always zero for allocated string
-                str_uint_cap:1,     // capacity and length have unsigned type and stored in extra_data
-                str_char_size:2;    // character size in bytes minus one
-        uint8_t _str_padding;
-        // strings are copied on write, so it's okay
-        // to duplicate length and capacity in each UwValue
-        uint16_t str_capacity;
-        uint16_t str_length;
-        _UwExtraData* _string_extra_data;
+        uint8_t _x_str_embedded:1;  // zero for allocated string
+        uint8_t _str_padding[5];
+        _UwExtraData* string_data;
     };
 };
 
@@ -205,13 +198,12 @@ typedef union __UwValue _UwValue;
 // make sure _UwValue structure is correct
 static_assert( offsetof(_UwValue, charptr_subtype) == 2 );
 static_assert( offsetof(_UwValue, status_code)     == 4 );
-static_assert( offsetof(_UwValue, str_capacity)    == 4 );
 
 static_assert( offsetof(_UwValue, bool_value) == 8 );
 static_assert( offsetof(_UwValue, charptr)    == 8 );
 static_assert( offsetof(_UwValue, extra_data) == 8 );
-static_assert( offsetof(_UwValue, _status_extra_data) == 8 );
-static_assert( offsetof(_UwValue, _string_extra_data) == 8 );
+static_assert( offsetof(_UwValue, status_data) == 8 );
+static_assert( offsetof(_UwValue, string_data) == 8 );
 
 static_assert( offsetof(_UwValue, str_embedded_length) == 3 );
 static_assert( offsetof(_UwValue, str_1) == 4 );

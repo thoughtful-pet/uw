@@ -410,19 +410,19 @@ void test_string()
         TEST(_uw_string_length(&v) == 0);
         TEST(_uw_string_capacity(&v) == 12);
         TEST(_uw_string_char_size(&v) == 1);
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
 
         uw_string_append(&v, "hello");
 
         TEST(_uw_string_length(&v) == 5);
         TEST(_uw_string_capacity(&v) == 12);
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
 
         uw_string_append(&v, '!');
 
         TEST(_uw_string_length(&v) == 6);
         TEST(_uw_string_capacity(&v) == 12);
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
 
         // XXX TODO increase capacity to more than 64K
         for (int i = 0; i < 250; i++) {
@@ -430,12 +430,12 @@ void test_string()
         }
         TEST(_uw_string_length(&v) == 256);
         TEST(_uw_string_char_size(&v) == 1);
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
 
         uw_string_append(&v, "everybody");
         uw_string_erase(&v, 5, 255);
         TEST(uw_equal(&v, "hello everybody"));
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
         TEST(!uw_equal(&v, ""));
 
         // test comparison
@@ -492,8 +492,8 @@ void test_string()
         TEST(uw_equal(&v, ""));
 
         TEST(_uw_string_length(&v) == 0);
-        TEST(_uw_string_capacity(&v) == 268);
-        //uw_dump(stdout, &v);
+        TEST(_uw_string_capacity(&v) == 278);
+        //uw_dump(stderr, &v);
 
         // test append substring
         uw_string_append_substring(&v, "0123456789", 3, 7);
@@ -508,10 +508,10 @@ void test_string()
         uw_string_append(&v, u8"สวัสดี");
 
         TEST(_uw_string_length(&v) == 6);
-        TEST(_uw_string_capacity(&v) == 270);  // capacity is slightly changed because of alignment and char_size increase
+        TEST(_uw_string_capacity(&v) == 283);  // capacity is slightly changed because of alignment and char_size increase
         TEST(_uw_string_char_size(&v) == 2);
         TEST(uw_equal(&v, u8"สวัสดี"));
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
     }
 
     { // testing char_size=2
@@ -519,13 +519,13 @@ void test_string()
         TEST(_uw_string_length(&v) == 0);
         TEST(_uw_string_capacity(&v) == 6);
         TEST(_uw_string_char_size(&v) == 2);
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
 
         uw_string_append(&v, u8"สบาย");
 
         TEST(_uw_string_length(&v) == 4);
         TEST(_uw_string_capacity(&v) == 6);
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
 
         uw_string_append(&v, 0x0e14);
         uw_string_append(&v, 0x0e35);
@@ -533,21 +533,22 @@ void test_string()
         TEST(_uw_string_length(&v) == 6);
         TEST(_uw_string_capacity(&v) == 6);
         TEST(uw_equal(&v, u8"สบายดี"));
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
 
         // test truncate
         uw_string_truncate(&v, 4);
         TEST(uw_equal(&v, u8"สบาย"));
         TEST(!uw_equal(&v, ""));
+        //uw_dump(stderr, &v);
 
         // increase capacity to 2 bytes
         for (int i = 0; i < 251; i++) {
             uw_string_append(&v, ' ');
         }
         TEST(_uw_string_length(&v) == 255);
-        TEST(_uw_string_capacity(&v) == 262);
+        TEST(_uw_string_capacity(&v) == 259);
         TEST(_uw_string_char_size(&v) == 2);
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
 
         uw_string_append(&v, U"สบาย");
         uw_string_erase(&v, 4, 255);
@@ -594,8 +595,8 @@ void test_string()
         uw_string_truncate(&v, 0);
 
         TEST(_uw_string_length(&v) == 0);
-        TEST(_uw_string_capacity(&v) == 262);
-        //uw_dump(stdout, &v);
+        TEST(_uw_string_capacity(&v) == 259);
+        //uw_dump(stderr, &v);
     }
 
     { // testing char_size=3
@@ -603,7 +604,7 @@ void test_string()
         TEST(_uw_string_length(&v) == 0);
         TEST(_uw_string_capacity(&v) == 4);
         TEST(_uw_string_char_size(&v) == 3);
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
     }
 
     { // testing char_size=4
@@ -611,7 +612,7 @@ void test_string()
         TEST(_uw_string_length(&v) == 0);
         TEST(_uw_string_capacity(&v) == 3);
         TEST(_uw_string_char_size(&v) == 4);
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
     }
 
     { // test trimming
@@ -632,7 +633,7 @@ void test_string()
         uw_list_append(&list, U"mulțumesc");
         UwValue v = uw_string_join('/', &list);
         TEST(uw_equal(&v, U"Hello/สวัสดี/Thanks/mulțumesc"));
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
     }
 
     { // test join with CharPtr
@@ -647,7 +648,7 @@ void test_string()
         uw_list_append(&list, &multsumesc);
         UwValue v = uw_string_join(&wat, &list);
         TEST(uw_equal(&v, U"Hello🙏สวัสดี🙏Thanks🙏mulțumesc"));
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
     }
 
     { // test uw_strcat
@@ -655,13 +656,13 @@ void test_string()
             uw_create_string("Hello! "), UwCharPtr("Thanks"), UwChar32Ptr(U"🙏"), UwChar8Ptr(u8"สวัสดี")
         );
         TEST(uw_equal(&v, U"Hello! Thanks🙏สวัสดี"));
-        //uw_dump(stdout, &v);
+        //uw_dump(stderr, &v);
     }
 
     { // test split/join
         UwValue str = uw_create(U"สบาย/สบาย/yo/yo");
         UwValue list = uw_string_split_chr(&str, '/');
-        //uw_dump(stdout, &list);
+        //uw_dump(stderr, &list);
         UwValue v = uw_string_join('/', &list);
         TEST(uw_equal(&v, U"สบาย/สบาย/yo/yo"));
     }
@@ -676,7 +677,7 @@ void test_string()
         uw_string_append_buffer(&str, data, sizeof(data));
         TEST(_uw_string_capacity(&str) >= _uw_string_length(&str));
         TEST(_uw_string_length(&str) == 2500);
-        //uw_dump(stdout, &str);
+        //uw_dump(stderr, &str);
     }
 }
 
@@ -765,7 +766,7 @@ void test_map()
         uw_map_del(&map, 25);
 
         TEST(uw_map_length(&map) == 49);
-        //uw_dump(stdout, &map);
+        //uw_dump(stderr, &map);
     }
 
     {
@@ -782,7 +783,7 @@ void test_map()
             UwCharPtr("finally"),     UwMap(UwCharPtr("ok"), UwCharPtr("done"))
         );
         TEST(uw_map_length(&map) == 9);
-        //uw_dump(stdout, &map);
+        //uw_dump(stderr, &map);
     }
 }
 
@@ -905,7 +906,7 @@ void test_netutils()
         UwValue parsed_subnet = uw_parse_ipv4_subnet(&subnet, &netmask);
         TEST(uw_error(&parsed_subnet));
         TEST(parsed_subnet.status_code == UW_ERROR_BAD_IP_ADDRESS);
-        //uw_dump(stdout, &parsed_subnet);
+        //uw_dump(stderr, &parsed_subnet);
     }
     {
         // bad CIDR netmask
@@ -913,7 +914,7 @@ void test_netutils()
         UwValue netmask = UwNull();
         UwValue parsed_subnet = uw_parse_ipv4_subnet(&subnet, &netmask);
         TEST(parsed_subnet.status_code == UW_ERROR_BAD_NETMASK);
-        //uw_dump(stdout, &parsed_subnet);
+        //uw_dump(stderr, &parsed_subnet);
     }
     {
         // bad CIDR netmask
@@ -921,7 +922,7 @@ void test_netutils()
         UwValue netmask = UwNull();
         UwValue parsed_subnet = uw_parse_ipv4_subnet(&subnet, &netmask);
         TEST(parsed_subnet.status_code == UW_ERROR_BAD_NETMASK);
-        //uw_dump(stdout, &parsed_subnet);
+        //uw_dump(stderr, &parsed_subnet);
     }
 }
 
