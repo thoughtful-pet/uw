@@ -8,11 +8,11 @@
 #include <sys/mman.h>
 
 #include "include/uw_base.h"
+#include "include/uw_string.h"
 
 struct _UwStatusExtraData {
     _UwExtraData value_data;
-    char* status_desc;  // status description
-                        // note: allocated by asprintf
+    _UwValue description;  // string
 };
 
 static char* basic_statuses[] = {
@@ -101,25 +101,21 @@ char* uw_status_str(uint16_t status_code)
     }
 }
 
-char* uw_status_desc(UwValuePtr status)
+UwResult uw_status_desc(UwValuePtr status)
 {
-    static char* no_desc = "no description";
-    static char* null_str = "null";
-    static char* bad_status = "bad status";
-
     if (!status) {
-        return null_str;
+        return UwString_1_12(4, 'n', 'u', 'l', 'l', 0, 0, 0, 0, 0, 0, 0, 0);
     }
     if (!uw_is_status(status)) {
-        return bad_status;
+        return UwString_1_12(10, 'b', 'a', 'd', ' ', 's', 't', 'a', 't', 'u', 's', 0, 0);
     }
-    struct _UwStatusExtraData* extra_data = (struct _UwStatusExtraData*) status->extra_data;
-    if (extra_data) {
-        if (extra_data->status_desc) {
-            return extra_data->status_desc;
+    struct _UwStatusExtraData* status_data = (struct _UwStatusExtraData*) status->extra_data;
+    if (status_data) {
+        if (uw_is_string(&status_data->description)) {
+            return uw_clone(&status_data->description);
         }
     }
-    return no_desc;
+    return UwString_1_12(4, 'n', 'o', 'n', 'e', 0, 0, 0, 0, 0, 0, 0, 0);
 }
 
 void _uw_set_status_desc(UwValuePtr status, char* fmt, ...)
@@ -134,18 +130,24 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap)
 {
     uw_assert_status(status);
 
-    struct _UwStatusExtraData* extra_data = (struct _UwStatusExtraData*) status->extra_data;
-    if (!extra_data) {
+    struct _UwStatusExtraData* status_data = (struct _UwStatusExtraData*) status->extra_data;
+    if (status_data) {
+        uw_destroy(&status_data->description);
+    } else {
         if (!_uw_mandatory_alloc_extra_data(status)) {
-            status->status_code  = UW_ERROR_OOM;
             return;
         }
-        extra_data = (struct _UwStatusExtraData*) status->extra_data;
+        status_data = (struct _UwStatusExtraData*) status->extra_data;
     }
-    if (vasprintf(&extra_data->status_desc, fmt, ap) == -1) {
-        extra_data->status_desc = nullptr;
-        status->status_code  = UW_ERROR_OOM;
+    char* desc;
+    if (vasprintf(&desc, fmt, ap) == -1) {
+        return;
     }
+    status_data->description = uw_create_string(desc);
+    if (uw_error(&status_data->description)) {
+        uw_destroy(&status_data->description);
+    }
+    free(desc);
 }
 
 /****************************************************************
@@ -173,12 +175,9 @@ static UwResult status_create(UwTypeId type_id, va_list ap)
 
 static void status_fini(UwValuePtr self)
 {
-    struct _UwStatusExtraData* extra_data = (struct _UwStatusExtraData*) self->extra_data;
-    if (extra_data) {
-        if (extra_data->status_desc) {
-            free(extra_data->status_desc);
-            extra_data->status_desc = nullptr;
-        }
+    struct _UwStatusExtraData* status_data = (struct _UwStatusExtraData*) self->extra_data;
+    if (status_data) {
+        uw_destroy(&status_data->description);
     }
 }
 
@@ -200,15 +199,12 @@ static UwResult status_deepcopy(UwValuePtr self)
     }
     result.extra_data = nullptr;
 
-    // copy description
-
-    if (_uw_alloc_extra_data(&result)) {
-
-        struct _UwStatusExtraData* self_extra_data   = (struct _UwStatusExtraData*) self->extra_data;
-        struct _UwStatusExtraData* result_extra_data = (struct _UwStatusExtraData*) result.extra_data;
-
-        result_extra_data->status_desc = strdup(self_extra_data->status_desc);
+    if (!_uw_mandatory_alloc_extra_data(self)) {
+        return UwOOM();
     }
+    struct _UwStatusExtraData* status_data = (struct _UwStatusExtraData*) self->extra_data;
+    uw_destroy(&status_data->description);
+    status_data->description = uw_deepcopy(&status_data->description);
     return uw_move(&result);
 }
 
@@ -221,7 +217,9 @@ static void status_dump(UwValuePtr self, FILE* fp, int first_indent, int next_in
     if (self->status_code == UW_ERROR_ERRNO) {
         fprintf(fp, "\nerrno %d: %s\n", self->uw_errno, strerror(self->uw_errno));
     } else {
-        fprintf(fp, "\n%s (%u): %s\n", uw_status_str(self->status_code), self->status_code, uw_status_desc(self));
+        UwValue desc = uw_status_desc(self);
+        UW_CSTRING_LOCAL(cdesc, &desc);
+        fprintf(fp, "\n%s (%u): %s\n", uw_status_str(self->status_code), self->status_code, cdesc);
         if (self->extra_data) {
             _uw_dump_base_extra_data(fp, self->extra_data);
         }
@@ -271,8 +269,8 @@ UwType _uw_status_type = {
     .compound        = false,
     .data_optional   = true,
     .name            = "Status",
-    .data_offset     = offsetof(struct _UwStatusExtraData, status_desc),  // extra_data is optional and not allocated by default
-    .data_size       = sizeof(char*),
+    .data_offset     = offsetof(struct _UwStatusExtraData, description),  // extra_data is optional and not allocated by default
+    .data_size       = sizeof(_UwValue),
     .allocator       = &default_allocator,
     ._create         = status_create,
     ._destroy        = _uw_default_destroy,

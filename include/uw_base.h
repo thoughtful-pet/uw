@@ -569,15 +569,9 @@ static inline bool uw_va_end(UwValuePtr status)
     return status->status_code == UW_STATUS_VA_END;
 }
 
-char* uw_status_desc(UwValuePtr status);
+UwResult uw_status_desc(UwValuePtr status);
 /*
  * Get status description.
- * If `status` has no description return a pointer to static string.
- * If `status` is nullptr, return a pointer to static "null" string.
- * If `status` is not a status, return a pointer to static "bad status" string.
- *
- * XXX the result should be used within the lifetime of `status` value
- * XXX need to replace this function with a safer one, maybe CString-based
  */
 
 void _uw_set_status_desc(UwValuePtr status, char* fmt, ...);
