@@ -18,6 +18,7 @@ struct _UwStatusExtraData {
 static char* basic_statuses[] = {
     [UW_SUCCESS]                   = "SUCCESS",
     [UW_STATUS_VA_END]             = "VA_END",
+    [UW_ERROR_ERRNO]               = "ERRNO",
     [UW_ERROR_OOM]                 = "OOM",
     [UW_ERROR_NOT_IMPLEMENTED]     = "NOT IMPLEMENTED",
     [UW_ERROR_INCOMPATIBLE_TYPE]   = "INCOMPATIBLE_TYPE",
@@ -136,7 +137,6 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap)
     struct _UwStatusExtraData* extra_data = (struct _UwStatusExtraData*) status->extra_data;
     if (!extra_data) {
         if (!_uw_mandatory_alloc_extra_data(status)) {
-            status->status_class = UWSC_DEFAULT;
             status->status_code  = UW_ERROR_OOM;
             return;
         }
@@ -144,7 +144,6 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap)
     }
     if (vasprintf(&extra_data->status_desc, fmt, ap) == -1) {
         extra_data->status_desc = nullptr;
-        status->status_class = UWSC_DEFAULT;
         status->status_code  = UW_ERROR_OOM;
     }
 }
@@ -161,12 +160,11 @@ static UwResult status_create(UwTypeId type_id, va_list ap)
  * Description can be string or null.
  */
 {
-    unsigned status_class = va_arg(ap, unsigned);
     unsigned status_code  = va_arg(ap, unsigned);
     char*    description  = va_arg(ap, char*);
 
     // using not autocleaned variable here, no uw_move necessary on exit
-    __UWDECL_Status(result, status_class, status_code);
+    __UWDECL_Status(result, status_code);
     if (description) {
         _uw_set_status_desc_ap(&result, description, ap);
     }
@@ -187,11 +185,9 @@ static void status_fini(UwValuePtr self)
 static void status_hash(UwValuePtr self, UwHashContext* ctx)
 {
     _uw_hash_uint64(ctx, self->type_id);
-    _uw_hash_uint64(ctx, self->status_class);
-    switch (self->status_class) {
-        case UWSC_DEFAULT: _uw_hash_uint64(ctx, self->status_code); break;
-        case UWSC_ERRNO:   _uw_hash_uint64(ctx, self->uw_errno); break;
-        default: break;
+    _uw_hash_uint64(ctx, self->status_code);
+    if (self->status_code == UW_ERROR_ERRNO) {
+        _uw_hash_uint64(ctx, self->uw_errno);
     }
     // XXX do not hash extra data
 }
@@ -199,10 +195,6 @@ static void status_hash(UwValuePtr self, UwHashContext* ctx)
 static UwResult status_deepcopy(UwValuePtr self)
 {
     UwValue result = *self;
-    if (self->status_class == UWSC_ERRNO) {
-        return uw_move(&result);
-    }
-    uw_assert(self->status_class == UWSC_DEFAULT);
     if (!result.extra_data) {
         return uw_move(&result);
     }
@@ -223,24 +215,16 @@ static UwResult status_deepcopy(UwValuePtr self)
 static void status_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
     _uw_dump_start(fp, self, first_indent);
-    switch (self->status_class) {
-        case UWSC_DEFAULT:
-            if (self->extra_data) {
-                _uw_dump_base_extra_data(fp, self->extra_data);
-            }
-            fprintf(fp, "\n%s (%u): %s\n", uw_status_str(self->status_code), self->status_code, uw_status_desc(self));
-            break;
-
-        case UWSC_ERRNO:
-            fprintf(fp, "\nerrno %d: %s\n", self->uw_errno, strerror(self->uw_errno));
-            break;
-
-        default:
-            if (self->extra_data) {
-                _uw_dump_base_extra_data(fp, self->extra_data);
-            }
-            fprintf(fp, "\nstatus class=%u (unknown); status code=%u (unknown)\n", self->status_class, self->status_code);
-            break;
+    if (self->extra_data) {
+        _uw_dump_base_extra_data(fp, self->extra_data);
+    }
+    if (self->status_code == UW_ERROR_ERRNO) {
+        fprintf(fp, "\nerrno %d: %s\n", self->uw_errno, strerror(self->uw_errno));
+    } else {
+        fprintf(fp, "\n%s (%u): %s\n", uw_status_str(self->status_code), self->status_code, uw_status_desc(self));
+        if (self->extra_data) {
+            _uw_dump_base_extra_data(fp, self->extra_data);
+        }
     }
 }
 
@@ -257,10 +241,11 @@ static bool status_is_true(UwValuePtr self)
 
 static bool status_equal_sametype(UwValuePtr self, UwValuePtr other)
 {
-    switch (self->status_class) {
-        case UWSC_DEFAULT: return self->status_code == other->status_code;
-        case UWSC_ERRNO:   return self->uw_errno == other->uw_errno;
-        default: return false;
+    if (self->status_code == UW_ERROR_ERRNO) {
+        return other->status_code == UW_ERROR_ERRNO && self->uw_errno == other->uw_errno;
+    }
+    else {
+        return self->status_code == other->status_code;
     }
 }
 

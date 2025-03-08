@@ -161,12 +161,8 @@ union __UwValue {
     struct {
         // status
         UwTypeId /* uint16_t */ _status_type_id;
-        uint8_t status_class;  // see UWSC_* constants
-        uint8_t _status_padding;
-        union {
-            uint16_t status_code;  // for UWSC_DEFAULT status class
-            int16_t  uw_errno;     // errno for UWSC_ERRNO status class
-        };
+        int16_t uw_errno;
+        uint32_t status_code;
         _UwExtraData* status_data;
     };
 
@@ -497,32 +493,28 @@ static inline char* _uw_get_type_name_from_value(UwValuePtr value) { return _uw_
  * Statuses
  */
 
-// Classes of status codes
-#define UWSC_DEFAULT  0  // value contains status_code, and optionally _UwStatusExtraData
-#define UWSC_ERRNO    1  // value contains errno only
-
-// Status codes for UWSC_DEFAULT class
 #define UW_SUCCESS                 0
 #define UW_STATUS_VA_END           1  // used as a terminator for variadic arguments
-#define UW_ERROR_OOM               2
-#define UW_ERROR_NOT_IMPLEMENTED   3
-#define UW_ERROR_INCOMPATIBLE_TYPE 4
-#define UW_ERROR_NO_INTERFACE      5
-#define UW_ERROR_EOF               6
+#define UW_ERROR_ERRNO             2
+#define UW_ERROR_OOM               3
+#define UW_ERROR_NOT_IMPLEMENTED   4
+#define UW_ERROR_INCOMPATIBLE_TYPE 5
+#define UW_ERROR_NO_INTERFACE      6
+#define UW_ERROR_EOF               7
 
 // list errors
-#define UW_ERROR_POP_FROM_EMPTY_LIST  7
+#define UW_ERROR_POP_FROM_EMPTY_LIST  8
 
 // map errors
-#define UW_ERROR_KEY_NOT_FOUND        8
+#define UW_ERROR_KEY_NOT_FOUND        9
 
 // File errors
-#define UW_ERROR_FILE_ALREADY_OPENED  9
-#define UW_ERROR_CANNOT_SET_FILENAME  10
-#define UW_ERROR_FD_ALREADY_SET       11
+#define UW_ERROR_FILE_ALREADY_OPENED  10
+#define UW_ERROR_CANNOT_SET_FILENAME  11
+#define UW_ERROR_FD_ALREADY_SET       12
 
 // StringIO errors
-#define UW_ERROR_PUSHBACK_FAILED      12
+#define UW_ERROR_PUSHBACK_FAILED      13
 
 uint16_t uw_define_status(char* status);
 /*
@@ -547,11 +539,7 @@ static inline bool uw_ok(UwValuePtr status)
         // any other type means okay
         return true;
     }
-    switch (status->status_class) {
-        case UWSC_DEFAULT: return status->status_code == UW_SUCCESS;
-        case UWSC_ERRNO:   return status->uw_errno == 0;
-        default: return false;
-    }
+    return status->status_code == UW_SUCCESS;
 }
 
 static inline bool uw_error(UwValuePtr status)
@@ -567,7 +555,7 @@ static inline bool uw_eof(UwValuePtr status)
     if (!uw_is_status(status)) {
         return false;
     }
-    return status->status_class == UWSC_DEFAULT && status->status_code == UW_ERROR_EOF;
+    return status->status_code == UW_ERROR_EOF;
 }
 
 static inline bool uw_va_end(UwValuePtr status)
@@ -578,7 +566,7 @@ static inline bool uw_va_end(UwValuePtr status)
     if (!uw_is_status(status)) {
         return false;
     }
-    return status->status_class == UWSC_DEFAULT && status->status_code == UW_STATUS_VA_END;
+    return status->status_code == UW_STATUS_VA_END;
 }
 
 char* uw_status_desc(UwValuePtr status);
@@ -765,55 +753,54 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
 
 // Status declarations and rvalues
 
-#define __UWDECL_Status(name, _status_class, _status_code)  \
+#define __UWDECL_Status(name, _status_code)  \
     /* declare Status variable */  \
     _UwValue name = {  \
         ._status_type_id = UwTypeId_Status,  \
-        .status_class = _status_class,  \
         .status_code = _status_code  \
     }
 
-#define UWDECL_Status(name, _status_class, _status_code)  \
-    _UW_VALUE_CLEANUP __UWDECL_Status((name), (_status_class), (_status_code))
+#define UWDECL_Status(name, _status_code)  \
+    _UW_VALUE_CLEANUP __UWDECL_Status((name), (_status_code))
 
-#define UwStatus(_status_class, _status_code)  \
+#define UwStatus(_status_code)  \
     /* make Status rvalue */  \
     ({  \
-        __UWDECL_Status(status, (_status_class), (_status_code));  \
+        __UWDECL_Status(status, ((_status_code));  \
         status;  \
     })
 
 #define UwOK()  \
     /* make success rvalue */  \
     ({  \
-        __UWDECL_Status(status, UWSC_DEFAULT, UW_SUCCESS);  \
+        __UWDECL_Status(status, UW_SUCCESS);  \
         status;  \
     })
 
 #define UwError(code)  \
-    /* make Status rvalue of UWSC_DEFAULT class */  \
+    /* make Status rvalue */  \
     ({  \
-        __UWDECL_Status(status, UWSC_DEFAULT, (code));  \
+        __UWDECL_Status(status, (code));  \
         status;  \
     })
 
 #define UwOOM()  \
     /* make UW_ERROR_OOM rvalue */  \
     ({  \
-        __UWDECL_Status(status, UWSC_DEFAULT, UW_ERROR_OOM);  \
+        __UWDECL_Status(status, UW_ERROR_OOM);  \
         status;  \
     })
 
 #define UwVaEnd()  \
     /* make VA_END rvalue */  \
     ({  \
-        __UWDECL_Status(status, UWSC_DEFAULT, UW_STATUS_VA_END);  \
+        __UWDECL_Status(status, UW_STATUS_VA_END);  \
         status;  \
     })
 
 #define UwErrorNoInterface(value, interface_name)  \
     ({  \
-        __UWDECL_Status(status, UWSC_DEFAULT, UW_ERROR_NO_INTERFACE);  \
+        __UWDECL_Status(status, UW_ERROR_NO_INTERFACE);  \
         _uw_set_status_desc(&status,  \
                             "Value of type %s provides no UwInterface_%s",  \
                             _uw_types[(value)->type_id]->name,  \
@@ -823,17 +810,17 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
     })
 
 #define __UWDECL_Errno(name, _errno)  \
-    /* declare Status variable of UWSC_ERRNO class */  \
+    /* declare errno Status variable */  \
     _UwValue name = {  \
         ._status_type_id = UwTypeId_Status,  \
-        .status_class = UWSC_ERRNO,  \
+        .status_code = UW_ERROR_ERRNO,  \
         .uw_errno = _errno  \
     }
 
 #define UWDECL_Errno(name, _errno)  _UW_VALUE_CLEANUP __UWDECL_Errno((name), (_errno))
 
 #define UwErrno(_errno)  \
-    /* make Status rvalue of UWSC_ERRNO class */  \
+    /* make errno Status rvalue */  \
     ({  \
         __UWDECL_Errno(status, _errno);  \
         status;  \
