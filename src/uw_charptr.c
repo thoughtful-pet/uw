@@ -293,12 +293,11 @@ static bool charptr_equal(UwValuePtr self, UwValuePtr other)
 UwType _uw_charptr_type = {
     .id              = UwTypeId_CharPtr,
     .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = false,
-    .data_optional   = true,
     .name            = "CharPtr",
+    .allocator       = nullptr,
     .data_offset     = 0,
     .data_size       = 0,
-    .allocator       = nullptr,
+    .compound        = false,
     ._create         = charptr_create,
     ._destroy        = nullptr,
     ._init           = nullptr,

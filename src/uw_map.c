@@ -4,7 +4,9 @@
 #include "src/uw_charptr_internal.h"
 #include "src/uw_map_internal.h"
 
-static inline unsigned get_map_length(struct _UwMap* map)
+#define get_data_ptr(value)  _uw_get_data_ptr((value), UwTypeId_Map)
+
+static inline unsigned get_map_length(_UwMap* map)
 {
     return _uw_list_length(&map->kv_pairs) >> 1;
 }
@@ -134,7 +136,7 @@ static bool init_hash_table(UwTypeId type_id, struct _UwHashTable* ht,
     return true;
 }
 
-static unsigned lookup(struct _UwMap* map, UwValuePtr key, unsigned* ht_index, unsigned* ht_offset)
+static unsigned lookup(_UwMap* map, UwValuePtr key, unsigned* ht_index, unsigned* ht_offset)
 /*
  * Lookup key starting from index = hash(key).
  *
@@ -204,7 +206,7 @@ static unsigned set_hash_table_item(struct _UwHashTable* hash_table, unsigned ht
     } while (true);
 }
 
-static bool _uw_map_expand(UwTypeId type_id, struct _UwMap* map, unsigned desired_capacity, unsigned ht_offset)
+static bool _uw_map_expand(UwTypeId type_id, _UwMap* map, unsigned desired_capacity, unsigned ht_offset)
 /*
  * Expand map if necessary.
  *
@@ -257,7 +259,7 @@ static bool update_map(UwValuePtr map, UwValuePtr key, UwValuePtr value)
  */
 {
     UwTypeId type_id = map->type_id;
-    struct _UwMap* __map = _uw_get_map_ptr(map);
+    _UwMap* __map = get_data_ptr(map);
 
     // lookup key in the map
 
@@ -300,7 +302,7 @@ panic:
 
 static void map_fini(UwValuePtr self)
 {
-    struct _UwMap* map = _uw_get_map_ptr(self);
+    _UwMap* map = get_data_ptr(self);
     struct _UwHashTable* ht = &map->hash_table;
     _UwCompoundData* cdata = (_UwCompoundData*) self->extra_data;
     UwTypeId type_id = self->type_id;
@@ -317,7 +319,7 @@ static UwResult map_init(UwValuePtr self, va_list ap)
 {
     _uw_init_compound_data((_UwCompoundData*) (self->extra_data));
 
-    struct _UwMap* map = _uw_get_map_ptr(self);
+    _UwMap* map = get_data_ptr(self);
     struct _UwHashTable* ht = &map->hash_table;
     UwTypeId type_id = self->type_id;
 
@@ -342,7 +344,7 @@ static UwResult map_init(UwValuePtr self, va_list ap)
 static void map_hash(UwValuePtr self, UwHashContext* ctx)
 {
     _uw_hash_uint64(ctx, self->type_id);
-    struct _UwMap* map = _uw_get_map_ptr(self);
+    _UwMap* map = get_data_ptr(self);
     for (unsigned i = 0, n = _uw_list_length(&map->kv_pairs); i < n; i++) {
         UwValuePtr item = _uw_list_item(&map->kv_pairs, i);
         _uw_call_hash(item, ctx);
@@ -356,10 +358,10 @@ static UwResult map_deepcopy(UwValuePtr self)
         return uw_move(&dest);
     }
 
-    struct _UwMap* src_map = _uw_get_map_ptr(self);
+    _UwMap* src_map = get_data_ptr(self);
     unsigned map_length    = get_map_length(src_map);
 
-    if (!_uw_map_expand(dest.type_id, _uw_get_map_ptr(&dest), map_length, 0)) {
+    if (!_uw_map_expand(dest.type_id, get_data_ptr(&dest), map_length, 0)) {
         return UwOOM();
     }
 
@@ -401,7 +403,7 @@ static void map_dump(UwValuePtr self, FILE* fp, int first_indent, int next_inden
         .value = self
     };
 
-    struct _UwMap* map = _uw_get_map_ptr(self);
+    _UwMap* map = get_data_ptr(self);
     fprintf(fp, "%u items, list items/capacity=%u/%u\n",
             get_map_length(map), _uw_list_length(&map->kv_pairs), _uw_list_capacity(&map->kv_pairs));
 
@@ -467,17 +469,17 @@ static UwResult map_to_string(UwValuePtr self)
 
 static bool map_is_true(UwValuePtr self)
 {
-    return get_map_length(_uw_get_map_ptr(self));
+    return get_map_length(get_data_ptr(self));
 }
 
-static inline bool map_eq(struct _UwMap* a, struct _UwMap* b)
+static inline bool map_eq(_UwMap* a, _UwMap* b)
 {
     return _uw_list_eq(&a->kv_pairs, &b->kv_pairs);
 }
 
 static bool map_equal_sametype(UwValuePtr self, UwValuePtr other)
 {
-    return map_eq(_uw_get_map_ptr(self), _uw_get_map_ptr(other));
+    return map_eq(get_data_ptr(self), get_data_ptr(other));
 }
 
 static bool map_equal(UwValuePtr self, UwValuePtr other)
@@ -485,7 +487,7 @@ static bool map_equal(UwValuePtr self, UwValuePtr other)
     UwTypeId t = other->type_id;
     for (;;) {
         if (t == UwTypeId_Map) {
-            return map_eq(_uw_get_map_ptr(self), _uw_get_map_ptr(other));
+            return map_eq(get_data_ptr(self), get_data_ptr(other));
         } else {
             // check base type
             t = _uw_types[t]->ancestor_id;
@@ -499,12 +501,11 @@ static bool map_equal(UwValuePtr self, UwValuePtr other)
 UwType _uw_map_type = {
     .id              = UwTypeId_Map,
     .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = true,
-    .data_optional   = false,
     .name            = "Map",
-    .data_offset     = offsetof(struct _UwMapExtraData, map_data),
-    .data_size       = sizeof(struct _UwMap),
     .allocator       = &default_allocator,
+    .data_offset     = sizeof(_UwCompoundData),
+    .data_size       = sizeof(_UwMap),
+    .compound        = true,
     ._create         = _uw_default_create,
     ._destroy        = _uw_default_destroy,
     ._init           = map_init,
@@ -610,14 +611,14 @@ failure:
 bool _uw_map_has_key(UwValuePtr self, UwValuePtr key)
 {
     uw_assert_map(self);
-    struct _UwMap* map = _uw_get_map_ptr(self);
+    _UwMap* map = get_data_ptr(self);
     return lookup(map, key, nullptr, nullptr) != UINT_MAX;
 }
 
 UwResult _uw_map_get(UwValuePtr self, UwValuePtr key)
 {
     uw_assert_map(self);
-    struct _UwMap* map = _uw_get_map_ptr(self);
+    _UwMap* map = get_data_ptr(self);
 
     // lookup key in the map
     unsigned key_index = lookup(map, key, nullptr, nullptr);
@@ -636,7 +637,7 @@ bool _uw_map_del(UwValuePtr self, UwValuePtr key)
 {
     uw_assert_map(self);
 
-    struct _UwMap* map = _uw_get_map_ptr(self);
+    _UwMap* map = get_data_ptr(self);
 
     // lookup key in the map
 
@@ -674,14 +675,14 @@ bool _uw_map_del(UwValuePtr self, UwValuePtr key)
 unsigned uw_map_length(UwValuePtr self)
 {
     uw_assert_map(self);
-    return get_map_length(_uw_get_map_ptr(self));
+    return get_map_length(get_data_ptr(self));
 }
 
 bool uw_map_item(UwValuePtr self, unsigned index, UwValuePtr key, UwValuePtr value)
 {
     uw_assert_map(self);
 
-    struct _UwMap* map = _uw_get_map_ptr(self);
+    _UwMap* map = get_data_ptr(self);
 
     index <<= 1;
 

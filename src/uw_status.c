@@ -10,10 +10,11 @@
 #include "include/uw_base.h"
 #include "include/uw_string.h"
 
-struct _UwStatusExtraData {
-    _UwExtraData value_data;
+typedef struct {
     _UwValue description;  // string
-};
+} _UwStatusData;
+
+#define get_data_ptr(value)  ((_UwStatusData*) _uw_get_data_ptr((value), UwTypeId_Status))
 
 static char* basic_statuses[] = {
     [UW_SUCCESS]                   = "SUCCESS",
@@ -109,7 +110,7 @@ UwResult uw_status_desc(UwValuePtr status)
     if (!uw_is_status(status)) {
         return UwString_1_12(10, 'b', 'a', 'd', ' ', 's', 't', 'a', 't', 'u', 's', 0, 0);
     }
-    struct _UwStatusExtraData* status_data = (struct _UwStatusExtraData*) status->extra_data;
+    _UwStatusData* status_data = get_data_ptr(status);
     if (status_data) {
         if (uw_is_string(&status_data->description)) {
             return uw_clone(&status_data->description);
@@ -130,14 +131,14 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap)
 {
     uw_assert_status(status);
 
-    struct _UwStatusExtraData* status_data = (struct _UwStatusExtraData*) status->extra_data;
+    _UwStatusData* status_data = get_data_ptr(status);
     if (status_data) {
         uw_destroy(&status_data->description);
     } else {
-        if (!_uw_mandatory_alloc_extra_data(status)) {
+        if (!_uw_alloc_extra_data(status)) {
             return;
         }
-        status_data = (struct _UwStatusExtraData*) status->extra_data;
+        status_data = get_data_ptr(status);
     }
     char* desc;
     if (vasprintf(&desc, fmt, ap) == -1) {
@@ -175,7 +176,7 @@ static UwResult status_create(UwTypeId type_id, va_list ap)
 
 static void status_fini(UwValuePtr self)
 {
-    struct _UwStatusExtraData* status_data = (struct _UwStatusExtraData*) self->extra_data;
+    _UwStatusData* status_data = get_data_ptr(self);
     if (status_data) {
         uw_destroy(&status_data->description);
     }
@@ -199,10 +200,10 @@ static UwResult status_deepcopy(UwValuePtr self)
     }
     result.extra_data = nullptr;
 
-    if (!_uw_mandatory_alloc_extra_data(self)) {
+    if (!_uw_alloc_extra_data(self)) {
         return UwOOM();
     }
-    struct _UwStatusExtraData* status_data = (struct _UwStatusExtraData*) self->extra_data;
+    _UwStatusData* status_data = get_data_ptr(self);
     uw_destroy(&status_data->description);
     status_data->description = uw_deepcopy(&status_data->description);
     return uw_move(&result);
@@ -266,12 +267,11 @@ static bool status_equal(UwValuePtr self, UwValuePtr other)
 UwType _uw_status_type = {
     .id              = UwTypeId_Status,
     .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = false,
-    .data_optional   = true,
     .name            = "Status",
-    .data_offset     = offsetof(struct _UwStatusExtraData, description),  // extra_data is optional and not allocated by default
-    .data_size       = sizeof(_UwValue),
     .allocator       = &default_allocator,
+    .data_offset     = sizeof(_UwExtraData),
+    .data_size       = sizeof(_UwStatusData),
+    .compound        = false,
     ._create         = status_create,
     ._destroy        = _uw_default_destroy,
     ._init           = nullptr,

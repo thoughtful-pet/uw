@@ -42,16 +42,6 @@ UwResult _uw_create(UwTypeId type_id, ...)
 
 bool _uw_alloc_extra_data(UwValuePtr v)
 {
-    if (_uw_types[v->type_id]->data_optional) {
-        // extra_data is optional, not creating
-        v->extra_data = nullptr;
-        return true;
-    }
-    return _uw_mandatory_alloc_extra_data(v);
-}
-
-bool _uw_mandatory_alloc_extra_data(UwValuePtr v)
-{
     UwType* t = _uw_types[v->type_id];
     unsigned memsize = t->data_offset + t->data_size;
     if (memsize) {
@@ -62,6 +52,7 @@ bool _uw_mandatory_alloc_extra_data(UwValuePtr v)
         extra_data->refcount = 1;
         v->extra_data = extra_data;
     } else {
+        // extra_data is optional, not creating
         v->extra_data = nullptr;
     }
     return true;
@@ -296,12 +287,11 @@ static bool null_equal(UwValuePtr self, UwValuePtr other)
 static UwType null_type = {
     .id              = UwTypeId_Null,
     .ancestor_id     = UwTypeId_Null,  // no ancestor; Null can't be an ancestor for any type
-    .compound        = false,
-    .data_optional   = true,
     .name            = "Null",
+    .allocator       = nullptr,
     .data_offset     = 0,
     .data_size       = 0,
-    .allocator       = nullptr,
+    .compound        = false,
     ._create         = null_create,
     ._destroy        = nullptr,
     ._init           = nullptr,
@@ -382,12 +372,11 @@ static bool bool_equal(UwValuePtr self, UwValuePtr other)
 static UwType bool_type = {
     .id              = UwTypeId_Bool,
     .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = false,
-    .data_optional   = true,
     .name            = "Bool",
+    .allocator       = nullptr,
     .data_offset     = 0,
     .data_size       = 0,
-    .allocator       = nullptr,
+    .compound        = false,
     ._create         = bool_create,
     ._destroy        = nullptr,
     ._init           = nullptr,
@@ -449,12 +438,11 @@ static bool int_equal(UwValuePtr self, UwValuePtr other)
 static UwType int_type = {
     .id              = UwTypeId_Int,
     .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = false,
-    .data_optional   = true,
     .name            = "Int",
+    .allocator       = nullptr,
     .data_offset     = 0,
     .data_size       = 0,
-    .allocator       = nullptr,
+    .compound        = false,
     ._create         = int_create,
     ._destroy        = nullptr,
     ._init           = nullptr,
@@ -549,12 +537,11 @@ static bool signed_equal(UwValuePtr self, UwValuePtr other)
 static UwType signed_type = {
     .id              = UwTypeId_Signed,
     .ancestor_id     = UwTypeId_Int,
-    .compound        = false,
-    .data_optional   = true,
     .name            = "Signed",
+    .allocator       = nullptr,
     .data_offset     = 0,
     .data_size       = 0,
-    .allocator       = nullptr,
+    .compound        = false,
     ._create         = signed_create,
     ._destroy        = nullptr,
     ._init           = nullptr,
@@ -646,12 +633,11 @@ static bool unsigned_equal(UwValuePtr self, UwValuePtr other)
 static UwType unsigned_type = {
     .id              = UwTypeId_Unsigned,
     .ancestor_id     = UwTypeId_Int,
-    .compound        = false,
-    .data_optional   = true,
     .name            = "Unsigned",
+    .allocator       = nullptr,
     .data_offset     = 0,
     .data_size       = 0,
-    .allocator       = nullptr,
+    .compound        = false,
     ._create         = unsigned_create,
     ._destroy        = nullptr,
     ._init           = nullptr,
@@ -732,12 +718,11 @@ static bool float_equal(UwValuePtr self, UwValuePtr other)
 static UwType float_type = {
     .id              = UwTypeId_Float,
     .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = false,
-    .data_optional   = true,
     .name            = "Float",
+    .allocator       = nullptr,
     .data_offset     = 0,
     .data_size       = 0,
-    .allocator       = nullptr,
+    .compound        = false,
     ._create         = float_create,
     ._destroy        = nullptr,
     ._init           = nullptr,
@@ -826,12 +811,11 @@ static bool struct_equal(UwValuePtr self, UwValuePtr other)
 static UwType struct_type = {
     .id              = UwTypeId_Struct,
     .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = false,
-    .data_optional   = false,
     .name            = "Struct",
+    .allocator       = &default_allocator,
     .data_offset     = 0,
     .data_size       = 0,
-    .allocator       = &default_allocator,
+    .compound        = false,
     ._create         = struct_create,
     ._destroy        = _uw_default_destroy,
     ._init           = nullptr,

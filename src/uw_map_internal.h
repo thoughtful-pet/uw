@@ -28,20 +28,10 @@ struct _UwHashTable {
     uint8_t* items;     // items have variable size
 };
 
-struct _UwMap {
-    struct _UwList kv_pairs;        // key-value pairs in the insertion order
+typedef struct {
+    _UwList kv_pairs;        // key-value pairs in the insertion order
     struct _UwHashTable hash_table;
-};
-
-struct _UwMapExtraData {
-    _UwCompoundData value_data;
-    struct _UwMap   map_data;
-};
-
-#define _uw_get_map_ptr(value)  \
-    (  \
-        &((struct _UwMapExtraData*) ((value)->extra_data))->map_data \
-    )
+} _UwMap;
 
 #ifdef __cplusplus
 }

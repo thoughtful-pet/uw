@@ -185,7 +185,7 @@ union __UwValue {
         UwTypeId /* uint16_t */ _string_type_id;
         uint8_t _x_str_embedded:1;  // zero for allocated string
         uint8_t _str_padding[5];
-        _UwExtraData* string_data;
+        void* string_data;
     };
 };
 
@@ -288,17 +288,12 @@ typedef struct {
 typedef struct {
     UwTypeId id;
     UwTypeId ancestor_id;
-
+    char* name;
+    Allocator* allocator;
+    unsigned data_offset;  // offset of type-specific data
+    unsigned data_size;
     bool compound;  // if true, value.extra_data may include other compound values;
                     // this flag is required to work around cyclic references
-
-    bool data_optional;  // if true, extra_data is optional
-
-    char* name;
-
-    unsigned data_offset;
-    unsigned data_size;
-    Allocator* allocator;
 
     // basic interface
     // method names must start with underscore, see note for interfaces
@@ -1147,15 +1142,6 @@ void uw_destroy_cstring(CStringPtr* str);
  * Helper functions and macros
  */
 
-// XXX this macro is not suitable for subtypes because the base data_offset is zero;
-//     need a better way to define structures
-#define _uw_get_data_ptr(value, type_id, type_name_ptr)  \
-    (  \
-        (type_name_ptr) (  \
-            ((uint8_t*) ((value)->extra_data)) + _uw_types[type_id]->data_offset \
-        )  \
-    )
-
 static inline void _uw_call_fini(UwValuePtr value)
 {
     uw_call_void(value, fini);
@@ -1183,7 +1169,6 @@ UwResult _uw_default_clone(UwValuePtr self);
  */
 
 bool _uw_alloc_extra_data(UwValuePtr v);
-bool _uw_mandatory_alloc_extra_data(UwValuePtr v);
 /*
  * Helper functions for custom constructors.
  * Alocate extra data for value `v`.
@@ -1195,6 +1180,18 @@ void _uw_free_extra_data(UwValuePtr v);
  * Helper function for custom destructors.
  * Free extra data and make v->extra_data = nullptr.
  */
+
+static inline void* _uw_get_data_ptr(UwValuePtr v, UwTypeId type_id)
+{
+    if (v->extra_data) {
+        UwType* t = _uw_types[type_id];
+        return (void*) (
+            ((uint8_t*) v->extra_data) + t->data_offset
+        );
+    } else {
+        return nullptr;
+    }
+}
 
 #define _uw_init_compound_data(data)
 //void _uw_init_compound_data(_UwCompoundData* cdata);

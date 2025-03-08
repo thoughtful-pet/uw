@@ -2,24 +2,15 @@
 #include "src/uw_charptr_internal.h"
 #include "src/uw_string_internal.h"
 
-struct _UwStringIO {
+typedef struct {
     // line reader data
     _UwValue line;
     _UwValue pushback;
     unsigned line_number;
     unsigned line_position;
-};
+} _UwStringIO;
 
-struct _UwStringIOExtraData {
-    // outline structure to determine correct aligned offset
-    _UwExtraData       value_data;
-    struct _UwStringIO stringio_data;
-};
-
-#define get_stringio_ptr(value)  \
-    (  \
-        &((struct _UwStringIOExtraData*) ((value)->extra_data))->stringio_data \
-    )
+#define get_data_ptr(value)  ((_UwStringIO*) _uw_get_data_ptr((value), UwTypeId_StringIO))
 
 // forward declaration
 static UwResult read_line_inplace(UwValuePtr self, UwValuePtr line);
@@ -35,7 +26,7 @@ static UwResult stringio_init(UwValuePtr self, va_list ap)
     if (!uw_is_string(&str)) {
         return UwError(UW_ERROR_INCOMPATIBLE_TYPE);
     }
-    struct _UwStringIO* sio = get_stringio_ptr(self);
+    _UwStringIO* sio = get_data_ptr(self);
     sio->line = uw_move(&str);
     sio->pushback = UwNull();
     return UwOK();
@@ -43,7 +34,7 @@ static UwResult stringio_init(UwValuePtr self, va_list ap)
 
 static void stringio_fini(UwValuePtr self)
 {
-    struct _UwStringIO* sio = get_stringio_ptr(self);
+    _UwStringIO* sio = get_data_ptr(self);
     uw_destroy(&sio->line);
     uw_destroy(&sio->pushback);
 }
@@ -57,7 +48,7 @@ static void stringio_hash(UwValuePtr self, UwHashContext* ctx)
 {
     _uw_hash_uint64(ctx, self->type_id);
 
-    struct _UwStringIO* sio = get_stringio_ptr(self);
+    _UwStringIO* sio = get_data_ptr(self);
     unsigned length = _uw_string_length(&sio->line);
     if (length) {
         get_str_methods(&sio->line)->hash(_uw_string_char_ptr(&sio->line, 0), length, ctx);
@@ -66,7 +57,7 @@ static void stringio_hash(UwValuePtr self, UwHashContext* ctx)
 
 static void stringio_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
-    struct _UwStringIO* sio = get_stringio_ptr(self);
+    _UwStringIO* sio = get_data_ptr(self);
 
     _uw_dump_start(fp, self, first_indent);
     _uw_string_dump_data(fp, &sio->line, next_indent);
@@ -87,20 +78,20 @@ static void stringio_dump(UwValuePtr self, FILE* fp, int first_indent, int next_
 
 static UwResult stringio_to_string(UwValuePtr self)
 {
-    struct _UwStringIO* sio = get_stringio_ptr(self);
+    _UwStringIO* sio = get_data_ptr(self);
     return uw_clone(&sio->line);
 }
 
 static bool stringio_is_true(UwValuePtr self)
 {
-    struct _UwStringIO* sio = get_stringio_ptr(self);
+    _UwStringIO* sio = get_data_ptr(self);
     return uw_is_true(&sio->line);
 }
 
 static bool stringio_equal_sametype(UwValuePtr self, UwValuePtr other)
 {
-    struct _UwStringIO* sio_self  = get_stringio_ptr(self);
-    struct _UwStringIO* sio_other = get_stringio_ptr(other);
+    _UwStringIO* sio_self  = get_data_ptr(self);
+    _UwStringIO* sio_other = get_data_ptr(other);
 
     UwMethodEqual fn_cmp = _uw_types[sio_self->line.type_id]->_equal_sametype;
     return fn_cmp(&sio_self->line, &sio_other->line);
@@ -108,7 +99,7 @@ static bool stringio_equal_sametype(UwValuePtr self, UwValuePtr other)
 
 static bool stringio_equal(UwValuePtr self, UwValuePtr other)
 {
-    struct _UwStringIO* sio_self  = get_stringio_ptr(self);
+    _UwStringIO* sio_self  = get_data_ptr(self);
 
     UwMethodEqual fn_cmp = _uw_types[sio_self->line.type_id]->_equal;
     return fn_cmp(&sio_self->line, other);
@@ -120,7 +111,7 @@ static bool stringio_equal(UwValuePtr self, UwValuePtr other)
 
 static UwResult start_read_lines(UwValuePtr self)
 {
-    struct _UwStringIO* sio = get_stringio_ptr(self);
+    _UwStringIO* sio = get_data_ptr(self);
     sio->line_position = 0;
     sio->line_number = 0;
     uw_destroy(&sio->pushback);
@@ -139,7 +130,7 @@ static UwResult read_line(UwValuePtr self)
 
 static UwResult read_line_inplace(UwValuePtr self, UwValuePtr line)
 {
-    struct _UwStringIO* sio = get_stringio_ptr(self);
+    _UwStringIO* sio = get_data_ptr(self);
 
     uw_string_truncate(line, 0);
 
@@ -168,7 +159,7 @@ static UwResult read_line_inplace(UwValuePtr self, UwValuePtr line)
 
 static UwResult unread_line(UwValuePtr self, UwValuePtr line)
 {
-    struct _UwStringIO* sio = get_stringio_ptr(self);
+    _UwStringIO* sio = get_data_ptr(self);
 
     if (uw_is_null(&sio->pushback)) {
         sio->pushback = uw_clone(line);
@@ -181,12 +172,12 @@ static UwResult unread_line(UwValuePtr self, UwValuePtr line)
 
 static UwResult get_line_number(UwValuePtr self)
 {
-    return UwUnsigned(get_stringio_ptr(self)->line_number);
+    return UwUnsigned(get_data_ptr(self)->line_number);
 }
 
 static UwResult stop_read_lines(UwValuePtr self)
 {
-    struct _UwStringIO* sio = get_stringio_ptr(self);
+    _UwStringIO* sio = get_data_ptr(self);
     uw_destroy(&sio->pushback);
     return UwOK();
 }
@@ -214,12 +205,11 @@ static _UwInterface stringio_interfaces[1] = {
 static UwType stringio_type = {
     .id              = 0,
     .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = false,
-    .data_optional   = false,
     .name            = "StringIO",
-    .data_offset     = offsetof(struct _UwStringIOExtraData, stringio_data),
-    .data_size       = sizeof(struct _UwStringIO),
     .allocator       = &default_allocator,
+    .data_offset     = sizeof(_UwExtraData),
+    .data_size       = sizeof(_UwStringIO),
+    .compound        = false,
     ._create         = _uw_default_create,
     ._destroy        = _uw_default_destroy,
     ._init           = stringio_init,

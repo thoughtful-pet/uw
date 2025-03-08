@@ -5,7 +5,7 @@
 #include "include/uw.h"
 #include "src/uw_charptr_internal.h"
 
-struct _UwFile {
+typedef struct {
     int fd;               // file descriptor
     bool is_external_fd;  // fd is set by `set_fd` and should not be closed
     int error;            // errno, set by `open`
@@ -20,18 +20,9 @@ struct _UwFile {
     unsigned partial_utf8_len;
     _UwValue pushback;  // for unread_line
     unsigned line_number;
-};
+} _UwFile;
 
-struct _UwFileExtraData {
-    // outline structure to determine correct aligned offset
-    _UwExtraData   value_data;
-    struct _UwFile file_data;
-};
-
-#define _uw_get_file_ptr(value)  \
-    (  \
-        &((struct _UwFileExtraData*) ((value)->extra_data))->file_data \
-    )
+#define get_data_ptr(value)  ((_UwFile*) _uw_get_data_ptr((value), UwTypeId_File))
 
 #define LINE_READER_BUFFER_SIZE  4096  // typical filesystem block size
 
@@ -45,7 +36,7 @@ static UwResult read_line_inplace(UwValuePtr self, UwValuePtr line);
 
 static UwResult file_init(UwValuePtr self, va_list ap)
 {
-    struct _UwFile* f = _uw_get_file_ptr(self);
+    _UwFile* f = get_data_ptr(self);
     f->fd = -1;
     f->name = UwNull();
     f->pushback = UwNull();
@@ -61,7 +52,7 @@ static void file_hash(UwValuePtr self, UwHashContext* ctx)
 {
     // it's not a hash of entire file content!
 
-    struct _UwFile* f = _uw_get_file_ptr(self);
+    _UwFile* f = get_data_ptr(self);
 
     _uw_hash_uint64(ctx, self->type_id);
 
@@ -79,7 +70,7 @@ static UwResult file_deepcopy(UwValuePtr self)
 
 static void file_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
 {
-    struct _UwFile* f = _uw_get_file_ptr(self);
+    _UwFile* f = get_data_ptr(self);
 
     _uw_dump_start(fp, self, first_indent);
     _uw_dump_base_extra_data(fp, self->extra_data);
@@ -126,7 +117,7 @@ static bool file_equal(UwValuePtr self, UwValuePtr other)
 
 static UwResult file_open(UwValuePtr self, UwValuePtr file_name, int flags, mode_t mode)
 {
-    struct _UwFile* f = _uw_get_file_ptr(self);
+    _UwFile* f = get_data_ptr(self);
 
     if (f->fd != -1) {
         return UwError(UW_ERROR_FILE_ALREADY_OPENED);
@@ -157,7 +148,7 @@ static UwResult file_open(UwValuePtr self, UwValuePtr file_name, int flags, mode
 
 static UwResult file_close(UwValuePtr self)
 {
-    struct _UwFile* f = _uw_get_file_ptr(self);
+    _UwFile* f = get_data_ptr(self);
 
     if (f->fd != -1 && !f->is_external_fd) {
         close(f->fd);
@@ -176,7 +167,7 @@ static UwResult file_close(UwValuePtr self)
 
 static UwResult file_set_fd(UwValuePtr self, int fd)
 {
-    struct _UwFile* f = _uw_get_file_ptr(self);
+    _UwFile* f = get_data_ptr(self);
 
     if (f->fd != -1) {
         // fd already set
@@ -191,13 +182,13 @@ static UwResult file_set_fd(UwValuePtr self, int fd)
 
 static UwResult file_get_name(UwValuePtr self)
 {
-    struct _UwFile* f = _uw_get_file_ptr(self);
+    _UwFile* f = get_data_ptr(self);
     return uw_clone(&f->name);
 }
 
 static UwResult file_set_name(UwValuePtr self, UwValuePtr file_name)
 {
-    struct _UwFile* f = _uw_get_file_ptr(self);
+    _UwFile* f = get_data_ptr(self);
 
     if (f->fd != -1 && !f->is_external_fd) {
         // not an externally set fd
@@ -217,7 +208,7 @@ static UwResult file_set_name(UwValuePtr self, UwValuePtr file_name)
 
 static UwResult file_read(UwValuePtr self, void* buffer, unsigned buffer_size, unsigned* bytes_read)
 {
-    struct _UwFile* f = _uw_get_file_ptr(self);
+    _UwFile* f = get_data_ptr(self);
 
     ssize_t result;
     do {
@@ -238,7 +229,7 @@ static UwResult file_read(UwValuePtr self, void* buffer, unsigned buffer_size, u
 
 static UwResult file_write(UwValuePtr self, void* data, unsigned size, unsigned* bytes_written)
 {
-    struct _UwFile* f = _uw_get_file_ptr(self);
+    _UwFile* f = get_data_ptr(self);
 
     ssize_t result;
     do {
@@ -259,7 +250,7 @@ static UwResult file_write(UwValuePtr self, void* data, unsigned size, unsigned*
 
 static UwResult start_read_lines(UwValuePtr self)
 {
-    struct _UwFile* f = _uw_get_file_ptr(self);
+    _UwFile* f = get_data_ptr(self);
 
     uw_destroy(&f->pushback);
 
@@ -297,7 +288,7 @@ static UwResult read_line(UwValuePtr self)
 
 static UwResult read_line_inplace(UwValuePtr self, UwValuePtr line)
 {
-    struct _UwFile* f = _uw_get_file_ptr(self);
+    _UwFile* f = get_data_ptr(self);
 
     uw_string_truncate(line, 0);
 
@@ -401,7 +392,7 @@ static UwResult read_line_inplace(UwValuePtr self, UwValuePtr line)
 
 static UwResult unread_line(UwValuePtr self, UwValuePtr line)
 {
-    struct _UwFile* f = _uw_get_file_ptr(self);
+    _UwFile* f = get_data_ptr(self);
 
     if (uw_is_null(&f->pushback)) {
         f->pushback = uw_clone(line);
@@ -414,12 +405,12 @@ static UwResult unread_line(UwValuePtr self, UwValuePtr line)
 
 static UwResult get_line_number(UwValuePtr self)
 {
-    return UwUnsigned(_uw_get_file_ptr(self)->line_number);
+    return UwUnsigned(get_data_ptr(self)->line_number);
 }
 
 static UwResult stop_read_lines(UwValuePtr self)
 {
-    struct _UwFile* f = _uw_get_file_ptr(self);
+    _UwFile* f = get_data_ptr(self);
 
     free(f->buffer);
     f->buffer = nullptr;
@@ -468,12 +459,11 @@ static _UwInterface file_interfaces[4] = {
 static UwType file_type = {
     .id              = 0,
     .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = false,
-    .data_optional   = false,
     .name            = "File",
-    .data_offset     = offsetof(struct _UwFileExtraData, file_data),
-    .data_size       = sizeof(struct _UwFile),
     .allocator       = &default_allocator,
+    .data_offset     = sizeof(_UwExtraData),
+    .data_size       = sizeof(_UwFile),
+    .compound        = false,
     ._create         = _uw_default_create,
     ._destroy        = _uw_default_destroy,
     ._init           = file_init,

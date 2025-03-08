@@ -462,12 +462,11 @@ static bool string_equal(UwValuePtr self, UwValuePtr other)
 UwType _uw_string_type = {
     .id              = UwTypeId_String,
     .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = false,
-    .data_optional   = true,
     .name            = "String",
-    .data_offset     = offsetof(struct _UwStringExtraData, str),
-    .data_size       = 0,
     .allocator       = &default_allocator,
+    .data_offset     = sizeof(_UwExtraData),
+    .data_size       = 0,
+    .compound        = false,
     ._create         = string_create,
     ._destroy        = string_destroy,
     ._init           = nullptr,       // custom constructor performs all the initialization

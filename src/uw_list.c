@@ -2,6 +2,8 @@
 #include "src/uw_charptr_internal.h"
 #include "src/uw_list_internal.h"
 
+#define get_data_ptr(value)  ((_UwList*) _uw_get_data_ptr((value), UwTypeId_List))
+
 [[noreturn]]
 static void panic_status()
 {
@@ -11,7 +13,7 @@ static void panic_status()
 static UwResult list_init(UwValuePtr self, va_list ap)
 {
     _UwCompoundData* cdata = (_UwCompoundData*) self->extra_data;
-    struct _UwList*  list = _uw_get_list_ptr(self);
+    _UwList*  list = get_data_ptr(self);
 
     UwTypeId type_id = self->type_id;
     _uw_init_compound_data(cdata);
@@ -32,14 +34,14 @@ static void list_fini(UwValuePtr self)
 {
     _UwCompoundData* cdata = (_UwCompoundData*) self->extra_data;
 
-    _uw_destroy_list(self->type_id, _uw_get_list_ptr(self), cdata);
+    _uw_destroy_list(self->type_id, get_data_ptr(self), cdata);
     _uw_fini_compound_data(cdata);
 }
 
 static void list_hash(UwValuePtr self, UwHashContext* ctx)
 {
     _uw_hash_uint64(ctx, self->type_id);
-    struct _UwList* list = _uw_get_list_ptr(self);
+    _UwList* list = get_data_ptr(self);
     UwValuePtr item_ptr = list->items;
     for (unsigned n = list->length; n; n--, item_ptr++) {
         _uw_call_hash(item_ptr, ctx);
@@ -53,8 +55,8 @@ static UwResult list_deepcopy(UwValuePtr self)
         return uw_move(&dest);
     }
 
-    struct _UwList* src_list = _uw_get_list_ptr(self);
-    struct _UwList* dest_list = _uw_get_list_ptr(&dest);
+    _UwList* src_list = get_data_ptr(self);
+    _UwList* dest_list = get_data_ptr(&dest);
 
     if (!_uw_list_resize(dest.type_id, dest_list, src_list->length)) {
         return UwOOM();
@@ -92,7 +94,7 @@ static void list_dump(UwValuePtr self, FILE* fp, int first_indent, int next_inde
         .value = self
     };
 
-    struct _UwList* list = _uw_get_list_ptr(self);
+    _UwList* list = get_data_ptr(self);
     fprintf(fp, "%u items, capacity=%u\n", list->length, list->capacity);
 
     next_indent += 4;
@@ -109,12 +111,12 @@ static UwResult list_to_string(UwValuePtr self)
 
 static bool list_is_true(UwValuePtr self)
 {
-    return _uw_get_list_ptr(self)->length;
+    return get_data_ptr(self)->length;
 }
 
 static bool list_equal_sametype(UwValuePtr self, UwValuePtr other)
 {
-    return _uw_list_eq(_uw_get_list_ptr(self), _uw_get_list_ptr(other));
+    return _uw_list_eq(get_data_ptr(self), get_data_ptr(other));
 }
 
 static bool list_equal(UwValuePtr self, UwValuePtr other)
@@ -122,7 +124,7 @@ static bool list_equal(UwValuePtr self, UwValuePtr other)
     UwTypeId t = other->type_id;
     for (;;) {
         if (t == UwTypeId_List) {
-            return _uw_list_eq(_uw_get_list_ptr(self), _uw_get_list_ptr(other));
+            return _uw_list_eq(get_data_ptr(self), get_data_ptr(other));
         } else {
             // check base type
             t = _uw_types[t]->ancestor_id;
@@ -136,12 +138,11 @@ static bool list_equal(UwValuePtr self, UwValuePtr other)
 UwType _uw_list_type = {
     .id              = UwTypeId_List,
     .ancestor_id     = UwTypeId_Null,  // no ancestor
-    .compound        = true,
-    .data_optional   = false,
     .name            = "List",
-    .data_offset     = offsetof(struct _UwListExtraData, list_data),
-    .data_size       = sizeof(struct _UwList),
     .allocator       = &default_allocator,
+    .data_offset     = sizeof(_UwCompoundData),
+    .data_size       = sizeof(_UwList),
+    .compound        = true,
     ._create         = _uw_default_create,
     ._destroy        = _uw_default_destroy,
     ._init           = list_init,
@@ -170,7 +171,7 @@ static unsigned round_capacity(unsigned capacity)
     }
 }
 
-bool _uw_alloc_list(UwTypeId type_id, struct _UwList* list, unsigned capacity)
+bool _uw_alloc_list(UwTypeId type_id, _UwList* list, unsigned capacity)
 {
     if (capacity >= (UINT_MAX - UWLIST_CAPACITY_INCREMENT)) {
         return false;
@@ -185,7 +186,7 @@ bool _uw_alloc_list(UwTypeId type_id, struct _UwList* list, unsigned capacity)
     return list->items != nullptr;
 }
 
-void _uw_destroy_list(UwTypeId type_id, struct _UwList* list, _UwCompoundData* parent_cdata)
+void _uw_destroy_list(UwTypeId type_id, _UwList* list, _UwCompoundData* parent_cdata)
 {
     if (list->items) {
         UwValuePtr item_ptr = list->items;
@@ -201,7 +202,7 @@ void _uw_destroy_list(UwTypeId type_id, struct _UwList* list, _UwCompoundData* p
     }
 }
 
-bool _uw_list_resize(UwTypeId type_id, struct _UwList* list, unsigned desired_capacity)
+bool _uw_list_resize(UwTypeId type_id, _UwList* list, unsigned desired_capacity)
 {
     if (desired_capacity < list->length) {
         desired_capacity = list->length;
@@ -225,16 +226,16 @@ bool _uw_list_resize(UwTypeId type_id, struct _UwList* list, unsigned desired_ca
 bool uw_list_resize(UwValuePtr list, unsigned desired_capacity)
 {
     uw_assert_list(list);
-    return _uw_list_resize(list->type_id, _uw_get_list_ptr(list), desired_capacity);
+    return _uw_list_resize(list->type_id, get_data_ptr(list), desired_capacity);
 }
 
 unsigned uw_list_length(UwValuePtr list)
 {
     uw_assert_list(list);
-    return _uw_list_length(_uw_get_list_ptr(list));
+    return _uw_list_length(get_data_ptr(list));
 }
 
-bool _uw_list_eq(struct _UwList* a, struct _UwList* b)
+bool _uw_list_eq(_UwList* a, _UwList* b)
 {
     unsigned n = a->length;
     if (b->length != n) {
@@ -265,10 +266,10 @@ bool _uw_list_append(UwValuePtr list, UwValuePtr item)
         uw_destroy(&v);  // make error checker happy
         return false;
     }
-    return _uw_list_append_item(list->type_id, _uw_get_list_ptr(list), &v, list);
+    return _uw_list_append_item(list->type_id, get_data_ptr(list), &v, list);
 }
 
-bool _uw_list_append_item(UwTypeId type_id, struct _UwList* list, UwValuePtr item, UwValuePtr parent)
+bool _uw_list_append_item(UwTypeId type_id, _UwList* list, UwValuePtr item, UwValuePtr parent)
 {
     if (uw_is_status(item)) {
         // prohibit appending Status values
@@ -302,12 +303,12 @@ UwResult _uw_list_append_va(UwValuePtr list, ...)
     return uw_move(&result);
 }
 
-UwResult uw_list_append_ap(UwValuePtr list, va_list ap)
+UwResult uw_list_append_ap(UwValuePtr dest, va_list ap)
 {
-    uw_assert_list(list);
+    uw_assert_list(dest);
 
-    UwTypeId type_id = list->type_id;
-    struct _UwList* __list = _uw_get_list_ptr(list);
+    UwTypeId type_id = dest->type_id;
+    _UwList* list = get_data_ptr(dest);
     unsigned num_appended = 0;
     UwValue error = UwOOM();  // default error is OOM unless some arg is a status
     for(;;) {
@@ -324,7 +325,7 @@ UwResult uw_list_append_ap(UwValuePtr list, va_list ap)
             if (!uw_charptr_to_string_inplace(&arg)) {
                 goto failure;
             }
-            if (!_uw_list_append_item(type_id, __list, &arg, list)) {
+            if (!_uw_list_append_item(type_id, list, &arg, dest)) {
                 goto failure;
             }
             num_appended++;
@@ -334,7 +335,7 @@ UwResult uw_list_append_ap(UwValuePtr list, va_list ap)
 failure:
     // rollback
     while (num_appended--) {
-        UwValue v = _uw_list_pop(__list);
+        UwValue v = _uw_list_pop(list);
         uw_destroy(&v);
     }
     // consume args
@@ -353,7 +354,7 @@ UwResult uw_list_item(UwValuePtr self, int index)
 {
     uw_assert_list(self);
 
-    struct _UwList* list = _uw_get_list_ptr(self);
+    _UwList* list = get_data_ptr(self);
 
     if (index < 0) {
         index = list->length + index;
@@ -368,10 +369,10 @@ UwResult uw_list_item(UwValuePtr self, int index)
 UwResult uw_list_pop(UwValuePtr self)
 {
     uw_assert_list(self);
-    return _uw_list_pop(_uw_get_list_ptr(self));
+    return _uw_list_pop(get_data_ptr(self));
 }
 
-UwResult _uw_list_pop(struct _UwList* list)
+UwResult _uw_list_pop(_UwList* list)
 {
     if (list->length == 0) {
         return UwError(UW_ERROR_POP_FROM_EMPTY_LIST);
@@ -383,10 +384,10 @@ UwResult _uw_list_pop(struct _UwList* list)
 void uw_list_del(UwValuePtr self, unsigned start_index, unsigned end_index)
 {
     uw_assert_list(self);
-    _uw_list_del(_uw_get_list_ptr(self), start_index, end_index);
+    _uw_list_del(get_data_ptr(self), start_index, end_index);
 }
 
-void _uw_list_del(struct _UwList* list, unsigned start_index, unsigned end_index)
+void _uw_list_del(_UwList* list, unsigned start_index, unsigned end_index)
 {
     if (list->length == 0) {
         return;
@@ -413,7 +414,7 @@ void _uw_list_del(struct _UwList* list, unsigned start_index, unsigned end_index
 
 UwResult uw_list_slice(UwValuePtr self, unsigned start_index, unsigned end_index)
 {
-    struct _UwList* src_list = _uw_get_list_ptr(self);
+    _UwList* src_list = get_data_ptr(self);
     unsigned length = _uw_list_length(src_list);
 
     if (end_index > length) {
@@ -432,7 +433,7 @@ UwResult uw_list_slice(UwValuePtr self, unsigned start_index, unsigned end_index
     if (!uw_list_resize(&dest, slice_len)) {
         return UwOOM();
     }
-    struct _UwList* dest_list = _uw_get_list_ptr(&dest);
+    _UwList* dest_list = get_data_ptr(&dest);
 
     UwValuePtr src_item_ptr = &src_list->items[start_index];
     UwValuePtr dest_item_ptr = dest_list->items;
