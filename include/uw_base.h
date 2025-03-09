@@ -378,7 +378,7 @@ static inline void* _uw_get_interface(UwType* type, unsigned interface_id)
  *
  * IMPORTANT: all method names in interfaces must start with underscore.
  * That's because of limitations of ## preprocesor operator which
- * is used in uw_call, uw_super, and other convenience macros.
+ * is used in uw_call and other convenience macros.
  *
  * Interface methods should always return UwResult.
  * Simply because if an interface may not exist,
@@ -946,27 +946,6 @@ static inline UwResult _uwc_create_string_u8_wrapper(char* initializer)
             meth((v) __VA_OPT__(,) __VA_ARGS__)  \
         :  \
             (default_result);  \
-    })
-
-#define uw_super_void(self, method_name, ...)  \
-    /* call super method of the basic interface that returns void */  \
-    {  \
-        UwTypeId ancestor_id = _uw_types[(self)->type_id]->ancestor_id;  \
-        typeof(_uw_types[ancestor_id]->_##method_name) super_meth = _uw_types[ancestor_id]->_##method_name;  \
-        if (super_meth) {  \
-            super_meth((self) __VA_OPT__(,) __VA_ARGS__);  \
-        }  \
-    }
-
-#define uw_super(default_result, self, method_name, ...)  \
-    /* call super method of the basic interface; if method is nullptr, return default_result */  \
-    ({  \
-        UwTypeId ancestor_id = _uw_types[(self)->type_id]->ancestor_id;  \
-        typeof(_uw_types[ancestor_id]->_##method_name) super_meth = _uw_types[ancestor_id]->_##method_name;  \
-        (super_meth)?  \
-            super_meth((self) __VA_OPT__(,) __VA_ARGS__)  \
-        :  \
-            (default_result)  \
     })
 
 #define uw_ifcall(v, interface_name, method_name, ...)  \
