@@ -56,6 +56,8 @@ typedef int64_t    UwType_Signed;
 typedef uint64_t   UwType_Unsigned;
 typedef double     UwType_Float;
 
+#define UW_SIGNED_MAX  0x7fff'ffff'ffff'ffffL
+
 typedef struct {
     /*
      * Extra data for UwValue.
