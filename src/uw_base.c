@@ -273,6 +273,10 @@ static bool null_equal(UwValuePtr self, UwValuePtr other)
             case UwTypeId_Null:
                 return true;
 
+            case UwTypeId_CharPtr:
+            case UwTypeId_Ptr:
+                return other->ptr == nullptr;
+
             default: {
                 // check base type
                 t = _uw_types[t]->ancestor_id;
