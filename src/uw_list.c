@@ -592,6 +592,8 @@ UwResult _uw_list_join(UwValuePtr separator, UwValuePtr list)
 
 bool uw_list_dedent(UwValuePtr lines)
 {
+    static char32_t indent_chars[] = {' ', '\t', 0};
+
     unsigned n = uw_list_length(lines);
 
     // dedent inplace, so access items directly to avoid cloning
@@ -604,7 +606,7 @@ bool uw_list_dedent(UwValuePtr lines)
     for (unsigned i = 0; i < n; i++) {
         UwValuePtr line = &list->items[i];
         if (uw_is_string(line)) {
-            indent[i] = uw_string_skip_spaces(line, 0);
+            indent[i] = uw_string_skip_chars(line, 0, indent_chars);
             if (indent[i] && indent[i] < min_indent) {
                 min_indent = indent[i];
             }

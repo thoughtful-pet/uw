@@ -129,7 +129,7 @@ UwResult uw_list_slice(UwValuePtr list, unsigned start_index, unsigned end_index
 bool uw_list_dedent(UwValuePtr lines);
 /*
  * Dedent list of strings.
- * XXX treat tabs and other space characters as single spaces.
+ * XXX count treat tabs as single spaces.
  *
  * Return true on success, false if OOM.
  */

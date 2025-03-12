@@ -171,6 +171,12 @@ unsigned uw_string_skip_spaces(UwValuePtr str, unsigned position);
  * If non-space character is not found, the length is returned.
  */
 
+unsigned uw_string_skip_chars(UwValuePtr str, unsigned position, char32_t* skipchars);
+/*
+ * Find position of the first character not belonging to `skipchars` starting from `position`.
+ * If no `skipchars` encountered, the length is returned.
+ */
+
 /****************************************************************
  * Character classification functions
  */
