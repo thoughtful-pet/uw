@@ -274,7 +274,7 @@ static bool charptr_equal(UwValuePtr self, UwValuePtr other)
     for (;;) {
         switch (t) {
             case UwTypeId_Null:
-                return other->charptr == nullptr;
+                return self->charptr == nullptr;
 
             case UwTypeId_String:
                 return _uw_charptr_equal_string(self, other);
