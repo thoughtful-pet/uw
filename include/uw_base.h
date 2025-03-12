@@ -139,7 +139,7 @@ union __UwValue {
     };
 
     struct {
-        // charptr
+        // charptr and ptr
         UwTypeId /* uint16_t */ _charptr_type_id;
         uint8_t charptr_subtype; // see UW_CHARPTR* constants
         uint8_t  _charptr_padding_1;
@@ -149,6 +149,9 @@ union __UwValue {
             char*     charptr;
             char8_t*  char8ptr;
             char32_t* char32ptr;
+
+            // void*
+            void* ptr;
         };
     };
 
@@ -231,6 +234,7 @@ typedef _UwValue  UwResult;  // alias for return values
 #define UwTypeId_Map         9U  // always has extra data
 #define UwTypeId_Status     10U  // extra_data is optional
 #define UwTypeId_Struct     11U
+#define UwTypeId_Ptr        12U  // void*
 
 // char* sub-types
 #define UW_CHARPTR    0
@@ -407,6 +411,7 @@ static inline void* _uw_get_interface(UwType* type, unsigned interface_id)
 #define uw_is_struct(value)    uw_is_subtype((value), UwTypeId_Struct)
 #define uw_is_file(value)      uw_is_subtype((value), UwTypeId_File)
 #define uw_is_stringio(value)  uw_is_subtype((value), UwTypeId_StringIO)
+#define uw_is_ptr(value)       uw_is_subtype((value), UwTypeId_Ptr)
 
 #define uw_assert_null(value)      uw_assert(uw_is_null    (value))
 #define uw_assert_bool(value)      uw_assert(uw_is_bool    (value))
@@ -422,6 +427,7 @@ static inline void* _uw_get_interface(UwType* type, unsigned interface_id)
 #define uw_assert_struct(value)    uw_assert(uw_is_struct  (value))
 #define uw_assert_file(value)      uw_assert(uw_is_file    (value))
 #define uw_assert_stringio(value)  uw_assert(uw_is_stringio(value))
+#define uw_assert_ptr(value)       uw_assert(uw_is_ptr     (value))
 
 extern UwType** _uw_types;
 /*
@@ -739,6 +745,22 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
     /* make Char32Ptr rvalue */  \
     ({  \
         __UWDECL_Char32Ptr(v, (initializer));  \
+        v;  \
+    })
+
+#define __UWDECL_Ptr(name, initializer)  \
+    /* declare Ptr variable */  \
+    _UwValue name = {  \
+        ._charptr_type_id = UwTypeId_Ptr,  \
+        .ptr = (initializer)  \
+    }
+
+#define UWDECL_Ptr(name, initializer)  _UW_VALUE_CLEANUP __UWDECL_Ptr((name), (initializer))
+
+#define UwPtr(initializer)  \
+    /* make Ptr rvalue */  \
+    ({  \
+        __UWDECL_Ptr(v, (initializer));  \
         v;  \
     })
 

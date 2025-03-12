@@ -701,7 +701,7 @@ static bool float_equal(UwValuePtr self, UwValuePtr other)
     UwTypeId t = other->type_id;
     for (;;) {
         switch (t) {
-            case UwTypeId_Signed:      return self->float_value == (UwType_Float) other->signed_value;
+            case UwTypeId_Signed:   return self->float_value == (UwType_Float) other->signed_value;
             case UwTypeId_Unsigned: return self->float_value == (UwType_Float) other->unsigned_value;
             case UwTypeId_Float:    return self->float_value == other->float_value;
             default: {
@@ -835,6 +835,90 @@ static UwType struct_type = {
 
 
 /****************************************************************
+ * Pointer type
+ */
+
+static UwResult ptr_create(UwTypeId type_id, va_list ap)
+{
+    return UwPtr(nullptr);
+}
+
+static void ptr_hash(UwValuePtr self, UwHashContext* ctx)
+{
+    // mind maps: the hash should be the same for subtypes, that's why not using self->type_id here
+    _uw_hash_uint64(ctx, UwTypeId_Ptr);
+    _uw_hash_buffer(ctx, &self->ptr, sizeof(self->ptr));
+}
+
+static void ptr_dump(UwValuePtr self, FILE* fp, int first_indent, int next_indent, _UwCompoundChain* tail)
+{
+    _uw_dump_start(fp, self, first_indent);
+    fprintf(fp, ": %p\n", self->ptr);
+}
+
+static UwResult ptr_to_string(UwValuePtr self)
+{
+    return UwError(UW_ERROR_NOT_IMPLEMENTED);
+}
+
+static bool ptr_is_true(UwValuePtr self)
+{
+    return self->ptr;
+}
+
+static bool ptr_equal_sametype(UwValuePtr self, UwValuePtr other)
+{
+    return self->ptr == other->ptr;
+}
+
+static bool ptr_equal(UwValuePtr self, UwValuePtr other)
+{
+    UwTypeId t = other->type_id;
+    for (;;) {
+        switch (t) {
+            case UwTypeId_Null:
+                return self->ptr == nullptr;
+
+            case UwTypeId_Ptr:
+                return self->ptr == other->ptr;
+
+            default: {
+                // check base type
+                t = _uw_types[t]->ancestor_id;
+                if (t == UwTypeId_Null) {
+                    return false;
+                }
+            }
+        }
+    }
+}
+
+static UwType ptr_type = {
+    .id              = UwTypeId_Ptr,
+    .ancestor_id     = UwTypeId_Null,  // no ancestor
+    .name            = "Ptr",
+    .allocator       = nullptr,
+    .data_offset     = 0,
+    .data_size       = 0,
+    .compound        = false,
+    ._create         = ptr_create,
+    ._destroy        = nullptr,
+    ._init           = nullptr,
+    ._fini           = nullptr,
+    ._clone          = nullptr,
+    ._hash           = ptr_hash,
+    ._deepcopy       = ptr_to_string,
+    ._dump           = ptr_dump,
+    ._to_string      = ptr_to_string,
+    ._is_true        = ptr_is_true,
+    ._equal_sametype = ptr_equal_sametype,
+    ._equal          = ptr_equal,
+
+    .num_interfaces  = 0,
+    .interfaces      = nullptr
+};
+
+/****************************************************************
  * Global list of types initialized with built-in types.
  */
 
@@ -853,7 +937,8 @@ static UwType* basic_types[] = {
     [UwTypeId_List]     = &_uw_list_type,
     [UwTypeId_Map]      = &_uw_map_type,
     [UwTypeId_Status]   = &_uw_status_type,
-    [UwTypeId_Struct]   = &struct_type
+    [UwTypeId_Struct]   = &struct_type,
+    [UwTypeId_Ptr]      = &ptr_type
 };
 
 UwType** _uw_types = nullptr;
