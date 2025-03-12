@@ -30,15 +30,15 @@ CStringPtr uw_string_to_cstring(UwValuePtr str);
  * Create C string.
  */
 
-void uw_string_copy_buf(UwValuePtr str, char* buffer);
-void uw_string_substr_buf(UwValuePtr str, unsigned start_pos, unsigned end_pos, char* buffer);
+void uw_strcopy_buf(UwValuePtr str, char* buffer);
+void uw_substrcopy_buf(UwValuePtr str, unsigned start_pos, unsigned end_pos, char* buffer);
 /*
  * Copy string to buffer, appending terminating 0.
  * Use carefully. The caller is responsible to allocate the buffer.
  * Encode multibyte chars to UTF-8.
  */
 
-UwResult uw_string_get_substring(UwValuePtr str, unsigned start_pos, unsigned end_pos);
+UwResult uw_substr(UwValuePtr str, unsigned start_pos, unsigned end_pos);
 /*
  * Get substring from `start_pos` to `end_pos`.
  */
@@ -88,7 +88,7 @@ char* uw_char32_to_utf8(char32_t codepoint, char* buffer);
  * Return pointer to the next position in buffer.
  */
 
-void* uw_string_get_bytes(UwValuePtr str, unsigned* length);
+void* uw_string_data(UwValuePtr str, unsigned* length);
 /*
  * Return pointer to internal string data.
  * The function is intended for file I/O operations.

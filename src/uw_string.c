@@ -21,7 +21,7 @@ static unsigned _max_capacity[4] = {
  * Basic functions
  */
 
-void* uw_string_get_bytes(UwValuePtr str, unsigned* length)
+void* uw_string_data(UwValuePtr str, unsigned* length)
 {
     uw_assert_string(str);
     uint8_t char_size = _uw_string_char_size(str);
@@ -1531,14 +1531,14 @@ CStringPtr uw_string_to_cstring(UwValuePtr str)
     return result;
 }
 
-void uw_string_copy_buf(UwValuePtr str, char* buffer)
+void uw_strcopy_buf(UwValuePtr str, char* buffer)
 {
     uw_assert_string(str);
     unsigned length = _uw_string_length(str);
     get_str_methods(str)->copy_to_u8(_uw_string_char_ptr(str, 0), buffer, length);
 }
 
-void uw_string_substr_buf(UwValuePtr str, unsigned start_pos, unsigned end_pos, char* buffer)
+void uw_substrcopy_buf(UwValuePtr str, unsigned start_pos, unsigned end_pos, char* buffer)
 {
     uw_assert_string(str);
     unsigned length = _uw_string_length(str);
@@ -1808,7 +1808,7 @@ UwResult uw_string_get_substring(UwValuePtr str, unsigned start_pos, unsigned en
     return result;
 }
 
-char32_t uw_string_at(UwValuePtr str, unsigned position)
+char32_t uw_char_at(UwValuePtr str, unsigned position)
 {
     uw_assert_string(str);
     unsigned length = _uw_string_length(str);
