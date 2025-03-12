@@ -1538,6 +1538,20 @@ void uw_string_copy_buf(UwValuePtr str, char* buffer)
     get_str_methods(str)->copy_to_u8(_uw_string_char_ptr(str, 0), buffer, length);
 }
 
+void uw_string_substr_buf(UwValuePtr str, unsigned start_pos, unsigned end_pos, char* buffer)
+{
+    uw_assert_string(str);
+    unsigned length = _uw_string_length(str);
+    if (end_pos >= length) {
+        end_pos = length;
+    }
+    if (end_pos <= start_pos) {
+        *buffer = 0;
+        return;
+    }
+    get_str_methods(str)->copy_to_u8(_uw_string_char_ptr(str, start_pos), buffer, end_pos - start_pos);
+}
+
 void uw_destroy_cstring(CStringPtr* str)
 {
     free(*str);

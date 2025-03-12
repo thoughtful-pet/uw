@@ -31,6 +31,7 @@ CStringPtr uw_string_to_cstring(UwValuePtr str);
  */
 
 void uw_string_copy_buf(UwValuePtr str, char* buffer);
+void uw_string_substr_buf(UwValuePtr str, unsigned start_pos, unsigned end_pos, char* buffer);
 /*
  * Copy string to buffer, appending terminating 0.
  * Use carefully. The caller is responsible to allocate the buffer.
