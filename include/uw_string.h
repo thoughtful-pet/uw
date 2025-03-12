@@ -165,6 +165,12 @@ UwResult _uw_strcat_va(...);
 
 UwResult uw_strcat_ap(va_list ap);
 
+unsigned uw_string_skip_spaces(UwValuePtr str, unsigned position);
+/*
+ * Find position of the first non-space character starting from `position`.
+ * If non-space character is not found, the length is returned.
+ */
+
 /****************************************************************
  * Character classification functions
  */

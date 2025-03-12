@@ -2144,3 +2144,25 @@ UwResult uw_strcat_ap(va_list ap)
     consume_args(ap);
     return uw_move(&error);
 }
+
+unsigned uw_string_skip_spaces(UwValuePtr str, unsigned position)
+/*
+ * Find position of the first non-space character starting from `position`.
+ * If non-space character is not found, the length is returned.
+ */
+{
+    uw_assert_string(str);
+    unsigned length = _uw_string_length(str);
+    StrMethods* strmeth = get_str_methods(str);
+    uint8_t char_size = _uw_string_char_size(str);
+    uint8_t* charptr = _uw_string_char_ptr(str, position);
+    while (position < length) {
+        char32_t c = strmeth->get_char(charptr);
+        if (!uw_char_isspace(c)) {
+            return position;
+        }
+        position++;
+        charptr += char_size;
+    }
+    return length;
+}
