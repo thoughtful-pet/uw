@@ -1748,6 +1748,16 @@ bool uw_string_append_buffer(UwValuePtr dest, uint8_t* buffer, unsigned size)
     return true;
 }
 
+bool _uw_string_append_charptr(UwValuePtr dest, UwValuePtr charptr, unsigned len, uint8_t char_size)
+{
+    switch (charptr->charptr_subtype) {
+        case UW_CHARPTR:   return append_cstr(dest, charptr->charptr,   len);
+        case UW_CHAR8PTR:  return append_u8  (dest, charptr->char8ptr,  len, char_size);
+        case UW_CHAR32PTR: return append_u32 (dest, charptr->char32ptr, len, char_size);
+        default: return true;  // XXX the caller must ensure charptr_subtype is correct
+    }
+}
+
 bool _uw_string_insert_many_c32(UwValuePtr str, unsigned position, char32_t chr, unsigned n)
 {
     if (n == 0) {
@@ -2008,157 +2018,6 @@ UwResult uw_string_split_chr(UwValuePtr str, char32_t splitter)
     return uw_move(&result);
 }
 
-UwResult _uw_string_join_c32(char32_t separator, UwValuePtr list)
-{
-    char32_t s[2] = {separator, 0};
-    UwValue sep = UwChar32Ptr(s);
-    return _uw_string_join(&sep, list);
-}
-
-UwResult _uw_string_join_u8(char8_t* separator, UwValuePtr list)
-{
-    UwValue sep = UwChar8Ptr(separator);
-    return _uw_string_join(&sep, list);
-}
-
-UwResult _uw_string_join_u32(char32_t*  separator, UwValuePtr list)
-{
-    UwValue sep = UwChar32Ptr(separator);
-    return _uw_string_join(&sep, list);
-}
-
-static bool append_charptr(UwValuePtr dest, UwValuePtr charptr, unsigned len, uint8_t char_size)
-{
-    switch (charptr->charptr_subtype) {
-        case UW_CHARPTR:   return append_cstr(dest, charptr->charptr,   len);
-        case UW_CHAR8PTR:  return append_u8  (dest, charptr->char8ptr,  len, char_size);
-        case UW_CHAR32PTR: return append_u32 (dest, charptr->char32ptr, len, char_size);
-        default: return true;  // XXX the caller must ensure charptr_subtype is correct
-    }
-}
-
-UwResult _uw_string_join(UwValuePtr separator, UwValuePtr list)
-{
-    unsigned num_items = uw_list_length(list);
-    if (num_items == 0) {
-        return UwString();
-    }
-    if (num_items == 1) {
-        UwValue item = uw_list_item(list, 0);
-        if (uw_is_string(&item)) {
-            return uw_move(&item);
-        } if (uw_is_charptr(&item)) {
-            return uw_charptr_to_string(&item);
-        } else {
-            // XXX skipping non-string values
-            return UwString();
-        }
-    }
-
-    uint8_t max_char_size;
-    unsigned separator_len;
-    bool separator_is_string = uw_is_string(separator);
-
-    if (separator_is_string) {
-        max_char_size = uw_string_char_size(separator);
-        separator_len = uw_strlen(separator);
-    } if (uw_is_charptr(separator)) {
-        separator_len = _uw_charptr_strlen2(separator, &max_char_size);
-    } else {
-        UwValue error = UwError(UW_ERROR_INCOMPATIBLE_TYPE);
-        _uw_set_status_desc(&error, "Bad separator type for uw_string_join: %u, %s",
-                            separator->type_id, uw_get_type_name(separator->type_id));
-        return uw_move(&error);
-    }
-
-    // calculate total length and max char width of string items
-    unsigned num_charptrs = 0;
-    unsigned result_len = 0;
-    for (unsigned i = 0; i < num_items; i++) {
-        {   // nested scope for autocleaning item
-            UwValue item = uw_list_item(list, i);
-            if (uw_is_string(&item)) {
-                if (i) {
-                    result_len += separator_len;
-                }
-                uint8_t char_size = uw_string_char_size(&item);
-                if (max_char_size < char_size) {
-                    max_char_size = char_size;
-                }
-                result_len += uw_strlen(&item);
-            } else if (uw_is_charptr(&item)) {
-                if (i) {
-                    result_len += separator_len;
-                }
-                num_charptrs++;
-            }
-            // XXX skipping non-string values
-        }
-    }
-
-    // can allocate array for CharPtr now
-    unsigned charptr_len[num_charptrs + 1];
-
-    if (num_charptrs) {
-        // need one more pass to get lengths and char sizes of CharPtr items
-        unsigned charptr_index = 0;
-        for (unsigned i = 0; i < num_items; i++) {
-            {   // nested scope for autocleaning item
-                UwValue item = uw_list_item(list, i);
-                if (uw_is_charptr(&item)) {
-                    uint8_t char_size;
-                    unsigned len = _uw_charptr_strlen2(&item, &char_size);
-
-                    charptr_len[charptr_index++] = len;
-
-                    result_len += len;
-                    if (max_char_size < char_size) {
-                        max_char_size = char_size;
-                    }
-                }
-            }
-        }
-    }
-
-    // join list items
-    UwValue result = uw_create_empty_string(result_len, max_char_size);
-    if (uw_error(&result)) {
-        return uw_move(&result);
-    }
-    unsigned charptr_index = 0;
-    for (unsigned i = 0; i < num_items; i++) {
-        {   // nested scope for autocleaning item
-            UwValue item = uw_list_item(list, i);
-            bool is_string = uw_is_string(&item);
-            if (is_string || uw_is_charptr(&item)) {
-                if (i) {
-                    if (separator_is_string) {
-                        if (!_uw_string_append(&result, separator)) {
-                            return UwOOM();
-                        }
-                    } else {
-                        if (!append_charptr(&result, separator, separator_len, max_char_size)) {
-                            return UwOOM();
-                        }
-                    }
-                }
-                if (is_string) {
-                    if (!_uw_string_append(&result, &item)) {
-                        return UwOOM();
-                    }
-                } else {
-                    if (!append_charptr(&result, &item, charptr_len[charptr_index], max_char_size)) {
-                        return UwOOM();
-                    }
-                    charptr_index++;
-                }
-            }
-            // XXX skipping non-string values
-        }
-    }
-    return uw_move(&result);
-}
-
 UwResult _uw_strcat_va(...)
 {
     va_list ap;
@@ -2275,7 +2134,7 @@ UwResult uw_strcat_ap(va_list ap)
                     break;
                 }
             } else if (uw_is_charptr(&arg)) {
-                if (!append_charptr(&str, &arg, charptr_len[charptr_index], max_char_size)) {
+                if (!_uw_string_append_charptr(&str, &arg, charptr_len[charptr_index], max_char_size)) {
                     break;
                 }
                 charptr_index++;

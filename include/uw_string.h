@@ -370,29 +370,6 @@ static inline UwResult _uw_string_split_strict_u8_wrapper(UwValuePtr str, char* 
 }
 
 /****************************************************************
- * Join list items. Return string value.
- */
-
-#define uw_string_join(separator, list) _Generic((separator), \
-              char32_t: _uw_string_join_c32,        \
-                   int: _uw_string_join_c32,        \
-                 char*: _uw_string_join_u8_wrapper, \
-              char8_t*: _uw_string_join_u8,         \
-             char32_t*: _uw_string_join_u32,        \
-            UwValuePtr: _uw_string_join             \
-    )((separator), (list))
-
-UwResult _uw_string_join_c32(char32_t   separator, UwValuePtr list);
-UwResult _uw_string_join_u8 (char8_t*   separator, UwValuePtr list);
-UwResult _uw_string_join_u32(char32_t*  separator, UwValuePtr list);
-UwResult _uw_string_join    (UwValuePtr separator, UwValuePtr list);
-
-static inline UwResult _uw_string_join_u8_wrapper(char* separator, UwValuePtr list)
-{
-    return _uw_string_join_u8((char8_t*) separator, list);
-}
-
-/****************************************************************
  * String variable declarations and rvalues with initialization
  */
 

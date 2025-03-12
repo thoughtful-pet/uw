@@ -71,7 +71,30 @@ UwResult uw_list_append_ap(UwValuePtr list, va_list ap);
  */
 
 /****************************************************************
- * List functions
+ * Join list items. Return string value.
+ */
+
+#define uw_list_join(separator, list) _Generic((separator), \
+              char32_t: _uw_list_join_c32,        \
+                   int: _uw_list_join_c32,        \
+                 char*: _uw_list_join_u8_wrapper, \
+              char8_t*: _uw_list_join_u8,         \
+             char32_t*: _uw_list_join_u32,        \
+            UwValuePtr: _uw_list_join             \
+    )((separator), (list))
+
+UwResult _uw_list_join_c32(char32_t   separator, UwValuePtr list);
+UwResult _uw_list_join_u8 (char8_t*   separator, UwValuePtr list);
+UwResult _uw_list_join_u32(char32_t*  separator, UwValuePtr list);
+UwResult _uw_list_join    (UwValuePtr separator, UwValuePtr list);
+
+static inline UwResult _uw_list_join_u8_wrapper(char* separator, UwValuePtr list)
+{
+    return _uw_list_join_u8((char8_t*) separator, list);
+}
+
+/****************************************************************
+ * Miscellaneous list functions
  */
 
 bool uw_list_resize(UwValuePtr list, unsigned desired_capacity);

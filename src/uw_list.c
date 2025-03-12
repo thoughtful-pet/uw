@@ -1,6 +1,7 @@
 #include "include/uw.h"
 #include "src/uw_charptr_internal.h"
 #include "src/uw_list_internal.h"
+#include "src/uw_string_internal.h"
 
 #define get_data_ptr(value)  ((_UwList*) _uw_get_data_ptr((value), UwTypeId_List))
 
@@ -447,4 +448,145 @@ UwResult uw_list_slice(UwValuePtr self, unsigned start_index, unsigned end_index
         dest_list->length++;
     }
     return uw_move(&dest);
+}
+
+UwResult _uw_list_join_c32(char32_t separator, UwValuePtr list)
+{
+    char32_t s[2] = {separator, 0};
+    UwValue sep = UwChar32Ptr(s);
+    return _uw_list_join(&sep, list);
+}
+
+UwResult _uw_list_join_u8(char8_t* separator, UwValuePtr list)
+{
+    UwValue sep = UwChar8Ptr(separator);
+    return _uw_list_join(&sep, list);
+}
+
+UwResult _uw_list_join_u32(char32_t*  separator, UwValuePtr list)
+{
+    UwValue sep = UwChar32Ptr(separator);
+    return _uw_list_join(&sep, list);
+}
+
+UwResult _uw_list_join(UwValuePtr separator, UwValuePtr list)
+{
+    unsigned num_items = uw_list_length(list);
+    if (num_items == 0) {
+        return UwString();
+    }
+    if (num_items == 1) {
+        UwValue item = uw_list_item(list, 0);
+        if (uw_is_string(&item)) {
+            return uw_move(&item);
+        } if (uw_is_charptr(&item)) {
+            return uw_charptr_to_string(&item);
+        } else {
+            // XXX skipping non-string values
+            return UwString();
+        }
+    }
+
+    uint8_t max_char_size;
+    unsigned separator_len;
+    bool separator_is_string = uw_is_string(separator);
+
+    if (separator_is_string) {
+        max_char_size = uw_string_char_size(separator);
+        separator_len = uw_strlen(separator);
+    } if (uw_is_charptr(separator)) {
+        separator_len = _uw_charptr_strlen2(separator, &max_char_size);
+    } else {
+        UwValue error = UwError(UW_ERROR_INCOMPATIBLE_TYPE);
+        _uw_set_status_desc(&error, "Bad separator type for uw_list_join: %u, %s",
+                            separator->type_id, uw_get_type_name(separator->type_id));
+        return uw_move(&error);
+    }
+
+    // calculate total length and max char width of string items
+    unsigned num_charptrs = 0;
+    unsigned result_len = 0;
+    for (unsigned i = 0; i < num_items; i++) {
+        {   // nested scope for autocleaning item
+            UwValue item = uw_list_item(list, i);
+            if (uw_is_string(&item)) {
+                if (i) {
+                    result_len += separator_len;
+                }
+                uint8_t char_size = uw_string_char_size(&item);
+                if (max_char_size < char_size) {
+                    max_char_size = char_size;
+                }
+                result_len += uw_strlen(&item);
+            } else if (uw_is_charptr(&item)) {
+                if (i) {
+                    result_len += separator_len;
+                }
+                num_charptrs++;
+            }
+            // XXX skipping non-string values
+        }
+    }
+
+    // can allocate array for CharPtr now
+    unsigned charptr_len[num_charptrs + 1];
+
+    if (num_charptrs) {
+        // need one more pass to get lengths and char sizes of CharPtr items
+        unsigned charptr_index = 0;
+        for (unsigned i = 0; i < num_items; i++) {
+            {   // nested scope for autocleaning item
+                UwValue item = uw_list_item(list, i);
+                if (uw_is_charptr(&item)) {
+                    uint8_t char_size;
+                    unsigned len = _uw_charptr_strlen2(&item, &char_size);
+
+                    charptr_len[charptr_index++] = len;
+
+                    result_len += len;
+                    if (max_char_size < char_size) {
+                        max_char_size = char_size;
+                    }
+                }
+            }
+        }
+    }
+
+    // join list items
+    UwValue result = uw_create_empty_string(result_len, max_char_size);
+    if (uw_error(&result)) {
+        return uw_move(&result);
+    }
+    unsigned charptr_index = 0;
+    for (unsigned i = 0; i < num_items; i++) {
+        {   // nested scope for autocleaning item
+            UwValue item = uw_list_item(list, i);
+            bool is_string = uw_is_string(&item);
+            if (is_string || uw_is_charptr(&item)) {
+                if (i) {
+                    if (separator_is_string) {
+                        if (!_uw_string_append(&result, separator)) {
+                            return UwOOM();
+                        }
+                    } else {
+                        if (!_uw_string_append_charptr(&result, separator, separator_len, max_char_size)) {
+                            return UwOOM();
+                        }
+                    }
+                }
+                if (is_string) {
+                    if (!_uw_string_append(&result, &item)) {
+                        return UwOOM();
+                    }
+                } else {
+                    if (!_uw_string_append_charptr(&result, &item, charptr_len[charptr_index], max_char_size)) {
+                        return UwOOM();
+                    }
+                    charptr_index++;
+                }
+            }
+            // XXX skipping non-string values
+        }
+    }
+    return uw_move(&result);
 }

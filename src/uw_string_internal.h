@@ -317,6 +317,11 @@ bad_utf8:
 #   undef APPEND_NEXT
 }
 
+bool _uw_string_append_charptr(UwValuePtr dest, UwValuePtr charptr, unsigned len, uint8_t char_size);
+/*
+ * Append one of CharPtr types to dest. `char_size` must be correct maximal size of character in charptr.
+ */
+
 #ifdef __cplusplus
 }
 #endif

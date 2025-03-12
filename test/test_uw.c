@@ -625,32 +625,6 @@ void test_string()
         TEST(uw_strlen(&v) == 6);
     }
 
-    { // test join
-        UwValue list = UwList();
-        uw_list_append(&list, "Hello");
-        uw_list_append(&list, u8"สวัสดี");
-        uw_list_append(&list, "Thanks");
-        uw_list_append(&list, U"mulțumesc");
-        UwValue v = uw_string_join('/', &list);
-        TEST(uw_equal(&v, U"Hello/สวัสดี/Thanks/mulțumesc"));
-        //uw_dump(stderr, &v);
-    }
-
-    { // test join with CharPtr
-        UwValue list       = UwList();
-        UwValue sawatdee   = UwChar8Ptr(u8"สวัสดี");
-        UwValue thanks     = UwCharPtr("Thanks");
-        UwValue multsumesc = UwChar32Ptr(U"mulțumesc");
-        UwValue wat        = UwChar32Ptr(U"🙏");
-        uw_list_append(&list, "Hello");
-        uw_list_append(&list, &sawatdee);
-        uw_list_append(&list, &thanks);
-        uw_list_append(&list, &multsumesc);
-        UwValue v = uw_string_join(&wat, &list);
-        TEST(uw_equal(&v, U"Hello🙏สวัสดี🙏Thanks🙏mulțumesc"));
-        //uw_dump(stderr, &v);
-    }
-
     { // test uw_strcat
         UwValue v = uw_strcat(
             uw_create_string("Hello! "), UwCharPtr("Thanks"), UwChar32Ptr(U"🙏"), UwChar8Ptr(u8"สวัสดี")
@@ -663,7 +637,7 @@ void test_string()
         UwValue str = uw_create(U"สบาย/สบาย/yo/yo");
         UwValue list = uw_string_split_chr(&str, '/');
         //uw_dump(stderr, &list);
-        UwValue v = uw_string_join('/', &list);
+        UwValue v = uw_list_join('/', &list);
         TEST(uw_equal(&v, U"สบาย/สบาย/yo/yo"));
     }
 
@@ -733,6 +707,31 @@ void test_list()
             UwValue item = uw_list_item(&slice, 98);
             TEST(uw_equal(&item, 948));
         }
+    }
+    { // test join
+        UwValue list = UwList();
+        uw_list_append(&list, "Hello");
+        uw_list_append(&list, u8"สวัสดี");
+        uw_list_append(&list, "Thanks");
+        uw_list_append(&list, U"mulțumesc");
+        UwValue v = uw_list_join('/', &list);
+        TEST(uw_equal(&v, U"Hello/สวัสดี/Thanks/mulțumesc"));
+        //uw_dump(stderr, &v);
+    }
+
+    { // test join with CharPtr
+        UwValue list       = UwList();
+        UwValue sawatdee   = UwChar8Ptr(u8"สวัสดี");
+        UwValue thanks     = UwCharPtr("Thanks");
+        UwValue multsumesc = UwChar32Ptr(U"mulțumesc");
+        UwValue wat        = UwChar32Ptr(U"🙏");
+        uw_list_append(&list, "Hello");
+        uw_list_append(&list, &sawatdee);
+        uw_list_append(&list, &thanks);
+        uw_list_append(&list, &multsumesc);
+        UwValue v = uw_list_join(&wat, &list);
+        TEST(uw_equal(&v, U"Hello🙏สวัสดี🙏Thanks🙏mulțumesc"));
+        //uw_dump(stderr, &v);
     }
 }
 
