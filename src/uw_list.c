@@ -363,7 +363,6 @@ UwResult uw_list_item(UwValuePtr self, int index)
     } else {
         uw_assert(((unsigned) index) < list->length);
     }
-    //return uw_clone(&list->items[index]);
     return uw_clone(&list->items[index]);
 }
 
@@ -589,4 +588,42 @@ UwResult _uw_list_join(UwValuePtr separator, UwValuePtr list)
         }
     }
     return uw_move(&result);
+}
+
+bool uw_list_dedent(UwValuePtr lines)
+{
+    unsigned n = uw_list_length(lines);
+
+    // dedent inplace, so access items directly to avoid cloning
+    _UwList* list = get_data_ptr(lines);
+
+    unsigned indent[n];
+
+    // measure indents
+    unsigned min_indent = UINT_MAX;
+    for (unsigned i = 0; i < n; i++) {
+        UwValuePtr line = &list->items[i];
+        if (uw_is_string(line)) {
+            indent[i] = uw_string_skip_spaces(line, 0);
+            if (indent[i] && indent[i] < min_indent) {
+                min_indent = indent[i];
+            }
+        } else {
+            indent[i] = 0;
+        }
+    }
+    if (min_indent == UINT_MAX || min_indent == 0) {
+        // nothing to dedent
+        return true;
+    }
+
+    for (unsigned i = 0; i < n; i++) {
+        if (indent[i]) {
+            UwValuePtr line = &list->items[i];
+            if (!uw_string_erase(line, 0, min_indent)) {
+                return false;
+            }
+        }
+    }
+    return true;
 }

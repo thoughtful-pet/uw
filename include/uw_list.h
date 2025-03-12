@@ -126,6 +126,14 @@ UwResult uw_list_slice(UwValuePtr list, unsigned start_index, unsigned end_index
  * Return shallow copy of the given range of list.
  */
 
+bool uw_list_dedent(UwValuePtr lines);
+/*
+ * Dedent list of strings.
+ * XXX treat tabs and other space characters as single spaces.
+ *
+ * Return true on success, false if OOM.
+ */
+
 #ifdef __cplusplus
 }
 #endif

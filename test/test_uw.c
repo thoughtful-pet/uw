@@ -733,6 +733,18 @@ void test_list()
         TEST(uw_equal(&v, U"Hello🙏สวัสดี🙏Thanks🙏mulțumesc"));
         //uw_dump(stderr, &v);
     }
+
+    { // test dedent
+        UwValue list = UwList(
+            UwCharPtr("   first line"),
+            UwCharPtr("  second line"),
+            UwCharPtr("    third line")
+        );
+        uw_list_dedent(&list);
+        UwValue v = uw_list_join(',', &list);
+        TEST(uw_equal(&v, " first line,second line,  third line"));
+        //uw_dump(stderr, &v);
+    }
 }
 
 void test_map()
