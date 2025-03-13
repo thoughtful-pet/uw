@@ -61,7 +61,7 @@ bool uw_string_truncate(UwValuePtr str, unsigned position);
  * This may make a copy of string, so checking return value is mandatory.
  */
 
-bool uw_string_indexof(UwValuePtr str, char32_t chr, unsigned start_pos, unsigned* result);
+bool uw_strchr(UwValuePtr str, char32_t chr, unsigned start_pos, unsigned* result);
 /*
  * Find first occurence of `chr` in `str` starting from `start_pos`.
  *

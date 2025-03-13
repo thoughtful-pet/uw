@@ -1854,7 +1854,7 @@ bool uw_string_truncate(UwValuePtr str, unsigned position)
     return true;
 }
 
-bool uw_string_indexof(UwValuePtr str, char32_t chr, unsigned start_pos, unsigned* result)
+bool uw_strchr(UwValuePtr str, char32_t chr, unsigned start_pos, unsigned* result)
 {
     uw_assert_string(str);
     StrMethods* strmeth = get_str_methods(str);

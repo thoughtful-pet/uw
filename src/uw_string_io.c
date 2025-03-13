@@ -148,7 +148,7 @@ static UwResult read_line_inplace(UwValuePtr self, UwValuePtr line)
     }
 
     unsigned lf_pos;
-    if (!uw_string_indexof(&sio->line, '\n', sio->line_position, &lf_pos)) {
+    if (!uw_strchr(&sio->line, '\n', sio->line_position, &lf_pos)) {
         lf_pos = uw_strlen(&sio->line) - 1;
     }
     uw_string_append_substring(line, &sio->line, sio->line_position, lf_pos + 1);
