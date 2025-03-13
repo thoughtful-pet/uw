@@ -496,28 +496,29 @@ static inline char* _uw_get_type_name_from_value(UwValuePtr value) { return _uw_
  * Statuses
  */
 
-#define UW_SUCCESS                 0
-#define UW_STATUS_VA_END           1  // used as a terminator for variadic arguments
-#define UW_ERROR_ERRNO             2
-#define UW_ERROR_OOM               3
-#define UW_ERROR_NOT_IMPLEMENTED   4
-#define UW_ERROR_INCOMPATIBLE_TYPE 5
-#define UW_ERROR_NO_INTERFACE      6
-#define UW_ERROR_EOF               7
+#define UW_SUCCESS                    0
+#define UW_STATUS_VA_END              1  // used as a terminator for variadic arguments
+#define UW_ERROR_ERRNO                2
+#define UW_ERROR_OOM                  3
+#define UW_ERROR_NOT_IMPLEMENTED      4
+#define UW_ERROR_INCOMPATIBLE_TYPE    5
+#define UW_ERROR_NO_INTERFACE         6
+#define UW_ERROR_EOF                  7
+#define UW_ERROR_INDEX_OUT_OF_RANGE   8
 
 // list errors
-#define UW_ERROR_POP_FROM_EMPTY_LIST  8
+#define UW_ERROR_POP_FROM_EMPTY_LIST  9
 
 // map errors
-#define UW_ERROR_KEY_NOT_FOUND        9
+#define UW_ERROR_KEY_NOT_FOUND        10
 
 // File errors
-#define UW_ERROR_FILE_ALREADY_OPENED  10
-#define UW_ERROR_CANNOT_SET_FILENAME  11
-#define UW_ERROR_FD_ALREADY_SET       12
+#define UW_ERROR_FILE_ALREADY_OPENED  11
+#define UW_ERROR_CANNOT_SET_FILENAME  12
+#define UW_ERROR_FD_ALREADY_SET       13
 
 // StringIO errors
-#define UW_ERROR_PUSHBACK_FAILED      13
+#define UW_ERROR_PUSHBACK_FAILED      14
 
 uint16_t uw_define_status(char* status);
 /*

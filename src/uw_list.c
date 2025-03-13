@@ -359,9 +359,11 @@ UwResult uw_list_item(UwValuePtr self, int index)
 
     if (index < 0) {
         index = list->length + index;
-        uw_assert(index >= 0);
-    } else {
-        uw_assert(((unsigned) index) < list->length);
+        if (index < 0) {
+            return UwError(UW_ERROR_INDEX_OUT_OF_RANGE);
+        }
+    } else if (((unsigned) index) >= list->length) {
+        return UwError(UW_ERROR_INDEX_OUT_OF_RANGE);
     }
     return uw_clone(&list->items[index]);
 }
