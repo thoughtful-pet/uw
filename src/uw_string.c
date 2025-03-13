@@ -1783,7 +1783,7 @@ bool _uw_string_insert_many_c32(UwValuePtr str, unsigned position, char32_t chr,
     return true;
 }
 
-UwResult uw_string_get_substring(UwValuePtr str, unsigned start_pos, unsigned end_pos)
+UwResult uw_substr(UwValuePtr str, unsigned start_pos, unsigned end_pos)
 {
     uw_assert_string(str);
     StrMethods* strmeth = get_str_methods(str);
