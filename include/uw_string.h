@@ -182,15 +182,15 @@ unsigned uw_string_skip_chars(UwValuePtr str, unsigned position, char32_t* skipc
  */
 
 #ifdef UW_WITH_ICU
-#   define uw_char_isspace(c)  u_isspace(c)
+#   define uw_isspace(c)  u_isspace(c)
 #else
-#   define uw_char_isspace(c)  isspace(c)
+#   define uw_isspace(c)  isspace(c)
 #endif
 /*
  * Return true if `c` is a whitespace character.
  */
 
-#define uw_char_isdigit(c)  isdigit(c)
+#define uw_isdigit(c)  isdigit(c)
 /*
  * Return true if `c` is an ASCII digit.
  * Do not consider any other unicode digits because this function

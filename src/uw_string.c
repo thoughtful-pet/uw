@@ -1887,7 +1887,7 @@ bool uw_string_ltrim(UwValuePtr str)
     unsigned i = 0;
     while (i < len) {
         char32_t c = strmeth->get_char(ptr);
-        if (!uw_char_isspace(c)) {
+        if (!uw_isspace(c)) {
             break;
         }
         i++;
@@ -1907,7 +1907,7 @@ bool uw_string_rtrim(UwValuePtr str)
     while (n) {
         ptr -= char_size;
         char32_t c = strmeth->get_char(ptr);
-        if (!uw_char_isspace(c)) {
+        if (!uw_isspace(c)) {
             break;
         }
         n--;
@@ -2154,7 +2154,7 @@ unsigned uw_string_skip_spaces(UwValuePtr str, unsigned position)
     uint8_t* charptr = _uw_string_char_ptr(str, position);
     while (position < length) {
         char32_t c = strmeth->get_char(charptr);
-        if (!uw_char_isspace(c)) {
+        if (!uw_isspace(c)) {
             return position;
         }
         position++;

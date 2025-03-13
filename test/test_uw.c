@@ -42,12 +42,12 @@ void test_icu()
 {
 #   ifdef UW_WITH_ICU
         puts("With ICU");
-        TEST(uw_char_isspace(' '));
-        TEST(uw_char_isspace(0x2003));
+        TEST(uw_isspace(' '));
+        TEST(uw_isspace(0x2003));
 #   else
         puts("Without ICU");
-        TEST(uw_char_isspace(' '));
-        TEST(!uw_char_isspace(0x2003));
+        TEST(uw_isspace(' '));
+        TEST(!uw_isspace(0x2003));
 #   endif
 }
 
@@ -403,7 +403,7 @@ void test_integral_types()
 
 void test_string()
 {
-    TEST(uw_char_isspace(0) == false);
+    TEST(uw_isspace(0) == false);
 
     { // testing char_size=1
         UwValue v = uw_create_empty_string(0, 1);
