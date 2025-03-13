@@ -780,7 +780,7 @@ void _uw_set_status_desc_ap(UwValuePtr status, char* fmt, va_list ap);
 #define UwStatus(_status_code)  \
     /* make Status rvalue */  \
     ({  \
-        __UWDECL_Status(status, ((_status_code));  \
+        __UWDECL_Status(status, (_status_code));  \
         status;  \
     })
 

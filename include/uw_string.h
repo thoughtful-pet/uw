@@ -43,7 +43,7 @@ UwResult uw_substr(UwValuePtr str, unsigned start_pos, unsigned end_pos);
  * Get substring from `start_pos` to `end_pos`.
  */
 
-char32_t uw_string_at(UwValuePtr str, unsigned position);
+char32_t uw_char_at(UwValuePtr str, unsigned position);
 /*
  * Return character at `position`.
  * If position is beyond end of line return 0.
