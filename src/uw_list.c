@@ -368,6 +368,26 @@ UwResult uw_list_item(UwValuePtr self, int index)
     return uw_clone(&list->items[index]);
 }
 
+UwResult uw_list_set_item(UwValuePtr self, int index, UwValuePtr item)
+{
+    uw_assert_list(self);
+
+    _UwList* list = get_data_ptr(self);
+
+    if (index < 0) {
+        index = list->length + index;
+        if (index < 0) {
+            return UwError(UW_ERROR_INDEX_OUT_OF_RANGE);
+        }
+    } else if (((unsigned) index) >= list->length) {
+        return UwError(UW_ERROR_INDEX_OUT_OF_RANGE);
+    }
+
+    uw_destroy(&list->items[index]);
+    list->items[index] = uw_clone(item);
+    return UwOK();
+}
+
 UwResult uw_list_pop(UwValuePtr self)
 {
     uw_assert_list(self);

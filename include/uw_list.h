@@ -108,6 +108,12 @@ UwResult uw_list_item(UwValuePtr list, int index);
  * The simplest way is assigning it to an UwValue.
  */
 
+UwResult uw_list_set_item(UwValuePtr list, int index, UwValuePtr item);
+/*
+ * Set item at specific index.
+ * Return UwStatus.
+ */
+
 UwResult uw_list_pop(UwValuePtr list);
 /*
  * Extract last item from the list.
