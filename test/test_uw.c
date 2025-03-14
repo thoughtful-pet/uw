@@ -432,54 +432,54 @@ void test_string()
         TEST(_uw_string_char_size(&v) == 1);
         //uw_dump(stderr, &v);
 
-        uw_string_append(&v, "everybody");
+        uw_string_append(&v, "pet");
         uw_string_erase(&v, 5, 255);
-        TEST(uw_equal(&v, "hello everybody"));
+        TEST(uw_equal(&v, "hello pet"));
         //uw_dump(stderr, &v);
         TEST(!uw_equal(&v, ""));
 
         // test comparison
-        UwValue v2 = uw_create("hello everybody");
+        UwValue v2 = uw_create("hello pet");
         TEST(uw_equal(&v, &v2));
-        TEST(uw_equal_cstr(&v, "hello everybody"));
-        TEST(uw_equal_cstr(&v2, "hello everybody"));
-        TEST(!uw_equal_cstr(&v, "hello Everybody"));
-        TEST(!uw_equal_cstr(&v2, "hello Everybody"));
-        TEST(uw_equal(&v, "hello everybody"));
-        TEST(uw_equal(&v2, "hello everybody"));
-        TEST(!uw_equal(&v, "hello Everybody"));
-        TEST(!uw_equal(&v2, "hello Everybody"));
-        TEST(uw_equal(&v, u8"hello everybody"));
-        TEST(uw_equal(&v2, u8"hello everybody"));
-        TEST(!uw_equal(&v, u8"hello Everybody"));
-        TEST(!uw_equal(&v2, u8"hello Everybody"));
-        TEST(uw_equal(&v, U"hello everybody"));
-        TEST(uw_equal(&v2, U"hello everybody"));
-        TEST(!uw_equal(&v, U"hello Everybody"));
-        TEST(!uw_equal(&v2, U"hello Everybody"));
+        TEST(uw_equal_cstr(&v, "hello pet"));
+        TEST(uw_equal_cstr(&v2, "hello pet"));
+        TEST(!uw_equal_cstr(&v, "hello Pet"));
+        TEST(!uw_equal_cstr(&v2, "hello Pet"));
+        TEST(uw_equal(&v, "hello pet"));
+        TEST(uw_equal(&v2, "hello pet"));
+        TEST(!uw_equal(&v, "hello Pet"));
+        TEST(!uw_equal(&v2, "hello Pet"));
+        TEST(uw_equal(&v, u8"hello pet"));
+        TEST(uw_equal(&v2, u8"hello pet"));
+        TEST(!uw_equal(&v, u8"hello Pet"));
+        TEST(!uw_equal(&v2, u8"hello Pet"));
+        TEST(uw_equal(&v, U"hello pet"));
+        TEST(uw_equal(&v2, U"hello pet"));
+        TEST(!uw_equal(&v, U"hello Pet"));
+        TEST(!uw_equal(&v2, U"hello Pet"));
 
-        UwValue v3 = uw_create("hello everybody");
+        UwValue v3 = uw_create("hello pet");
         // test C string
         UW_CSTRING_LOCAL(cv3, &v3);
-        TEST(strcmp(cv3, "hello everybody") == 0);
+        TEST(strcmp(cv3, "hello pet") == 0);
 
         // test substring
-        TEST(uw_substring_eq_cstr(&v, 4, 7, "o e"));
+        TEST(uw_substring_eq_cstr(&v, 4, 7, "o p"));
         TEST(!uw_substring_eq_cstr(&v, 4, 7, ""));
         TEST(uw_substring_eq_cstr(&v, 0, 4, "hell"));
-        TEST(uw_substring_eq_cstr(&v, 11, 100, "body"));
-        TEST(uw_substring_eq(&v, 4, 7, "o e"));
+        TEST(uw_substring_eq_cstr(&v, 7, 100, "et"));
+        TEST(uw_substring_eq(&v, 4, 7, "o p"));
         TEST(!uw_substring_eq(&v, 4, 7, ""));
         TEST(uw_substring_eq(&v, 0, 4, "hell"));
-        TEST(uw_substring_eq(&v, 11, 100, "body"));
-        TEST(uw_substring_eq(&v, 4, 7, u8"o e"));
+        TEST(uw_substring_eq(&v, 7, 100, "et"));
+        TEST(uw_substring_eq(&v, 4, 7, u8"o p"));
         TEST(!uw_substring_eq(&v, 4, 7, u8""));
         TEST(uw_substring_eq(&v, 0, 4, u8"hell"));
-        TEST(uw_substring_eq(&v, 11, 100, u8"body"));
-        TEST(uw_substring_eq(&v, 4, 7, U"o e"));
+        TEST(uw_substring_eq(&v, 7, 100, u8"et"));
+        TEST(uw_substring_eq(&v, 4, 7, U"o p"));
         TEST(!uw_substring_eq(&v, 4, 7, U""));
         TEST(uw_substring_eq(&v, 0, 4, U"hell"));
-        TEST(uw_substring_eq(&v, 11, 100, U"body"));
+        TEST(uw_substring_eq(&v, 7, 100, U"et"));
 
         // test erase and truncate
         uw_string_erase(&v, 4, 255);
@@ -492,7 +492,7 @@ void test_string()
         TEST(uw_equal(&v, ""));
 
         TEST(_uw_string_length(&v) == 0);
-        TEST(_uw_string_capacity(&v) == 278);
+        TEST(_uw_string_capacity(&v) == 262);
         //uw_dump(stderr, &v);
 
         // test append substring
@@ -508,7 +508,7 @@ void test_string()
         uw_string_append(&v, u8"สวัสดี");
 
         TEST(_uw_string_length(&v) == 6);
-        TEST(_uw_string_capacity(&v) == 283);  // capacity is slightly changed because of alignment and char_size increase
+        TEST(_uw_string_capacity(&v) == 267);  // capacity is slightly changed because of alignment and char_size increase
         TEST(_uw_string_char_size(&v) == 2);
         TEST(uw_equal(&v, u8"สวัสดี"));
         //uw_dump(stderr, &v);
