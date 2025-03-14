@@ -106,7 +106,7 @@ char* uw_status_str(uint16_t status_code)
 UwResult uw_status_desc(UwValuePtr status)
 {
     if (!status) {
-        return UwString_1_12(4, 'n', 'u', 'l', 'l', 0, 0, 0, 0, 0, 0, 0, 0);
+        return UwString_1_12(6, '(', 'n', 'u', 'l', 'l', ')', 0, 0, 0, 0, 0, 0);
     }
     if (!uw_is_status(status)) {
         return UwString_1_12(10, 'b', 'a', 'd', ' ', 's', 't', 'a', 't', 'u', 's', 0, 0);
@@ -117,7 +117,7 @@ UwResult uw_status_desc(UwValuePtr status)
             return uw_clone(&status_data->description);
         }
     }
-    return UwString_1_12(4, 'n', 'o', 'n', 'e', 0, 0, 0, 0, 0, 0, 0, 0);
+    return UwString_1_12(6, '(', 'n', 'o', 'n', 'e', ')', 0, 0, 0, 0, 0, 0);
 }
 
 void _uw_set_status_desc(UwValuePtr status, char* fmt, ...)
