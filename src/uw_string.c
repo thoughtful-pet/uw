@@ -1805,7 +1805,7 @@ UwResult uw_substr(UwValuePtr str, unsigned start_pos, unsigned end_pos)
         strmeth->copy_to(src, &result, 0, length);
         _uw_string_set_length(&result, length);
     }
-    return result;
+    return uw_move(&result);
 }
 
 char32_t uw_char_at(UwValuePtr str, unsigned position)
