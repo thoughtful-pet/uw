@@ -1007,6 +1007,9 @@ UwTypeId uw_add_type(UwType* type)
 
 UwTypeId uw_subtype(UwType* type, char* name, UwTypeId ancestor_id, unsigned data_size)
 {
+    // the order constructor are called is undefined, make sure _uw_types is initialized
+    init_uw_types();
+
     uw_assert(ancestor_id != UwTypeId_Null);
 
     UwType* ancestor = _uw_types[ancestor_id];
